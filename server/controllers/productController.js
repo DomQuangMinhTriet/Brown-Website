@@ -4,14 +4,18 @@ const supabase = require('../config/supabase');
 // Lấy danh sách
 exports.getProducts = async (req, res) => {
     try {
-        const { data, error } = await supabase.from('products').select('*');
+        // THÊM: , variants(*) vào trong select để lấy kèm các biến thể
+        const { data, error } = await supabase
+            .from('products')
+            .select('*, variants(*)') 
+            .order('created_at', { ascending: false });
+
         if (error) throw error;
-        res.json({ success: true, count: data.length, data: data });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };
-
 //Tạo sản phẩm
 exports.createProduct = async (req, res) => {
     try {

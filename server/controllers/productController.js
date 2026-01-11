@@ -90,15 +90,47 @@ exports.createProduct = async (req, res) => {
 exports.getProductBySlug = async (req, res) => {
     try {
         const { slug } = req.params;
-        const { data, error } = await supabase
+        
+        // 1. Lấy thông tin sản phẩm và các biến thể
+        const { data: product, error } = await supabase
             .from('products')
-            .select(`*, variants(*)`) // Lấy kèm biến thể
+            .select(`
+                *,
+                variants (*)
+            `)
             .eq('slug', slug)
             .single();
-            
+
         if (error) throw error;
-        res.json({ success: true, data: data });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        if (!product) return res.status(404).json({ success: false, message: 'Not found' });
+
+        // 2. TÍNH TOÁN TỒN KHO CHO TỪNG BIẾN THỂ (MỚI)
+        // Lấy danh sách ID của các biến thể
+        const variantIds = product.variants.map(v => v.id);
+
+        // Lấy tất cả các lô hàng (batches) của các biến thể này
+        const { data: batches } = await supabase
+            .from('inventory_batches')
+            .select('variant_id, quantity_remaining')
+            .in('variant_id', variantIds);
+
+        // Cộng dồn số lượng tồn kho theo từng variant_id
+        const stockMap = {};
+        batches.forEach(batch => {
+            if (!stockMap[batch.variant_id]) stockMap[batch.variant_id] = 0;
+            stockMap[batch.variant_id] += batch.quantity_remaining;
+        });
+
+        // Gán số lượng tồn kho ngược lại vào mảng variants
+        product.variants = product.variants.map(v => ({
+            ...v,
+            inventory: stockMap[v.id] || 0 // Nếu không có batch nào thì tồn = 0
+        }));
+
+        res.json({ success: true, data: product });
+
+    } catch (error) {
+        console.error("Lỗi lấy sản phẩm:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -1,9 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { FaHome, FaBox, FaWarehouse, FaTruck, FaChartBar, FaTimes } from 'react-icons/fa';
-<<<<<<< Updated upstream
-=======
 import { FaMoneyBillWave } from 'react-icons/fa';
->>>>>>> Stashed changes
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
@@ -13,10 +10,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { path: '/products', name: 'Sản phẩm', icon: <FaBox /> },
     { path: '/inventory', name: 'Kho & Nhập hàng', icon: <FaWarehouse /> },
     { path: '/orders', name: 'Đơn hàng', icon: <FaTruck /> },
-<<<<<<< Updated upstream
-=======
     { path: '/expenses', name: 'Tài chính & Chi phí', icon: <FaMoneyBillWave /> }, // <--- THÊM MỚI
->>>>>>> Stashed changes
     { path: '/reports', name: 'Báo cáo', icon: <FaChartBar /> },
   ];
 
@@ -32,11 +26,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       <div className={`fixed top-0 left-0 h-full w-72 bg-stone-100 border-r border-stone-200 z-40 transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Logo & Nút đóng */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-stone-200 bg-stone-100">
-<<<<<<< Updated upstream
-          <h1 className="text-2xl font-bold text-stone-800 tracking-[0.2em]">MUSE</h1>
-=======
           <h1 className="text-2xl font-bold text-stone-800 tracking-[0.2em]">BROWN</h1>
->>>>>>> Stashed changes
           <button onClick={toggleSidebar} className="md:hidden text-stone-500 focus:outline-none">
             <FaTimes className="w-5 h-5" />
           </button>

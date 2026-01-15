@@ -5,7 +5,10 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Collection from './pages/Collection';
 import Checkout from './pages/Checkout';
-
+// --- IMPORT CÁC TRANG TÀI KHOẢN ---
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile'; // Trang này chúng ta tạo ở bước trước
 
 function App() {
   return (
@@ -18,9 +21,13 @@ function App() {
           <Route path="/product/:slug" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} /> 
           <Route path="/checkout" element={<Checkout />} />
+          
+          {/* --- CÁC ROUTE MỚI --- */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/account" element={<Profile />} />
         </Routes>
         
-        {/* Footer đơn giản */}
         <footer className="bg-stone-900 text-stone-400 py-12 text-center text-sm">
           © 2026 BROWN FASHION. All rights reserved.
         </footer>

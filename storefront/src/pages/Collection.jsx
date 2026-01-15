@@ -1,68 +1,114 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { FaSearch, FaStore, FaShoppingCart } from 'react-icons/fa';
+import { useCart } from '../context/CartContext'; // Import Cart
 
 const Collection = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { cartCount, cartTotal } = useCart(); // Lấy thông tin giỏ hàng
+  const navigate = useNavigate();
+  
+  // Lấy tham số POS
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search');
+  const isPosMode = searchParams.get('pos') === 'true'; // Kiểm tra chế độ POS
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
-        const res = await axios.get('http://localhost:5000/api/products');
-        if (res.data.success) {
-          setProducts(res.data.data);
-        }
-      } catch (error) {
-        console.error("Lỗi tải sản phẩm:", error);
-      } finally {
-        setLoading(false);
-      }
+        const endpoint = searchQuery 
+            ? `http://localhost:5000/api/products?search=${encodeURIComponent(searchQuery)}`
+            : 'http://localhost:5000/api/products';
+
+        const res = await axios.get(endpoint);
+        if (res.data.success) setProducts(res.data.data);
+      } catch (error) { console.error(error); } 
+      finally { setLoading(false); }
     };
     fetchProducts();
-  }, []);
+  }, [searchQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl font-serif text-stone-900 mb-4">Tất Cả Sản Phẩm</h1>
-        <p className="text-stone-500">Khám phá những thiết kế mới nhất từ BROWN</p>
+    <div className={isPosMode ? "bg-stone-100 min-h-screen pb-24" : ""}>
+      
+      {/* 1. HEADER POS MODE */}
+      {isPosMode && (
+          <div className="bg-red-700 text-white p-4 shadow-md sticky top-20 z-40 flex justify-between items-center">
+             <div className="font-bold text-lg flex items-center gap-2 uppercase">
+                <FaStore/> Chọn sản phẩm (POS)
+             </div>
+             <button onClick={() => window.close()} className="text-xs underline opacity-80 hover:opacity-100">
+                Thoát
+             </button>
+          </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Title & Search... (Giữ nguyên logic cũ) */}
+        <div className="text-center mb-10">
+            <h1 className="text-3xl font-serif text-stone-900 mb-2">
+                {searchQuery ? `Tìm: "${searchQuery}"` : 'Danh Sách Sản Phẩm'}
+            </h1>
+        </div>
+
+        {/* LIST SẢN PHẨM */}
+        {loading ? (
+            <div className="text-center py-20">Đang tải...</div>
+        ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map(product => (
+                <Link 
+                    // QUAN TRỌNG: Nếu đang ở POS, khi bấm vào sản phẩm phải giữ nguyên ?pos=true
+                    to={`/product/${product.slug}${isPosMode ? '?pos=true' : ''}`} 
+                    key={product.id} 
+                    className="bg-white p-3 rounded shadow-sm hover:shadow-md transition-all group block"
+                >
+                <div className="aspect-[3/4] bg-stone-200 overflow-hidden rounded mb-3 relative">
+                    <img 
+                        src={product.images?.[0]} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                    {isPosMode && (
+                        <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">CHỌN MUA</span>
+                        </div>
+                    )}
+                </div>
+                <h3 className="font-medium text-stone-900 text-sm truncate">{product.name}</h3>
+                <p className="text-stone-500 font-bold mt-1">
+                    {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                </p>
+                </Link>
+            ))}
+            </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className="text-center py-20 text-stone-400">Đang tải danh sách...</div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-10">
-          {products.map((product) => (
-            <Link to={`/product/${product.slug}`} key={product.id} className="group block">
-              <div className="aspect-[3/4] bg-stone-100 mb-4 overflow-hidden relative">
-                {product.images?.[0] ? (
-                  <img 
-                    src={product.images[0]} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-stone-300 bg-stone-50">No Image</div>
-                )}
-                {/* Nút xem nhanh */}
-                <div className="absolute inset-x-0 bottom-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                  <button className="w-full bg-white/90 backdrop-blur text-stone-900 py-3 text-xs uppercase tracking-widest font-bold hover:bg-stone-900 hover:text-white transition-colors">
-                    Xem chi tiết
-                  </button>
+      {/* 2. THANH THANH TOÁN (CHỈ HIỆN KHI Ở POS) */}
+      {isPosMode && (
+        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-stone-200 p-4 shadow-[0_-5px_10px_rgba(0,0,0,0.1)] z-50 flex justify-between items-center">
+            <div className="flex items-center gap-4">
+                <div className="bg-stone-900 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl relative">
+                    <FaShoppingCart />
+                    {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border border-white">{cartCount}</span>}
                 </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-stone-900 text-sm group-hover:text-stone-600 transition-colors">
-                  {product.name}
-                </h3>
-                <p className="text-stone-500 text-sm mt-1">
-                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.base_price)}
-                </p>
-              </div>
-            </Link>
-          ))}
+                <div>
+                    <p className="text-xs text-stone-500 uppercase">Tổng tiền tạm tính</p>
+                    <p className="text-xl font-bold text-stone-900">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</p>
+                </div>
+            </div>
+            
+            <button 
+                onClick={() => navigate('/checkout?pos=true')} // Chuyển sang trang thanh toán POS
+                disabled={cartCount === 0}
+                className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded font-bold uppercase tracking-widest disabled:bg-gray-300 transition-colors"
+            >
+                Thanh Toán Ngay
+            </button>
         </div>
       )}
     </div>

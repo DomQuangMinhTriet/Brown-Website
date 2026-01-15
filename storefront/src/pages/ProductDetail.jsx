@@ -3,10 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { FaStore, FaArrowLeft, FaStar, FaShoppingCart, FaCheck } from 'react-icons/fa';
-<<<<<<< Updated upstream
-=======
 import SEO from '../components/SEO'; // <--- IMPORT
->>>>>>> Stashed changes
 
 const ProductDetail = () => {
   const { slug } = useParams();
@@ -112,11 +109,7 @@ const ProductDetail = () => {
       )}
 
       {/* 2. NỘI DUNG CHÍNH */}
-<<<<<<< Updated upstream
-      <div className="max-w-6xl mx-auto px-6 py-10">
-=======
       <div className="max-w-7xl mx-auto px-6 py-10">
->>>>>>> Stashed changes
         
         {/* Breadcrumb / Back Button (Cho chế độ thường) */}
         {!isPosMode && (
@@ -126,8 +119,6 @@ const ProductDetail = () => {
                  </button>
             </div>
         )}
-<<<<<<< Updated upstream
-=======
         
         {/* --- THÊM SEO ĐỘNG --- */}
         <SEO 
@@ -136,7 +127,6 @@ const ProductDetail = () => {
           image={product.images?.[0]} // Lấy ảnh đầu tiên làm ảnh thumbnail khi share
           url={`/product/${product.slug}`}
         />
->>>>>>> Stashed changes
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
             

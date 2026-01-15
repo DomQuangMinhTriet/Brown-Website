@@ -17,7 +17,15 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+<<<<<<< Updated upstream
     "multer": "^2.0.2",
+=======
+<<<<<<< Updated upstream
+=======
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.12",
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
     "postgres": "^3.4.8"
   },
   "devDependencies": {

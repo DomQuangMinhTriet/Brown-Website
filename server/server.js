@@ -15,6 +15,7 @@ const reportRoutes = require('./routes/reportRoutes');   // <--- MỚI
 const customerRoutes = require('./routes/customerRoutes'); // <--- Thêm
 const promotionRoutes = require('./routes/promotionRoutes'); // <--- Thêm
 const shippingRoutes = require('./routes/shippingRoutes');
+const contentRoutes = require('./routes/contentRoutes');
 
 
 
@@ -37,7 +38,7 @@ app.use('/api/reports', reportRoutes);   // <--- Đảm bảo dòng này có
 app.use('/api/customers', customerRoutes); // <--- Thêm
 app.use('/api/promotions', promotionRoutes); // <--- Đăng ký
 app.use('/api/shipping', shippingRoutes);
-
+app.use('/api/content', contentRoutes);
 
 app.get('/', (req, res) => res.send('API Running...'));
 

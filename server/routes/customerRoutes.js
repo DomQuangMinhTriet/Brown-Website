@@ -6,6 +6,7 @@ const requireAuth = require('../middleware/authMiddleware'); // <--- Import Midd
 // Các Route Admin (Giữ nguyên hoặc thêm middleware Admin nếu cần)
 router.get('/', customerController.getCustomers);
 router.get('/:id', customerController.getCustomerDetail); // Lưu ý: Route này có thể xung đột với /profile bên dưới nếu id giống profile
+router.get('/:id/history', customerController.getCustomerHistory);
 
 // --- ROUTE CHO KHÁCH HÀNG (Cần đăng nhập) ---
 // Đặt route này LÊN TRƯỚC route /:id để tránh bị nhầm 'profile' là 1 cái id

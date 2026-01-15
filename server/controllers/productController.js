@@ -4,12 +4,36 @@ const supabase = require('../config/supabase');
 // Lấy danh sách
 exports.getProducts = async (req, res) => {
     try {
+<<<<<<< Updated upstream
         // THÊM: , variants(*) vào trong select để lấy kèm các biến thể
         const { data, error } = await supabase
             .from('products')
             .select('*, variants(*)') 
             .order('created_at', { ascending: false });
 
+=======
+<<<<<<< Updated upstream
+        const { data, error } = await supabase.from('products').select('*');
+=======
+        // Lấy tham số search từ URL (VD: /api/products?search=ao)
+        const { search } = req.query;
+
+        let query = supabase
+            .from('products')
+            .select('*, variants(*)')
+            .order('created_at', { ascending: false });
+
+        // NẾU CÓ TỪ KHÓA TÌM KIẾM -> THÊM ĐIỀU KIỆN LỌC
+        if (search) {
+            // ilike là tìm kiếm không phân biệt hoa thường (Case-insensitive)
+            // %search% là tìm kiếm tương đối (chứa từ khóa)
+            query = query.ilike('name', `%${search}%`);
+        }
+
+        const { data, error } = await query;
+
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
         if (error) throw error;
         res.json({ success: true, data });
     } catch (error) {

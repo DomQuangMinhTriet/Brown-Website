@@ -4,6 +4,11 @@ const cors = require('cors');
 
 // Import các Routes
 const productRoutes = require('./routes/productRoutes');
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 const uploadRoutes = require('./routes/uploadRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const masterRoutes = require('./routes/masterRoutes');
@@ -11,6 +16,14 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const expenseRoutes = require('./routes/expenseRoutes'); // <--- MỚI
 const reportRoutes = require('./routes/reportRoutes');   // <--- MỚI
+<<<<<<< Updated upstream
+=======
+const customerRoutes = require('./routes/customerRoutes'); // <--- Thêm
+const promotionRoutes = require('./routes/promotionRoutes'); // <--- Thêm
+const shippingRoutes = require('./routes/shippingRoutes');
+
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -20,6 +33,11 @@ app.use(express.json());
 
 // --- ĐĂNG KÝ ROUTE (QUAN TRỌNG) ---
 app.use('/api/products', productRoutes);
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api', masterRoutes); // stores, suppliers
@@ -27,6 +45,13 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/expenses', expenseRoutes); // <--- Đảm bảo dòng này có
 app.use('/api/reports', reportRoutes);   // <--- Đảm bảo dòng này có
+<<<<<<< Updated upstream
+=======
+app.use('/api/customers', customerRoutes); // <--- Thêm
+app.use('/api/promotions', promotionRoutes); // <--- Đăng ký
+app.use('/api/shipping', shippingRoutes);
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 app.get('/', (req, res) => res.send('API Running...'));
 

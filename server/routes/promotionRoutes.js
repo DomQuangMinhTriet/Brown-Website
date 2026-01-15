@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/promotionController');
-const requireAuth = require('../middleware/authMiddleware'); // Nếu cần check login
+const promotionController = require('../controllers/promotionController');
 
-router.post('/check', controller.checkVoucher); // Có thể thêm requireAuth nếu muốn
+// Admin quản lý
+router.get('/', promotionController.getAllPromotions);
+router.post('/', promotionController.createPromotion);
+router.delete('/:id', promotionController.deletePromotion);
+
+// Public check
+router.post('/check', promotionController.checkVoucher);
+
 module.exports = router;

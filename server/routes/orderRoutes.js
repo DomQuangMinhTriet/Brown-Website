@@ -1,14 +1,18 @@
+// server/routes/orderRoutes.js
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 
-// Khách hàng tạo đơn
-router.post('/', orderController.createOrder);
+// Import Middleware và Schema vừa tạo
+const validate = require('../middleware/validateMiddleware');
+const { createOrderSchema } = require('../validators/orderSchema');
 
-// Admin xem danh sách
+// --- CẬP NHẬT ROUTE NÀY ---
+// Thêm validate(createOrderSchema) vào giữa
+router.post('/', validate(createOrderSchema), orderController.createOrder);
+
+// Các route khác giữ nguyên
 router.get('/', orderController.getAllOrders);
-
-// Admin cập nhật trạng thái
 router.put('/:id/status', orderController.updateOrderStatus);
 
 module.exports = router;

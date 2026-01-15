@@ -1,15 +1,19 @@
 const express = require('express');
 const router = express.Router();
-// Import controller (chúng ta sẽ tạo ngay sau đây)
 const productController = require('../controllers/productController');
 
-// Định nghĩa: GET / -> gọi hàm getProducts
-router.get('/', productController.getProducts);
+// Import Cache
+const { verifyCache } = require('../middleware/cacheMiddleware');
 
-// POST /api/products -> Tạo mới (MỚI THÊM)
+// --- ÁP DỤNG CACHE ---
+// Cache 300 giây (5 phút) cho danh sách sản phẩm
+// Vì danh sách sản phẩm trang chủ ít khi thay đổi trong 5 phút
+router.get('/', verifyCache(300), productController.getProducts);
+
+// Cache 600 giây (10 phút) cho chi tiết sản phẩm
+router.get('/:slug', verifyCache(600), productController.getProductBySlug);
+
+// Các route ghi (Tạo/Sửa/Xóa) KHÔNG ĐƯỢC CACHE
 router.post('/', productController.createProduct);
-
-// Định nghĩa: GET /:slug -> gọi hàm getProductBySlug
-router.get('/:slug', productController.getProductBySlug);
 
 module.exports = router;

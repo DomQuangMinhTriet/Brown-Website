@@ -92,7 +92,9 @@ exports.createProduct = async (req, res) => {
 
             if (variantError) throw variantError;
         }
-
+        
+        clearCache('/api/products');
+        
         res.json({ success: true, data: productData, message: 'Tạo sản phẩm thành công!' });
 
     } catch (error) {

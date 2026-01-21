@@ -16,6 +16,21 @@ const Collection = () => {
   const isPosMode = searchParams.get('pos') === 'true'; // Kiểm tra chế độ POS
   const categorySlug = searchParams.get('category'); // <--- LẤY SLUG DANH MỤC
 
+
+  const getCategoryName = () => {
+    if (!products || products.length === 0) return "";
+    
+    const firstProduct = products[0];
+    const cat = firstProduct.categories;
+
+    // Trường hợp 1: categories là Object (Chuẩn)
+    if (cat && cat.name) return cat.name;
+    
+    // Trường hợp 2: categories là Array (Do Supabase trả về mảng)
+    if (Array.isArray(cat) && cat.length > 0) return cat[0].name;
+
+    return "Sản phẩm";
+  };
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -70,7 +85,7 @@ const Collection = () => {
                 {searchQuery 
                     ? `Kết quả tìm kiếm: "${searchQuery}"` 
                     : categorySlug 
-                        ? `Danh mục: ${products[0]?.categories?.name || 'Sản phẩm'}` 
+                        ? `Danh mục: ${getCategoryName()}` // <--- Dùng hàm này thay vì viết trực tiếp
                         : "Tất cả sản phẩm"}
             </h2>
         </div>

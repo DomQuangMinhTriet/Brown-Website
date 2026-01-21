@@ -18,7 +18,11 @@ const orderSchema = z.object({
         variant_id: z.number().int().positive(),
         quantity: z.number().int().min(1, "Số lượng phải lớn hơn 0")
     })).min(1, "Giỏ hàng không được để trống"),
+<<<<<<< HEAD
     payment_method: z.enum(['cod', 'banking'], { 
+=======
+    payment_method: z.enum(['done', 'banking'], { 
+>>>>>>> Frontend
         errorMap: () => ({ message: "Phương thức thanh toán không hợp lệ" }) 
     }),
     voucher_code: z.string().nullable().optional(),
@@ -42,8 +46,17 @@ exports.createOrder = async (req, res) => {
 
         const { customer, items, payment_method, voucher_code, shipping_fee, note } = parseResult.data;
         
+<<<<<<< HEAD
         // B. LẤY ID KHÁCH HÀNG (Nếu đã đăng nhập)
         let customerId = null;
+=======
+        // ==============================================================================
+        // B. [ĐÃ CHỈNH SỬA] XÁC ĐỊNH KHÁCH HÀNG (Ưu tiên Login -> Tìm SĐT -> Tạo mới)
+        // ==============================================================================
+        let customerId = null;
+
+        // 1. Kiểm tra nếu khách đã đăng nhập
+>>>>>>> Frontend
         if (req.user && req.user.id) {
              const { data: cusData } = await supabase
                 .from('customers')
@@ -53,6 +66,41 @@ exports.createOrder = async (req, res) => {
              if (cusData) customerId = cusData.id;
         }
 
+<<<<<<< HEAD
+=======
+        // 2. Nếu chưa có ID (Khách vãng lai), tìm trong Database bằng Số điện thoại
+        // Bước này giúp gộp đơn hàng vào lịch sử của khách cũ
+        if (!customerId && customer.phone) {
+            const { data: existingCus } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('phone', customer.phone)
+                .single();
+
+            if (existingCus) {
+                // -> Tìm thấy khách cũ: Dùng ID đó luôn
+                customerId = existingCus.id;
+            } else {
+                // -> Khách mới hoàn toàn: Tạo hồ sơ khách hàng mới
+                const { data: newCus, error: createError } = await supabase
+                    .from('customers')
+                    .insert([{
+                        full_name: customer.fullName || customer.name || "Khách mới",
+                        phone: customer.phone,
+                        email: customer.email || null,
+                        address: customer.address || null
+                        // Không có user_id vì là khách vãng lai
+                    }])
+                    .select('id')
+                    .single();
+                
+                if (!createError && newCus) {
+                    customerId = newCus.id;
+                }
+            }
+        }
+        // ==============================================================================
+>>>>>>> Frontend
         // C. CHUẨN BỊ DỮ LIỆU & BẢO MẬT GIÁ
         // Hacker có thể sửa giá ở Frontend, nên ta phải lấy giá gốc từ Database
         const cleanItems = [];
@@ -113,11 +161,18 @@ exports.createOrder = async (req, res) => {
         }
 
         // E. GỌI DATABASE TRANSACTION (RPC)
+<<<<<<< HEAD
         // Đây là bước quan trọng nhất: Gửi toàn bộ dữ liệu sạch xuống SQL xử lý
         const { data, error } = await supabase.rpc('create_order_transaction', {
             p_customer_id: customerId,
             p_customer_info: {
                 name: customer.fullName,
+=======
+        const { data, error } = await supabase.rpc('create_order_transaction', {
+            p_customer_id: customerId,
+            p_customer_info: {
+                name: customer.fullName || customer.name || "Khách hàng", // Fallback nhiều trường hợp
+>>>>>>> Frontend
                 phone: customer.phone,
                 email: customer.email,
                 address: customer.address + (customer.province ? `, ${customer.district}, ${customer.province}` : '')
@@ -131,6 +186,7 @@ exports.createOrder = async (req, res) => {
 
         if (error) {
             console.error("RPC Error:", error);
+<<<<<<< HEAD
             // Lỗi từ SQL trả về (ví dụ: "Sản phẩm không đủ hàng")
             return res.status(400).json({ success: false, message: error.message });
         }
@@ -143,6 +199,29 @@ exports.createOrder = async (req, res) => {
             shipping_tracking_code: 'Đang cập nhật' 
         };
         sendOrderConfirmation(orderInfoForMail, customer.email).catch(console.error);
+=======
+            return res.status(400).json({ success: false, message: error.message });
+        }
+
+        // --- F. SỬA LỖI EMAIL (QUAN TRỌNG) ---
+        // Lấy dữ liệu từ req.body làm chuẩn nếu RPC trả về thiếu
+        const emailCustomerName = data.customer_name || customer.fullName || customer.name || "Quý khách";
+        const emailTotalAmount = data.total_amount || (subtotal_check + shipping_fee - discount_amount);
+        const emailAddress = customer.email; // Email người nhận
+
+        if (emailAddress) {
+            const orderInfoForMail = {
+                customer_name: emailCustomerName,
+                code: data.order_code,
+                // Ép kiểu số và format ngay tại đây để tránh NaN
+                total_amount: new Intl.NumberFormat('vi-VN').format(Number(emailTotalAmount)), 
+                shipping_tracking_code: 'Đang cập nhật' 
+            };
+            
+            // Gọi hàm gửi mail (không await để phản hồi nhanh)
+            sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Error:", err));
+        }
+>>>>>>> Frontend
 
         res.json({ 
             success: true, 
@@ -152,7 +231,11 @@ exports.createOrder = async (req, res) => {
 
     } catch (error) {
         console.error("Order Controller Error:", error);
+<<<<<<< HEAD
         res.status(500).json({ success: false, message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
+=======
+        res.status(500).json({ success: false, message: 'Lỗi hệ thống: ' + error.message });
+>>>>>>> Frontend
     }
 };
 
@@ -236,4 +319,178 @@ exports.updateOrderStatus = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
+<<<<<<< HEAD
 };
+=======
+};
+
+exports.createAdminOrder = async (req, res) => {
+    try {
+        const { customer, items, payment_method, note, is_paid } = req.body;
+
+        // --- BƯỚC 1: TÌM HOẶC TẠO KHÁCH HÀNG (GIỮ NGUYÊN) ---
+        let customerId = null;
+        const { data: existingCus } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('phone', customer.phone)
+            .single();
+
+        if (existingCus) {
+            customerId = existingCus.id;
+        } else {
+            const { data: newCus, error: createError } = await supabase
+                .from('customers')
+                .insert([{
+                    full_name: customer.fullName,
+                    phone: customer.phone,
+                    address: customer.address || "Tại quầy",
+                    email: customer.email || null
+                }])
+                .select()
+                .single();
+            
+            if (createError) throw new Error("Lỗi tạo khách hàng: " + createError.message);
+            customerId = newCus.id;
+        }
+
+        // --- BƯỚC 2: TÍNH TOÁN TIỀN (GIỮ NGUYÊN) ---
+        const itemTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const orderCode = `#ADM-${Date.now().toString().slice(-6)}`;
+
+        // --- BƯỚC 3: XỬ LÝ GHI CHÚ (GIỮ NGUYÊN) ---
+        let finalNote = note || "";
+        if (is_paid === true || is_paid === 'true') {
+            finalNote += " [ĐÃ THANH TOÁN]";
+        }
+
+        // --- BƯỚC 4: TẠO ĐƠN HÀNG (GIỮ NGUYÊN) ---
+        const orderPayload = {
+            code: orderCode,
+            customer_id: customerId,
+            customer_name: customer.fullName,
+            customer_phone: customer.phone,
+            customer_address: customer.address || "Tại quầy", 
+            
+            subtotal: itemTotal,      
+            total_amount: itemTotal,  
+            shipping_fee: 0,          
+            discount_amount: 0,       
+
+            payment_method: payment_method || 'cod',
+            status: 'pending',
+            note: finalNote.trim()
+        };
+
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .insert([orderPayload])
+            .select()
+            .single();
+
+        if (orderError) throw orderError;
+
+        // --- BƯỚC 5: LƯU CHI TIẾT SẢN PHẨM (GIỮ NGUYÊN) ---
+        const orderItems = items.map(item => ({
+            order_id: order.id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            price_at_purchase: item.price || 0 
+        }));
+
+        const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+        if (itemsError) throw itemsError;
+
+        // ============================================================
+        // --- BƯỚC 6: TRỪ TỒN KHO THEO LÔ (FIFO - MỚI) ---
+        // ============================================================
+        console.log("--- BẮT ĐẦU TRỪ KHO FIFO ---");
+
+        for (const item of items) {
+            let remainingNeeded = item.quantity; // Số lượng cần trừ
+
+            // A. Tìm các lô hàng (batches) còn hàng, sắp xếp cũ nhất lên đầu (created_at ASC)
+            const { data: batches } = await supabase
+                .from('inventory_batches')
+                .select('id, quantity_remaining, created_at')
+                .eq('variant_id', item.variant_id)
+                .gt('quantity_remaining', 0) // Chỉ lấy lô > 0
+                .order('created_at', { ascending: true }); // FIFO: Cũ nhất trước
+
+            // B. Duyệt qua từng lô để trừ
+            if (batches && batches.length > 0) {
+                for (const batch of batches) {
+                    if (remainingNeeded <= 0) break; // Đã trừ đủ thì dừng
+
+                    // Lấy số lượng có thể trừ ở lô này (Min giữa cần trừ và có sẵn)
+                    const deductAmount = Math.min(batch.quantity_remaining, remainingNeeded);
+
+                    // Cập nhật lô hàng này
+                    await supabase
+                        .from('inventory_batches')
+                        .update({ quantity_remaining: batch.quantity_remaining - deductAmount })
+                        .eq('id', batch.id);
+
+                    console.log(`-> Trừ ${deductAmount} từ Batch #${batch.id}`);
+                    remainingNeeded -= deductAmount;
+                }
+            }
+
+            // C. Cập nhật Tổng tồn kho (product_variants) để đồng bộ hiển thị
+            // Lấy tổng tồn kho hiện tại
+            const { data: variant } = await supabase
+                .from('product_variants')
+                .select('quantity_remaining') 
+                .eq('id', item.variant_id)
+                .single();
+
+            if (variant) {
+                // Trừ thẳng vào tổng số lượng
+                const newTotal = Math.max(0, (variant.quantity_remaining || 0) - item.quantity);
+                
+                await supabase
+                    .from('product_variants')
+                    .update({ quantity_remaining: newTotal }) 
+                    .eq('id', item.variant_id);
+            }
+        }
+        console.log("--- HOÀN TẤT TRỪ KHO ---");
+
+        // Chỉ gửi phản hồi 1 lần duy nhất ở cuối cùng
+        res.json({ success: true, message: "Tạo đơn thành công!", orderCode });
+
+    } catch (error) {
+        console.error("Create Admin Order Error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+};
+// 2. Hàm phụ trợ: Trừ kho theo nguyên tắc nhập trước xuất trước (FIFO)
+async function decreaseStock(variantId, qtyNeeded) {
+    // Lấy các lô hàng còn tồn của variant này, xếp theo cũ nhất trước
+    const { data: batches } = await supabase
+        .from('inventory_batches')
+        .select('*')
+        .eq('variant_id', variantId)
+        .gt('quantity_remaining', 0)
+        .order('created_at', { ascending: true });
+
+    let remainingToDeduct = qtyNeeded;
+
+    for (const batch of batches) {
+        if (remainingToDeduct <= 0) break;
+
+        // Lấy số lượng có thể trừ từ lô này
+        const deduct = Math.min(batch.quantity_remaining, remainingToDeduct);
+        
+        // Cập nhật lại lô hàng
+        await supabase
+            .from('inventory_batches')
+            .update({ quantity_remaining: batch.quantity_remaining - deduct })
+            .eq('id', batch.id);
+
+        remainingToDeduct -= deduct;
+    }
+}
+>>>>>>> Frontend

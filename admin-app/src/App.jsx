@@ -21,6 +21,7 @@ import Expenses from './pages/Expenses';
 import Customers from './pages/Customer';
 import Appearance from './pages/Appearance';
 import Promotions from './pages/Promotions'; // <--- IMPORT TRANG MỚI
+import CreateOrder from './pages/CreateOrder';
 
 // Layout bọc để kích hoạt Realtime Notification
 const AdminLayout = ({ children }) => {
@@ -55,6 +56,7 @@ function App() {
                       <Route path="/appearance" element={<Appearance />} />
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/expenses" element={<Expenses />} />
+                      <Route path="/orders/create" element={<CreateOrder />} />
                     </Routes>
                   </div>
                 </AdminLayout>

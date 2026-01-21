@@ -1,205 +1,251 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaMoneyBillAlt, FaPlus, FaTrash, FaCalendarAlt, FaStore, FaTag } from 'react-icons/fa';
+import { FaPlus, FaStore, FaTrash } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const Expenses = () => {
-  const [expenses, setExpenses] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [stores, setStores] = useState([]);
-  
-  // Form State
-  const [formData, setFormData] = useState({
-    amount: '',
-    category_id: '',
-    store_id: '',
-    note: '',
-    expense_date: new Date().toISOString().split('T')[0]
-  });
+    // --- STATE DỮ LIỆU ---
+    const [expenses, setExpenses] = useState([]);
+    const [stores, setStores] = useState([]); 
+    const [categories, setCategories] = useState([]); 
 
-  const [loading, setLoading] = useState(true);
+    // --- STATE FORM NHẬP LIỆU ---
+    const [newExpense, setNewExpense] = useState({
+        note: '',           
+        amount: '',         
+        category_id: '',    
+        store_id: '',       
+        expense_date: new Date().toISOString().split('T')[0]
+    });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+    // --- [MỚI] STATE TẠO DANH MỤC NHANH ---
+    const [isAddingType, setIsAddingType] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
 
-  const fetchData = async () => {
-    try {
-      const [expRes, catRes, storeRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/expenses'),
-        axios.get('http://localhost:5000/api/expenses/categories'),
-        axios.get('http://localhost:5000/api/stores')
-      ]);
+    useEffect(() => {
+        fetchExpenses();
+        fetchStores();
+        fetchCategories();
+    }, []);
 
-      if(expRes.data.success) setExpenses(expRes.data.data);
-      if(catRes.data.success) {
-          setCategories(catRes.data.data);
-          // Auto select first category
-          if(catRes.data.data.length > 0) setFormData(prev => ({...prev, category_id: catRes.data.data[0].id}));
-      }
-      if(storeRes.data.success) {
-          setStores(storeRes.data.data);
-          if(storeRes.data.data.length > 0) setFormData(prev => ({...prev, store_id: storeRes.data.data[0].id}));
-      }
+    const fetchExpenses = async () => {
+        try {
+            const res = await axios.get('http://localhost:5000/api/expenses');
+            if (res.data.success) setExpenses(res.data.data);
+        } catch (err) { console.error(err); }
+    };
 
-    } catch (error) {
-      console.error("Lỗi tải dữ liệu:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchStores = async () => {
+        try {
+            const res = await axios.get('http://localhost:5000/api/inventory/stores');
+            if (res.data.success) {
+                setStores(res.data.data);
+                if (res.data.data.length > 0) {
+                    setNewExpense(prev => ({ ...prev, store_id: res.data.data[0].id }));
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if(!formData.amount || !formData.category_id) return alert("Vui lòng nhập số tiền và loại chi phí");
+    const fetchCategories = async () => {
+        try {
+            // Gọi API lấy danh sách danh mục
+            const res = await axios.get('http://localhost:5000/api/expenses/categories'); 
+            if (res.data.success) {
+                setCategories(res.data.data);
+                if (res.data.data.length > 0) {
+                    setNewExpense(prev => ({ ...prev, category_id: res.data.data[0].id }));
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
 
-    try {
-      const res = await axios.post('http://localhost:5000/api/expenses', formData);
-      if(res.data.success) {
-        alert("✅ Đã lưu phiếu chi!");
-        setFormData({ ...formData, amount: '', note: '' }); // Reset form
-        fetchData(); // Reload list
-      }
-    } catch (error) {
-      alert("Lỗi: " + error.message);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if(!confirm("Bạn chắc chắn muốn xóa phiếu chi này?")) return;
-    try {
-      await axios.delete(`http://localhost:5000/api/expenses/${id}`);
-      setExpenses(expenses.filter(e => e.id !== id));
-    } catch (error) {
-      alert("Lỗi xóa: " + error.message);
-    }
-  };
-
-  const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
-
-  return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-800">Sổ Quỹ (Chi phí)</h1>
-          <p className="text-stone-500">Quản lý các khoản chi tiêu vận hành</p>
-        </div>
-        <div className="bg-red-50 text-red-700 px-6 py-3 rounded-xl border border-red-100">
-            <span className="text-sm font-bold uppercase tracking-wide block">Tổng chi tiêu</span>
-            <span className="text-2xl font-bold">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalExpense)}</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* FORM NHẬP LIỆU */}
-        <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
-            <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
-                <FaPlus className="text-stone-400"/> Lập phiếu chi mới
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-stone-600 mb-1">Ngày chi</label>
-                    <div className="relative">
-                        <FaCalendarAlt className="absolute left-3 top-3 text-stone-400"/>
-                        <input type="date" className="w-full pl-10 p-2 border rounded bg-stone-50" 
-                            value={formData.expense_date}
-                            onChange={e => setFormData({...formData, expense_date: e.target.value})}
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-stone-600 mb-1">Loại chi phí</label>
-                    <div className="relative">
-                        <FaTag className="absolute left-3 top-3 text-stone-400"/>
-                        <select className="w-full pl-10 p-2 border rounded"
-                            value={formData.category_id}
-                            onChange={e => setFormData({...formData, category_id: e.target.value})}
-                        >
-                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-stone-600 mb-1">Số tiền (VNĐ)</label>
-                    <div className="relative">
-                        <FaMoneyBillAlt className="absolute left-3 top-3 text-stone-400"/>
-                        <input type="number" className="w-full pl-10 p-2 border rounded font-bold text-stone-800" placeholder="0"
-                            value={formData.amount}
-                            onChange={e => setFormData({...formData, amount: e.target.value})}
-                        />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-stone-600 mb-1">Chi nhánh chi trả</label>
-                    <div className="relative">
-                        <FaStore className="absolute left-3 top-3 text-stone-400"/>
-                        <select className="w-full pl-10 p-2 border rounded"
-                            value={formData.store_id}
-                            onChange={e => setFormData({...formData, store_id: e.target.value})}
-                        >
-                            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-stone-600 mb-1">Ghi chú / Diễn giải</label>
-                    <textarea className="w-full p-2 border rounded" rows="3" placeholder="VD: Mua văn phòng phẩm..."
-                        value={formData.note}
-                        onChange={e => setFormData({...formData, note: e.target.value})}
-                    ></textarea>
-                </div>
-
-                <button type="submit" className="w-full bg-stone-900 text-white py-3 rounded font-bold hover:bg-stone-700 transition-colors">
-                    Lưu Phiếu Chi
-                </button>
-            </form>
-        </div>
-
-        {/* DANH SÁCH LỊCH SỬ */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
-                <span className="font-bold text-stone-700">Lịch sử chi tiêu gần đây</span>
-            </div>
+    // --- [MỚI] HÀM XỬ LÝ TẠO DANH MỤC ---
+    const handleAddCategory = async () => {
+        if (!newTypeName.trim()) return;
+        try {
+            // Gọi API vừa thêm ở Bước 1
+            const res = await axios.post('http://localhost:5000/api/expenses/categories', { name: newTypeName });
             
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-white text-stone-500 text-xs uppercase">
+            if (res.data.success) {
+                const newCat = res.data.data;
+                setCategories([...categories, newCat]); // Cập nhật list ngay lập tức
+                setNewExpense(prev => ({ ...prev, category_id: newCat.id })); // Chọn luôn loại vừa tạo
+                
+                setIsAddingType(false);
+                setNewTypeName('');
+                toast.success("Đã thêm loại chi phí mới");
+            }
+        } catch (error) {
+            toast.error("Lỗi tạo: " + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!newExpense.amount || !newExpense.category_id) return toast.warn("Vui lòng nhập đủ tiền và loại chi phí");
+        
+        try {
+            await axios.post('http://localhost:5000/api/expenses', newExpense);
+            toast.success("Đã lưu chi phí");
+            setNewExpense(prev => ({ ...prev, note: '', amount: '' })); 
+            fetchExpenses();
+        } catch (err) { 
+            toast.error("Lỗi lưu: " + (err.response?.data?.message || err.message)); 
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if(!confirm("Xóa khoản chi này?")) return;
+        try {
+            await axios.delete(`http://localhost:5000/api/expenses/${id}`);
+            toast.success("Đã xóa");
+            fetchExpenses();
+        } catch (err) { toast.error("Lỗi xóa"); }
+    }
+
+    return (
+        <div className="p-6 bg-stone-50 min-h-screen">
+            <h1 className="text-2xl font-bold mb-6 text-stone-800">Quản lý Chi phí</h1>
+            
+            {/* FORM NHẬP LIỆU */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 mb-8">
+                <h3 className="font-bold text-stone-700 mb-4 border-b pb-2">Lập phiếu chi mới</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    {/* 1. CHỌN CỬA HÀNG */}
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1">Chi nhánh / Kho</label>
+                        <div className="relative">
+                            <FaStore className="absolute left-3 top-3 text-stone-400"/>
+                            <select 
+                                className="w-full pl-9 p-2 border rounded bg-stone-50 focus:bg-white transition-colors outline-none focus:border-stone-800"
+                                value={newExpense.store_id}
+                                onChange={e => setNewExpense({...newExpense, store_id: e.target.value})}
+                            >
+                                <option value="">-- Chọn chi nhánh --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* 2. LOẠI CHI PHÍ (Đã khôi phục nút +) */}
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1">Loại chi phí</label>
+                        {!isAddingType ? (
+                            <div className="flex gap-2">
+                                <select 
+                                    className="w-full p-2 border rounded bg-stone-50 focus:bg-white outline-none focus:border-stone-800"
+                                    value={newExpense.category_id}
+                                    onChange={e => setNewExpense({...newExpense, category_id: e.target.value})}
+                                >
+                                    <option value="">-- Chọn loại --</option>
+                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                                <button 
+                                    onClick={() => setIsAddingType(true)} 
+                                    className="px-3 bg-stone-200 rounded hover:bg-stone-300 text-stone-600"
+                                    title="Thêm loại mới"
+                                >
+                                    <FaPlus size={12}/>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <input 
+                                    className="w-full p-2 border rounded border-blue-400 outline-none" 
+                                    placeholder="Nhập tên..." 
+                                    autoFocus
+                                    value={newTypeName}
+                                    onChange={e => setNewTypeName(e.target.value)}
+                                />
+                                <button onClick={handleAddCategory} className="bg-blue-600 text-white px-3 rounded text-xs font-bold">OK</button>
+                                <button onClick={() => setIsAddingType(false)} className="text-stone-400 px-1 text-xs">Hủy</button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. SỐ TIỀN */}
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1">Số tiền (VNĐ)</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-2 border rounded bg-stone-50 focus:bg-white outline-none focus:border-stone-800 font-bold text-stone-800"
+                            placeholder="0"
+                            value={newExpense.amount}
+                            onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                        />
+                    </div>
+
+                    {/* 4. NGÀY CHI */}
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1">Ngày chi</label>
+                        <input 
+                            type="date" 
+                            className="w-full p-2 border rounded bg-stone-50 focus:bg-white outline-none focus:border-stone-800"
+                            value={newExpense.expense_date}
+                            onChange={e => setNewExpense({...newExpense, expense_date: e.target.value})}
+                        />
+                    </div>
+                </div>
+                
+                <div className="mt-4">
+                    <label className="block text-xs font-bold text-stone-500 mb-1">Mô tả chi tiết</label>
+                    <div className="flex gap-4">
+                        <input 
+                            className="flex-1 p-2 border rounded bg-stone-50 focus:bg-white outline-none focus:border-stone-800" 
+                            placeholder="VD: Mua văn phòng phẩm, tiền cafe tiếp khách..."
+                            value={newExpense.note}
+                            onChange={e => setNewExpense({...newExpense, note: e.target.value})}
+                        />
+                        <button 
+                            onClick={handleSubmit} 
+                            className="bg-stone-900 text-white px-8 py-2 rounded font-bold hover:bg-black transition-transform active:scale-95 shadow-lg"
+                        >
+                            LƯU PHIẾU
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* DANH SÁCH CHI PHÍ */}
+            <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-stone-100 text-stone-600 uppercase text-xs">
                         <tr>
                             <th className="p-4">Ngày</th>
                             <th className="p-4">Nội dung</th>
-                            <th className="p-4">Danh mục</th>
+                            <th className="p-4">Loại / Kho</th>
                             <th className="p-4 text-right">Số tiền</th>
-                            <th className="p-4 text-center">Xóa</th>
+                            <th className="p-4 text-center">Hành động</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-100 text-sm">
+                    <tbody className="divide-y divide-stone-100">
                         {expenses.length === 0 && (
-                            <tr><td colSpan="5" className="p-8 text-center text-stone-400">Chưa có dữ liệu</td></tr>
+                            <tr><td colSpan="5" className="p-8 text-center text-stone-400 italic">Chưa có dữ liệu chi phí</td></tr>
                         )}
                         {expenses.map(item => (
                             <tr key={item.id} className="hover:bg-stone-50">
-                                <td className="p-4 text-stone-500 font-mono">
-                                    {new Date(item.expense_date).toLocaleDateString('vi-VN')}
+                                <td className="p-4 text-stone-500 text-sm">
+                                    {new Date(item.expense_date || item.created_at).toLocaleDateString('vi-VN')}
                                 </td>
-                                <td className="p-4">
-                                    <div className="font-medium text-stone-800">{item.note || 'Không có ghi chú'}</div>
-                                    <div className="text-xs text-stone-400">{item.stores?.name}</div>
+                                <td className="p-4 font-medium text-stone-800">
+                                    {item.note || item.description || 'Không có ghi chú'}
                                 </td>
-                                <td className="p-4">
-                                    <span className="bg-stone-100 text-stone-600 px-2 py-1 rounded text-xs">
-                                        {item.expense_categories?.name}
-                                    </span>
+                                <td className="p-4 text-sm">
+                                    <div className="font-bold text-stone-700">
+                                        {item.expense_categories?.name || '---'}
+                                    </div>
+                                    <div className="text-xs text-stone-400">
+                                        {item.stores?.name || '---'}
+                                    </div>
                                 </td>
                                 <td className="p-4 text-right font-bold text-red-600">
-                                    -{new Intl.NumberFormat('vi-VN').format(item.amount)} ₫
+                                    {new Intl.NumberFormat('vi-VN').format(item.amount)} ₫
                                 </td>
                                 <td className="p-4 text-center">
                                     <button onClick={() => handleDelete(item.id)} className="text-stone-300 hover:text-red-500 transition-colors">
-                                        <FaTrash/>
+                                        <FaTrash />
                                     </button>
                                 </td>
                             </tr>
@@ -208,10 +254,7 @@ const Expenses = () => {
                 </table>
             </div>
         </div>
-
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Expenses;

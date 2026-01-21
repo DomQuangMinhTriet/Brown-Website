@@ -68,4 +68,28 @@ exports.deleteExpense = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
+<<<<<<< HEAD
+=======
+};
+
+// 5. [MỚI] Tạo danh mục chi phí
+exports.createCategory = async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).json({ success: false, message: "Tên danh mục không được để trống" });
+
+        // Insert vào bảng expense_categories
+        const { data, error } = await supabase
+            .from('expense_categories')
+            .insert([{ name }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json({ success: true, data });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+>>>>>>> Frontend
 };

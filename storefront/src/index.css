@@ -1,25 +1,31 @@
 /* src/index.css */
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700&display=swap');
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  
+  /* Bảng màu chuẩn BROWN */
+  --color-brown-dark: #292524; /* Stone 800 */
+  --color-brown-main: #44403c; /* Stone 700 */
+  --color-beige: #f5f5f4;      /* Stone 100 */
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  min-width: 100vw;
+/* Cấu trúc để Footer luôn nằm dưới đáy */
+body, #root {
   min-height: 100vh;
-  background-color: #f5f5f4; /* Màu stone-100 */
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-beige);
 }
 
-/* Đảm bảo root container luôn full màn hình */
-#root {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  text-align: left; /* Vite mặc định là center, cần sửa lại */
+/* Class tiện ích cho Font */
+.font-serif {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-sans {
+  font-family: 'Inter', sans-serif;
 }

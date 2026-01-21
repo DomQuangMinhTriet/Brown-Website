@@ -1,19 +1,32 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { FaArrowRight } from 'react-icons/fa';
-import SEO from '../components/SEO';
+<<<<<<< HEAD
+=======
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
 const Home = () => {
-  // 1. State cho Sản phẩm (Giữ nguyên logic cũ)
   const [products, setProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-
-  // 2. State cho Banner (Mới thêm)
-  const [banners, setBanners] = useState([]);
-  const [loadingBanner, setLoadingBanner] = useState(true);
 
   useEffect(() => {
+    // Gọi API lấy sản phẩm từ Backend
+=======
+>>>>>>> Frontend
+import { FaArrowRight } from 'react-icons/fa';
+=======
+>>>>>>> Stashed changes
+import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext'; // Đa ngôn ngữ
+
+const Home = () => {
+  const { t } = useLanguage();
+  const [products, setProducts] = useState([]);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentBanner, setCurrentBanner] = useState(0);
+  useEffect(() => {
+<<<<<<< Updated upstream
     // Hàm lấy danh sách sản phẩm (Logic gốc)
     const fetchProducts = async () => {
       try {
@@ -26,108 +39,147 @@ const Home = () => {
       } finally {
         setLoadingProducts(false);
       }
-    };
-
-    // Hàm lấy Banner (Logic mới)
-    const fetchBanners = async () => {
+=======
+    const fetchData = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/content/banners');
-        if (res.data.success) {
-          setBanners(res.data.data);
-        }
-      } catch (err) {
-        console.error("Lỗi tải banner:", err);
-      } finally {
-        setLoadingBanner(false);
-      }
+        const [prodRes, banRes] = await Promise.all([
+            axios.get('http://localhost:5000/api/products'),
+            axios.get('http://localhost:5000/api/content/banners')
+        ]);
+        if (prodRes.data.success) setProducts(prodRes.data.data);
+        if (banRes.data.success) setBanners(banRes.data.data);
+      } catch (err) { console.error(err); } 
+      finally { setLoading(false); }
+>>>>>>> Stashed changes
     };
-
-    fetchProducts();
-    fetchBanners();
+    fetchData();
   }, []);
+  // 4. useEffect MỚI (Thêm vào ngay bên dưới - Để tự động chuyển)
+  useEffect(() => {
+    if (banners.length <= 1) return; // Chỉ chạy nếu có nhiều hơn 1 banner
 
-  // Hàm render Banner Hero (Mới)
-  const renderHeroSection = () => {
-    if (loadingBanner) return <div className="h-[500px] bg-stone-100 animate-pulse"></div>;
-    
-    // Nếu không có banner nào -> Hiển thị mặc định
-    if (banners.length === 0) {
-      return (
-        <div className="h-[500px] bg-stone-200 flex items-center justify-center text-center px-4">
-          <div>
-             <h1 className="text-4xl md:text-6xl font-bold text-stone-800 mb-4 tracking-widest">BROWN FASHION</h1>
-             <p className="text-stone-500 text-lg">Thanh lịch & Tối giản</p>
-          </div>
-        </div>
-      );
-    }
+    const interval = setInterval(() => {
+        setCurrentBanner(prev => (prev === banners.length - 1 ? 0 : prev + 1));
+    }, 5000); // 5 giây đổi 1 lần
 
-    // Lấy banner đầu tiên làm Hero
-    const mainBanner = banners[0];
-
-    return (
-      <div className="relative h-[60vh] md:h-[80vh] w-full overflow-hidden">
-        <img 
-          src={mainBanner.image_url} 
-          alt={mainBanner.title} 
-          className="w-full h-full object-cover object-center transition-transform duration-1000 hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-black/30"></div>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-          <h2 className="text-white text-4xl md:text-6xl font-bold mb-6 tracking-wide drop-shadow-lg uppercase">
-            {mainBanner.title}
-          </h2>
-          {mainBanner.link_to && (
-            <Link 
-              to={mainBanner.link_to} 
-              className="group bg-white text-black px-8 py-3 font-bold uppercase tracking-widest hover:bg-stone-900 hover:text-white transition-all duration-300 flex items-center gap-2"
-            >
-              Khám phá ngay <FaArrowRight className="group-hover:translate-x-1 transition-transform"/>
-            </Link>
-          )}
-        </div>
-      </div>
-    );
+    return () => clearInterval(interval);
+  }, [banners]); // Chạy lại mỗi khi danh sách banners thay đổi
+  // Logic kiểm tra xem URL là ảnh hay video
+  const isVideo = (url) => {
+    return url.match(/\.(mp4|webm|ogg)$/i);
   };
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* SEO */}
-      <SEO title="Trang chủ" description="Thương hiệu thời trang tối giản Brown Fashion." />
+    <>
+      <SEO title="Trang chủ" />
+      
+      {/* 1. HERO BANNER (Đã sửa lại: Render danh sách & Tự động chuyển) */}
+      <div className="relative w-full h-[85vh] bg-stone-200 overflow-hidden group">
+        {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">BROWN LOADING...</div>
+        ) : banners.length > 0 ? (
+            // [SỬA ĐỔI] Thay vì chỉ hiện banners[0], ta map qua TOÀN BỘ banners
+            banners.map((banner, index) => (
+                <div 
+                    key={banner.id}
+                    // Class này giúp xếp chồng ảnh lên nhau và tạo hiệu ứng mờ dần (Fade)
+                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out
+                        ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}
+                    `}
+                >
+                    {/* Kiểm tra Video hoặc Ảnh */}
+                    {isVideo(banner.image_url) ? (
+                        <video 
+                            autoPlay loop muted playsInline 
+                            className="w-full h-full object-cover"
+                        >
+                            <source src={banner.image_url} type="video/mp4" />
+                        </video>
+                    ) : (
+                        <img 
+                            src={banner.image_url} 
+                            alt={banner.title} 
+                            className="w-full h-full object-cover"
+                        />
+                    )}
 
-      {/* 1. HERO SECTION (BANNER) */}
-      {renderHeroSection()}
+                    {/* [SỬA ĐỔI] Nội dung chữ (Title/Link) sẽ thay đổi theo từng banner */}
+                    <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
+                        <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
+                            {banner.title || 'MINIMALIST & ELEGANT'}
+                        </h2>
+                        <Link to={banner.link_to || "/collection"} 
+                            className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
+                            {t('home.hero_btn')}
+                        </Link>
+                    </div>
+                </div>
+            ))
+        ) : (
+            // Banner mặc định nếu chưa có dữ liệu
+            <div className="w-full h-full bg-[#292524] flex items-center justify-center">
+                 <h2 className="text-white text-4xl font-serif"></h2>
+            </div>
+        )}
 
-      {/* 2. DANH SÁCH SẢN PHẨM (GIỮ NGUYÊN LOGIC CŨ) */}
-      <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="text-center mb-12">
-            <h3 className="text-2xl font-bold text-stone-800 uppercase tracking-widest mb-2">Hàng mới về</h3>
-            <p className="text-stone-500 italic">Những thiết kế mới nhất cho mùa này</p>
-          </div>
+        {/* [THÊM MỚI] Dấu chấm điều hướng bên dưới (Indicator Dots) */}
+        {!loading && banners.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                {banners.map((_, idx) => (
+                    <button 
+                        key={idx}
+                        onClick={() => setCurrentBanner(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-500 
+                            ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white'}
+                        `}
+                    />
+                ))}
+            </div>
+        )}
 
-          {loadingProducts ? (
-            <div className="text-center py-10">Đang tải sản phẩm...</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-              {products.map((product) => (
-                <Link to={`/product/${product.slug}`} key={product.id} className="group">
-                  <div className="relative overflow-hidden mb-4 bg-stone-200 aspect-[3/4]">
-                    {/* Ảnh sản phẩm */}
+
+        {/* Overlay Text */}
+        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
+            <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
+                {banners[0]?.title || 'MINIMALIST & ELEGANT'}
+            </h2>
+            <Link to={banners[0]?.link_to || "/collection"} 
+                className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
+                {t('home.hero_btn')}
+            </Link>
+        </div>
+      </div>
+
+      {/* 2. SẢN PHẨM MỚI */}
+      <section className="max-w-7xl mx-auto px-6 py-20">
+         <div className="text-center mb-12">
+            <h3 className="text-2xl md:text-3xl font-serif font-bold text-[#292524] mb-2">{t('home.new_arrival')}</h3>
+            <div className="w-16 h-1 bg-stone-900 mx-auto"></div>
+         </div>
+
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
+            {products.slice(0, 8).map(product => (
+                <Link key={product.id} to={`/product/${product.slug}`} className="group block">
+                  <div className="relative overflow-hidden mb-4 bg-stone-100 aspect-[3/4]">
                     <img 
                       src={product.images?.[0]} 
                       alt={product.name} 
-                      className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-110"
+                      className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                     />
-                    {/* Badge Mới/Sale nếu cần */}
-                    {/*<div className="absolute top-2 left-2 bg-stone-900 text-white text-xs px-2 py-1 uppercase tracking-wider">New</div>*/}
+                    {/* Nút xem nhanh (Desktop only) */}
+                    <div className="absolute bottom-0 left-0 w-full bg-white/90 text-center py-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 hidden md:block">
+                        <span className="text-xs font-bold uppercase tracking-wider text-stone-900">Xem chi tiết</span>
+                    </div>
                   </div>
                   
-                  {/* Thông tin sản phẩm */}
-                  <h3 className="text-stone-900 font-medium group-hover:text-stone-600 transition-colors">{product.name}</h3>
-                  <p className="text-stone-500 mt-1 font-bold">
+                  <h3 className="text-stone-900 font-medium text-sm group-hover:text-stone-600 transition-colors truncate px-1">
+                    {product.name}
+                  </h3>
+                  <p className="text-stone-500 mt-1 font-bold text-sm px-1">
                     {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
                   </p>
                 </Link>
+<<<<<<< Updated upstream
               ))}
             </div>
           )}
@@ -140,6 +192,18 @@ const Home = () => {
           </div>
       </div>
     </div>
+=======
+            ))}
+         </div>
+         
+         <div className="text-center mt-16">
+            <Link to="/collection" className="inline-block border border-stone-900 px-10 py-3 text-stone-900 font-bold uppercase tracking-widest hover:bg-stone-900 hover:text-white transition-all text-sm">
+                {t('home.view_all')}
+            </Link>
+         </div>
+      </section>
+    </>
+>>>>>>> Stashed changes
   );
 };
 

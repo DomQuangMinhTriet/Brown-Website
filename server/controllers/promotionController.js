@@ -3,11 +3,27 @@ const supabase = require('../config/supabase');
 // 1. Lấy danh sách (Admin)
 exports.getAllPromotions = async (req, res) => {
     try {
+<<<<<<< HEAD
         const { data, error } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         res.json({ success: true, data: data });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
+=======
+        const { data, error } = await supabase
+            .from('promotions')
+            .select('*')
+            // SỬA DÒNG NÀY: Đổi 'created_at' thành 'id'
+            .order('id', { ascending: false }); 
+
+        if (error) throw error;
+        // Luôn trả về mảng (nếu data null thì trả về [])
+        res.json({ success: true, data: data || [] });
+    } catch (error) {
+        console.error("Get Promotions Error:", error.message);
+        // Trả về mảng rỗng để Frontend không bị lỗi map()
+        res.json({ success: false, message: error.message, data: [] });
+>>>>>>> Frontend
     }
 };
 
@@ -73,10 +89,24 @@ exports.checkVoucher = async (req, res) => {
 
         // Tính tiền giảm
         let discount = 0;
+<<<<<<< HEAD
         if (promo.discount_type === 'percentage') {
             discount = cartTotal * (promo.discount_value / 100);
             if (promo.max_discount_amount) discount = Math.min(discount, promo.max_discount_amount);
         } else {
+=======
+        
+        // SỬA: Đổi điều kiện so sánh thành 'percent'
+        if (promo.discount_type === 'percent') { 
+            discount = cartTotal * (promo.discount_value / 100);
+            
+            // Logic max_discount_amount giữ nguyên
+            if (promo.max_discount_amount) {
+                discount = Math.min(discount, promo.max_discount_amount);
+            }
+        } else {
+            // Trường hợp fixed
+>>>>>>> Frontend
             discount = promo.discount_value;
         }
 

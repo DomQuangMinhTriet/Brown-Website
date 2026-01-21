@@ -70,50 +70,74 @@ const Customers = () => {
         </div>
       </div>
 
-      {/* Bảng Danh sách */}
+      {/* Bảng Danh sách Khách hàng */}
       <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-stone-50 border-b border-stone-200">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 text-xs uppercase font-bold tracking-wider">
             <tr>
-              <th className="p-4">Họ tên</th>
+              <th className="p-4">Khách hàng</th>
               <th className="p-4">Liên hệ</th>
-              <th className="p-4 text-center">Số đơn</th>
-              <th className="p-4 text-right">Tổng chi (LTV)</th>
-              <th className="p-4">Mua gần nhất</th>
-              <th className="p-4"></th>
+              <th className="p-4 text-center">Đơn hàng</th>
+              <th className="p-4 text-right">Tổng chi tiêu</th>
+              <th className="p-4">Giao dịch cuối</th>
+              <th className="p-4 text-center">Thao tác</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-stone-100">
             {loading ? (
-                <tr><td colSpan="6" className="p-8 text-center text-stone-500">Đang tải...</td></tr>
+                <tr><td colSpan="6" className="p-8 text-center text-stone-500 italic">Đang tải dữ liệu khách hàng...</td></tr>
             ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan="6" className="p-8 text-center text-stone-500">Không tìm thấy khách hàng.</td></tr>
+                <tr><td colSpan="6" className="p-8 text-center text-stone-500 italic">Không tìm thấy khách hàng nào.</td></tr>
             ) : (
                 filteredCustomers.map(cus => (
-                <tr key={cus.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                    <td className="p-4 font-bold text-stone-800">{cus.full_name}</td>
-                    <td className="p-4 text-sm">
-                        <div className="font-mono">{cus.phone}</div>
-                        <div className="text-stone-500 text-xs">{cus.email}</div>
+                <tr key={cus.id} className="hover:bg-stone-50 transition-colors group">
+                    {/* 1. Tên Khách */}
+                    <td className="p-4">
+                        <div className="font-bold text-stone-800">{cus.full_name || "Khách vãng lai"}</div>
+                        <div className="text-xs text-stone-400">ID: {cus.id}</div>
                     </td>
+
+                    {/* 2. Liên hệ */}
+                    <td className="p-4">
+                        <div className="text-sm font-medium text-stone-700">{cus.phone}</div>
+                        <div className="text-xs text-stone-500">{cus.email || "---"}</div>
+                        <div className="text-xs text-stone-400 truncate max-w-[150px]" title={cus.address}>{cus.address}</div>
+                    </td>
+
+                    {/* 3. Số lượng đơn (Data từ Backend đã fix) */}
                     <td className="p-4 text-center">
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold border border-blue-100">
-                            {cus.order_count}
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold 
+                            ${cus.order_count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-stone-100 text-stone-400'}`}>
+                            {cus.order_count} đơn
                         </span>
                     </td>
-                    <td className="p-4 text-right font-bold text-green-700">
-                        {new Intl.NumberFormat('vi-VN').format(cus.total_spent)}đ
-                    </td>
-                    <td className="p-4 text-sm text-stone-500">
-                        {cus.last_order_date ? new Date(cus.last_order_date).toLocaleDateString('vi-VN') : '-'}
-                    </td>
+
+                    {/* 4. Tổng chi tiêu (Data từ Backend đã fix) */}
                     <td className="p-4 text-right">
+                        <span className="font-bold text-stone-900 block">
+                            {new Intl.NumberFormat('vi-VN').format(cus.total_spent)} ₫
+                        </span>
+                        {/* Hạng thành viên giả định dựa trên chi tiêu */}
+                        <span className="text-[10px] text-stone-400 uppercase">
+                            {cus.total_spent > 5000000 ? 'VIP Member' : 'Member'}
+                        </span>
+                    </td>
+
+                    {/* 5. Ngày mua gần nhất */}
+                    <td className="p-4 text-sm text-stone-600">
+                        {cus.last_order_date 
+                            ? new Date(cus.last_order_date).toLocaleDateString('vi-VN') 
+                            : <span className="text-stone-300 italic">Chưa mua</span>}
+                    </td>
+
+                    {/* 6. Nút xem lịch sử */}
+                    <td className="p-4 text-center">
                         <button 
                             onClick={() => handleViewHistory(cus)}
-                            className="text-stone-400 hover:text-stone-900 p-2 rounded hover:bg-stone-200 transition-all tooltip"
-                            title="Xem lịch sử mua hàng"
+                            className="p-2 rounded-full text-stone-400 hover:text-stone-900 hover:bg-stone-200 transition-all"
+                            title="Xem lịch sử đơn hàng"
                         >
-                            <FaHistory />
+                            <FaHistory size={16} />
                         </button>
                     </td>
                 </tr>

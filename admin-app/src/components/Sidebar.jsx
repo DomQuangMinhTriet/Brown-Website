@@ -9,6 +9,7 @@ import {
   FaSignOutAlt, 
   FaImage, 
   FaUsers,
+  FaPlusCircle,
   FaTags // <--- Icon cho Khuyến mãi
 } from 'react-icons/fa';
 import { useAdminAuth } from '../context/AdminAuthContext';
@@ -21,6 +22,7 @@ const Sidebar = () => {
     { path: '/', icon: <FaHome />, label: 'Tổng quan' },
     { path: '/products', icon: <FaBoxOpen />, label: 'Sản phẩm' },
     { path: '/orders', icon: <FaClipboardList />, label: 'Đơn hàng' },
+    { path: '/orders/create', icon: <FaPlusCircle />, label: 'Tạo đơn mới' },
     { path: '/customers', icon: <FaUsers />, label: 'Khách hàng' },
     { path: '/inventory', icon: <FaWarehouse />, label: 'Kho hàng' },
     { path: '/promotions', icon: <FaTags />, label: 'Khuyến mãi' }, // <--- MỤC MỚI
@@ -33,7 +35,7 @@ const Sidebar = () => {
     <div className="w-64 bg-white h-screen border-r border-stone-200 flex flex-col fixed left-0 top-0 z-10">
       {/* Logo */}
       <div className="h-16 flex items-center justify-center border-b border-stone-100">
-        <h1 className="text-2xl font-bold text-stone-800 tracking-widest">BROWN.</h1>
+        <h1 className="text-2xl font-bold text-stone-800 tracking-widest">BROWN</h1>
       </div>
 
       {/* Menu */}

@@ -4,16 +4,25 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { HelmetProvider } from 'react-helmet-async'; // <--- IMPORT MỚI
+import { HelmetProvider } from 'react-helmet-async';
+import { LanguageProvider } from './context/LanguageContext';
+
+// --- THÊM 2 DÒNG NÀY ---
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <HelmetProvider> {/* <--- BỌC NGOÀI CÙNG HOẶC TRONG AUTHPROVIDER ĐỀU ĐƯỢC */}
-      <AuthProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
-      </AuthProvider>
+    <HelmetProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <CartProvider>
+            <App />
+            {/* Đặt ToastContainer ở đây để hiện thông báo trên toàn Website */}
+            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+          </CartProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </HelmetProvider>
   </StrictMode>,
 )

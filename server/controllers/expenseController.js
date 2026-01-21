@@ -68,8 +68,6 @@ exports.deleteExpense = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
-<<<<<<< HEAD
-=======
 };
 
 // 5. [MỚI] Tạo danh mục chi phí
@@ -91,5 +89,4 @@ exports.createCategory = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
->>>>>>> Frontend
 };

@@ -3,13 +3,6 @@ const supabase = require('../config/supabase');
 // 1. Lấy danh sách (Admin)
 exports.getAllPromotions = async (req, res) => {
     try {
-<<<<<<< HEAD
-        const { data, error } = await supabase.from('promotions').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        res.json({ success: true, data: data });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-=======
         const { data, error } = await supabase
             .from('promotions')
             .select('*')
@@ -23,7 +16,6 @@ exports.getAllPromotions = async (req, res) => {
         console.error("Get Promotions Error:", error.message);
         // Trả về mảng rỗng để Frontend không bị lỗi map()
         res.json({ success: false, message: error.message, data: [] });
->>>>>>> Frontend
     }
 };
 
@@ -89,12 +81,6 @@ exports.checkVoucher = async (req, res) => {
 
         // Tính tiền giảm
         let discount = 0;
-<<<<<<< HEAD
-        if (promo.discount_type === 'percentage') {
-            discount = cartTotal * (promo.discount_value / 100);
-            if (promo.max_discount_amount) discount = Math.min(discount, promo.max_discount_amount);
-        } else {
-=======
         
         // SỬA: Đổi điều kiện so sánh thành 'percent'
         if (promo.discount_type === 'percent') { 
@@ -106,7 +92,6 @@ exports.checkVoucher = async (req, res) => {
             }
         } else {
             // Trường hợp fixed
->>>>>>> Frontend
             discount = promo.discount_value;
         }
 

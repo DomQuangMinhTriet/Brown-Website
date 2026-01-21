@@ -22,18 +22,6 @@ exports.getBanners = async (req, res) => {
 exports.createBanner = async (req, res) => {
     try {
         const { title, image_url, link_to, display_order } = req.body;
-<<<<<<< HEAD
-        
-        const { data, error } = await supabase
-            .from('content_banners')
-            .insert([{ title, image_url, link_to, display_order }])
-            .select();
-
-        if (error) throw error;
-
-        // Xóa Cache để trang chủ cập nhật ngay
-        clearCache('/api/content/banners');
-=======
 
         // Validation cơ bản
         if (!image_url) {
@@ -61,7 +49,6 @@ exports.createBanner = async (req, res) => {
         // Lưu ý: Đảm bảo bạn đã export clearCache từ cacheMiddleware.js
         // Nếu không import được thì tạm thời comment dòng này lại
         try { clearCache('/api/content/banners'); } catch(e) {}
->>>>>>> Frontend
 
         res.json({ success: true, data: data[0] });
     } catch (error) {

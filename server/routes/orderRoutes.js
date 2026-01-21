@@ -14,9 +14,6 @@ router.post('/', validate(createOrderSchema), orderController.createOrder);
 // Các route khác giữ nguyên
 router.get('/', orderController.getAllOrders);
 router.put('/:id/status', orderController.updateOrderStatus);
-<<<<<<< HEAD
-=======
 router.post('/create-admin', orderController.createAdminOrder);
->>>>>>> Frontend
 
 module.exports = router;

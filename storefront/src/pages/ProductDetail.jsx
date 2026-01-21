@@ -2,15 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom'; // Thêm useParams để lấy ID từ URL
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
-<<<<<<< Updated upstream
+
 import { FaStore, FaArrowLeft, FaStar, FaShoppingCart, FaCheck } from 'react-icons/fa';
 import SEO from '../components/SEO'; // <--- IMPORT
-<<<<<<< HEAD
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
->>>>>>> Frontend
 
 const ProductDetail = () => {
     const { slug } = useParams(); // Lấy slug từ URL
@@ -45,101 +39,6 @@ const ProductDetail = () => {
         return variant?.stock ?? variant?.quantity_remaining ?? 0;
     };
 
-<<<<<<< Updated upstream
-  // --- HANDLE ADD TO CART ---
-  const handleAddToCart = () => {
-    if (!selectedSize || !selectedColor) {
-      alert('Vui lòng chọn đầy đủ Size và Màu sắc!');
-      return;
-    }
-    
-    // Tìm variant ID tương ứng
-    const variant = product.variants.find(v => v.size === selectedSize && v.color === selectedColor);
-    
-    // Kiểm tra tồn kho (nếu có logic check tồn kho frontend)
-    if (!variant) {
-        alert('Sản phẩm biến thể này tạm thời không khả dụng.');
-        return;
-    }
-
-    // Thêm vào Context
-    addToCart({
-      variant_id: variant.id,
-      name: product.name,
-      price: variant.price || product.base_price,
-      image: mainImage, // Lấy ảnh đang xem làm ảnh đại diện trong giỏ
-      size: selectedSize,
-      color: selectedColor,
-      quantity: 1
-    });
-
-    // --- LOGIC ĐIỀU HƯỚNG SAU KHI THÊM ---
-    if (isPosMode) {
-        // POS: Thường mua nhiều món, nên hỏi để quay lại chọn tiếp
-        const continueShopping = window.confirm(`✅ Đã thêm "${product.name}" vào đơn!\nBạn có muốn quay lại danh sách để chọn món khác không?`);
-        if (continueShopping) {
-            navigate('/collection?pos=true');
-        }
-        // Nếu chọn Cancel -> Ở lại trang này (có thể để sửa số lượng hoặc mua thêm màu khác)
-    } else {
-        // Khách Online: Thông báo nhẹ nhàng
-        alert('✅ Đã thêm sản phẩm vào giỏ hàng');
-    }
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-500">Đang tải chi tiết...</div>;
-  if (!product) return <div className="min-h-screen flex items-center justify-center text-stone-500">Không tìm thấy sản phẩm.</div>;
-
-  // Lọc danh sách Size và Color duy nhất để hiển thị button
-  const uniqueColors = [...new Set(product.variants.map(v => v.color))];
-  const uniqueSizes = [...new Set(product.variants.map(v => v.size))];
-
-  return (
-    <div className={`min-h-screen pb-20 transition-colors ${isPosMode ? "bg-stone-50" : "bg-white"}`}>
-      
-      {/* 1. HEADER DÀNH RIÊNG CHO POS */}
-      {isPosMode && (
-          <div className="bg-red-700 text-white px-6 py-3 shadow-md sticky top-0 z-50 flex items-center justify-between">
-             <div className="font-bold flex items-center gap-2 text-lg uppercase tracking-wider">
-                <FaStore className="text-xl"/> CHẾ ĐỘ POS
-             </div>
-             <button 
-                onClick={() => navigate('/collection?pos=true')} 
-                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 transition-all"
-            >
-                <FaArrowLeft/> Quay lại danh sách
-             </button>
-          </div>
-      )}
-
-      {/* 2. NỘI DUNG CHÍNH */}
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        
-        {/* Breadcrumb / Back Button (Cho chế độ thường) */}
-        {!isPosMode && (
-            <div className="mb-6">
-                 <button onClick={() => navigate(-1)} className="text-stone-500 hover:text-stone-900 flex items-center gap-2 text-sm">
-                    <FaArrowLeft/> Quay lại
-                 </button>
-            </div>
-        )}
-        
-        {/* --- THÊM SEO ĐỘNG --- */}
-        <SEO 
-          title={product.name} 
-          description={product.description ? product.description.substring(0, 150) + '...' : `Mua ngay ${product.name} giá tốt nhất.`}
-          image={product.images?.[0]} // Lấy ảnh đầu tiên làm ảnh thumbnail khi share
-          url={`/product/${product.slug}`}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
-            
-            {/* CỘT TRÁI: HÌNH ẢNH */}
-            <div className="space-y-4">
-                {/* Ảnh chính */}
-                <div className="aspect-[3/4] bg-stone-100 rounded-lg overflow-hidden shadow-sm border border-stone-200">
-                    <img src={mainImage} alt={product.name} className="w-full h-full object-cover" />
-=======
     return (
         <div className="container mx-auto p-4 md:p-10">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -151,7 +50,6 @@ const ProductDetail = () => {
                         alt={product.name} 
                         className="w-full h-full object-cover"
                     />
->>>>>>> Stashed changes
                 </div>
 
                 {/* 2. THÔNG TIN & MUA HÀNG */}

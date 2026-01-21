@@ -1,21 +1,8 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-<<<<<<< HEAD
-=======
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-
-const Home = () => {
-  const [products, setProducts] = useState([]);
-
-  useEffect(() => {
-    // Gọi API lấy sản phẩm từ Backend
-=======
->>>>>>> Frontend
 import { FaArrowRight } from 'react-icons/fa';
-=======
->>>>>>> Stashed changes
+
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext'; // Đa ngôn ngữ
 
@@ -26,20 +13,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [currentBanner, setCurrentBanner] = useState(0);
   useEffect(() => {
-<<<<<<< Updated upstream
-    // Hàm lấy danh sách sản phẩm (Logic gốc)
-    const fetchProducts = async () => {
-      try {
-        const res = await axios.get('http://localhost:5000/api/products');
-        if (res.data.success) {
-          setProducts(res.data.data);
-        }
-      } catch (err) {
-        console.error("Lỗi tải sản phẩm:", err);
-      } finally {
-        setLoadingProducts(false);
-      }
-=======
     const fetchData = async () => {
       try {
         const [prodRes, banRes] = await Promise.all([
@@ -50,7 +23,6 @@ const Home = () => {
         if (banRes.data.success) setBanners(banRes.data.data);
       } catch (err) { console.error(err); } 
       finally { setLoading(false); }
->>>>>>> Stashed changes
     };
     fetchData();
   }, []);
@@ -179,20 +151,6 @@ const Home = () => {
                     {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
                   </p>
                 </Link>
-<<<<<<< Updated upstream
-              ))}
-            </div>
-          )}
-          
-          {/* Nút xem tất cả */}
-          <div className="text-center mt-12">
-             <Link to="/collection" className="inline-block border-b-2 border-stone-900 pb-1 text-stone-900 font-bold uppercase tracking-widest hover:text-stone-600 hover:border-stone-600 transition-all">
-                Xem tất cả sản phẩm
-             </Link>
-          </div>
-      </div>
-    </div>
-=======
             ))}
          </div>
          
@@ -203,7 +161,6 @@ const Home = () => {
          </div>
       </section>
     </>
->>>>>>> Stashed changes
   );
 };
 

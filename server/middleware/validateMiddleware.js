@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-// server/middleware/validateMiddleware.js
-const validate = (schema) => (req, res, next) => {
-    try {
-        // Kiểm tra req.body xem có khớp với schema không
-        schema.parse(req.body);
-        next(); // Nếu đúng -> Cho đi tiếp vào Controller
-    } catch (error) {
-        // Nếu sai -> Trả về lỗi 400 kèm chi tiết
-        return res.status(400).json({
-            success: false,
-            message: 'Dữ liệu không hợp lệ',
-            errors: error.errors.map(e => ({
-                field: e.path.join('.'),
-                message: e.message
-            }))
-=======
 const validate = (schema) => (req, res, next) => {
     try {
         // Dùng safeParse thay vì parse để không gây crash server
@@ -49,7 +32,6 @@ const validate = (schema) => (req, res, next) => {
         return res.status(500).json({ 
             success: false, 
             message: "Lỗi hệ thống kiểm tra dữ liệu" 
->>>>>>> Frontend
         });
     }
 };

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
-import { FaHistory, FaPlus, FaSave, FaTrash, FaWarehouse, FaBoxOpen, FaSearch } from 'react-icons/fa';
+// [MỚI] Thêm FaUndo, FaCheck để làm nút Hủy và Lưu
+import { FaHistory, FaPlus, FaSave, FaTrash, FaWarehouse, FaBoxOpen, FaSearch, FaUndo, FaCheck } from 'react-icons/fa';
 
 const Inventory = () => {
   const [activeTab, setActiveTab] = useState('inbound'); // 'inbound', 'history', 'stock'
@@ -25,6 +26,13 @@ const Inventory = () => {
   // --- STATE TÌM KIẾM TỒN KHO ---
   const [stockSearch, setStockSearch] = useState('');
 
+  // --- [MỚI] STATE CHO TÍNH NĂNG TẠO NHANH ---
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState('');
+
+  const [isCreatingStore, setIsCreatingStore] = useState(false);
+  const [newStoreName, setNewStoreName] = useState('');
+
   // 1. Lấy dữ liệu ban đầu
   useEffect(() => {
     fetchMasterData();
@@ -34,9 +42,10 @@ const Inventory = () => {
   const fetchMasterData = async () => {
     try {
       const [supRes, storeRes, prodRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/suppliers'),
-        axios.get('http://localhost:5000/api/stores'),
-        axios.get('http://localhost:5000/api/products')
+        // Đã sửa đường dẫn đúng
+        axios.get('http://localhost:5000/api/inventory/suppliers'), 
+        axios.get('http://localhost:5000/api/inventory/stores'),
+        axios.get('http://localhost:5000/api/products') 
       ]);
       
       if (supRes.data.success) setSuppliers(supRes.data.data);
@@ -53,32 +62,68 @@ const Inventory = () => {
 
   const fetchHistory = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/inventory');
+      // --- [SỬA LẠI ĐƯỜNG DẪN API] ---
+      // Thêm /history vào cuối để gọi đúng route lấy lịch sử
+      const res = await axios.get('http://localhost:5000/api/inventory/history');
       if (res.data.success) setBatches(res.data.data);
     } catch (error) {
       console.error("Lỗi tải lịch sử:", error);
     }
   };
 
-  // 2. Logic tính toán Tổng Tồn kho (MỚI)
+  // --- [MỚI] HÀM XỬ LÝ TẠO NHANH ---
+  const handleQuickCreateSupplier = async () => {
+      if (!newSupplierName.trim()) return alert("Vui lòng nhập tên NCC!");
+      try {
+          const res = await axios.post('http://localhost:5000/api/inventory/suppliers', { name: newSupplierName });
+          if(res.data.success) {
+              const newSup = res.data.data;
+              setSuppliers([...suppliers, newSup]); // Thêm vào list hiện tại
+              setSelectedSupplier(newSup.id); // Tự động chọn NCC vừa tạo
+              setIsCreatingSupplier(false);
+              setNewSupplierName('');
+          }
+      } catch (error) {
+          alert("Lỗi tạo NCC: " + error.message);
+      }
+  };
+
+  const handleQuickCreateStore = async () => {
+      if (!newStoreName.trim()) return alert("Vui lòng nhập tên Kho!");
+      try {
+          const res = await axios.post('http://localhost:5000/api/inventory/stores', { name: newStoreName });
+          if(res.data.success) {
+              const newStore = res.data.data;
+              setStores([...stores, newStore]); // Thêm vào list hiện tại
+              setSelectedStore(newStore.id); // Tự động chọn Kho vừa tạo
+              setIsCreatingStore(false);
+              setNewStoreName('');
+          }
+      } catch (error) {
+          alert("Lỗi tạo Kho: " + error.message);
+      }
+  };
+  // ------------------------------------
+
+  // 2. Logic tính toán Tổng Tồn kho (Giữ nguyên)
   const inventorySummary = useMemo(() => {
     if (!products.length || !batches.length) return [];
 
     let summaryList = [];
 
-    // Duyệt qua từng sản phẩm và từng biến thể
     products.forEach(prod => {
       if (prod.variants) {
         prod.variants.forEach(variant => {
-            // Tính tổng tồn từ các lô hàng (batches) còn hạn
+            // SỬA: Dùng '==' thay vì '===' để so sánh (tránh lỗi string vs number)
+            // SỬA: Ép kiểu Number() cho quantity_remaining để cộng toán học
             const totalStock = batches
-                .filter(b => b.variant_id === variant.id)
-                .reduce((sum, b) => sum + b.quantity_remaining, 0);
+                .filter(b => b.variant_id == variant.id) 
+                .reduce((sum, b) => sum + (Number(b.quantity_remaining) || 0), 0);
 
-            // Tính giá trị tồn kho (Số lượng * Giá vốn của từng lô)
+            // SỬA: Ép kiểu Number() cho cost_price
             const totalValue = batches
-                .filter(b => b.variant_id === variant.id)
-                .reduce((sum, b) => sum + (b.quantity_remaining * b.cost_price), 0);
+                .filter(b => b.variant_id == variant.id)
+                .reduce((sum, b) => sum + ((Number(b.quantity_remaining) || 0) * (Number(b.cost_price) || 0)), 0);
 
             summaryList.push({
                 id: variant.id,
@@ -148,7 +193,7 @@ const Inventory = () => {
         }))
       };
 
-      const res = await axios.post('http://localhost:5000/api/inventory/import', payload);
+      const res = await axios.post('http://localhost:5000/api/inventory/inbound', payload);
 
       if (res.data.success) {
         alert("✅ Nhập hàng thành công!");
@@ -198,26 +243,88 @@ const Inventory = () => {
       {activeTab === 'inbound' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            {/* Form chọn NCC & Kho */}
+            
+            {/* Form chọn NCC & Kho (ĐÃ NÂNG CẤP) */}
             <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
               <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><FaWarehouse/> Thông tin phiếu nhập</h3>
               <div className="grid grid-cols-2 gap-4">
+                
+                {/* --- CỘT 1: NHÀ CUNG CẤP --- */}
                 <div>
-                  <label className="block text-sm font-medium text-stone-600 mb-1">Nhà cung cấp</label>
-                  <select className="w-full p-2 border rounded bg-stone-50" value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
-                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                  <div className="flex justify-between items-center mb-1">
+                      <label className="block text-sm font-medium text-stone-600">Nhà cung cấp</label>
+                      {/* Nút Toggle */}
+                      <button 
+                        onClick={() => setIsCreatingSupplier(!isCreatingSupplier)} 
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {isCreatingSupplier ? <><FaUndo/> Hủy</> : <><FaPlus/> Tạo mới</>}
+                      </button>
+                  </div>
+                  
+                  {isCreatingSupplier ? (
+                      // Input tạo mới
+                      <div className="flex gap-2">
+                          <input 
+                              type="text"
+                              className="w-full p-2 border rounded bg-blue-50 focus:border-blue-500 outline-none text-sm"
+                              placeholder="Nhập tên NCC..."
+                              value={newSupplierName}
+                              onChange={e => setNewSupplierName(e.target.value)}
+                              autoFocus
+                          />
+                          <button onClick={handleQuickCreateSupplier} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700">
+                              <FaCheck/>
+                          </button>
+                      </div>
+                  ) : (
+                      // Dropdown chọn cũ
+                      <select className="w-full p-2 border rounded bg-stone-50" value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                  )}
                 </div>
+
+                {/* --- CỘT 2: KHO HÀNG --- */}
                 <div>
-                  <label className="block text-sm font-medium text-stone-600 mb-1">Nhập về Kho</label>
-                  <select className="w-full p-2 border rounded bg-stone-50" value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-                    {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-stone-600">Nhập về Kho</label>
+                        {/* Nút Toggle */}
+                        <button 
+                            onClick={() => setIsCreatingStore(!isCreatingStore)} 
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                            {isCreatingStore ? <><FaUndo/> Hủy</> : <><FaPlus/> Tạo mới</>}
+                        </button>
+                    </div>
+
+                    {isCreatingStore ? (
+                        // Input tạo mới
+                        <div className="flex gap-2">
+                            <input 
+                                type="text"
+                                className="w-full p-2 border rounded bg-blue-50 focus:border-blue-500 outline-none text-sm"
+                                placeholder="Nhập tên Kho..."
+                                value={newStoreName}
+                                onChange={e => setNewStoreName(e.target.value)}
+                                autoFocus
+                            />
+                            <button onClick={handleQuickCreateStore} className="bg-blue-600 text-white px-3 rounded hover:bg-blue-700">
+                                <FaCheck/>
+                            </button>
+                        </div>
+                    ) : (
+                        // Dropdown chọn cũ
+                        <select className="w-full p-2 border rounded bg-stone-50" value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
+                            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                    )}
                 </div>
+
               </div>
             </div>
 
-            {/* Form chọn Sản phẩm */}
+            {/* Form chọn Sản phẩm (GIỮ NGUYÊN) */}
             <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
               <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><FaPlus/> Thêm sản phẩm</h3>
               <div className="space-y-4">
@@ -231,13 +338,13 @@ const Inventory = () => {
                 {tempProduct && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-3">
-                       <label className="block text-sm font-medium text-stone-600 mb-1">Phiên bản</label>
-                       <select className="w-full p-2 border rounded" value={tempVariant} onChange={e => setTempVariant(e.target.value)}>
+                        <label className="block text-sm font-medium text-stone-600 mb-1">Phiên bản</label>
+                        <select className="w-full p-2 border rounded" value={tempVariant} onChange={e => setTempVariant(e.target.value)}>
                           <option value="">-- Chọn Size/Màu --</option>
                           {products.find(p => p.id == tempProduct)?.variants.map(v => (
                             <option key={v.id} value={v.id}>{v.sku} - {v.color} / {v.size}</option>
                           ))}
-                       </select>
+                        </select>
                     </div>
                   </div>
                 )}
@@ -256,7 +363,7 @@ const Inventory = () => {
             </div>
           </div>
 
-          {/* Review List */}
+          {/* Review List (GIỮ NGUYÊN) */}
           <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
             <h3 className="font-bold text-stone-800 mb-4">Phiếu nhập ({importItems.length})</h3>
             <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto">
@@ -283,7 +390,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* --- TAB 2: TỒN KHO HIỆN TẠI (MỚI) --- */}
+      {/* --- TAB 2: TỒN KHO HIỆN TẠI (GIỮ NGUYÊN) --- */}
       {activeTab === 'stock' && (
         <div className="space-y-4">
             {/* Thanh tìm kiếm */}
@@ -342,7 +449,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* --- TAB 3: LỊCH SỬ NHẬP --- */}
+      {/* --- TAB 3: LỊCH SỬ NHẬP (GIỮ NGUYÊN) --- */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
@@ -360,7 +467,8 @@ const Inventory = () => {
                 {batches.map((batch) => (
                   <tr key={batch.id} className="hover:bg-stone-50">
                     <td className="p-4 text-stone-500">{new Date(batch.created_at).toLocaleDateString('vi-VN')}</td>
-                    <td className="p-4 font-mono text-xs text-blue-600">{batch.batch_name}</td>
+                    {/* --- [SỬA] THAY BATCH_NAME BẰNG ID --- */}
+                    <td className="p-4 font-mono text-xs text-blue-600">Batch #{batch.id}</td>
                     <td className="p-4">
                       <div className="font-medium">{batch.variants?.products?.name}</div>
                       <div className="text-xs text-stone-500">{batch.variants?.size} / {batch.variants?.color}</div>

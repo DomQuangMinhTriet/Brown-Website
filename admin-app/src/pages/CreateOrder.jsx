@@ -33,13 +33,15 @@ const CreateOrder = () => {
 
     // Logic Giỏ hàng
     const addToCart = (product, variant) => {
-        if (variant.stock <= 0) return toast.error("Hết hàng!");
+        // SỬA: variant.stock -> variant.quantity_remaining
+        if (variant.quantity_remaining <= 0) return toast.error("Hết hàng!");
         
         setCart(prev => {
             const existing = prev.find(item => item.variant_id === variant.id);
             if (existing) {
-                if (existing.quantity >= variant.stock) {
-                    toast.warn(`Kho chỉ còn ${variant.stock} sản phẩm!`);
+                // SỬA: variant.stock -> variant.quantity_remaining
+                if (existing.quantity >= variant.quantity_remaining) {
+                    toast.warn(`Kho chỉ còn ${variant.quantity_remaining} sản phẩm!`);
                     return prev;
                 }
                 return prev.map(item => item.variant_id === variant.id ? { ...item, quantity: item.quantity + 1 } : item);
@@ -52,7 +54,8 @@ const CreateOrder = () => {
                 color: variant.color,
                 price: product.base_price,
                 quantity: 1,
-                max_stock: variant.stock,
+                // SỬA: variant.stock -> variant.quantity_remaining
+                max_stock: variant.quantity_remaining, 
                 image: product.images?.[0]
             }];
         });
@@ -141,10 +144,23 @@ const CreateOrder = () => {
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-stone-800">{p.name}</div>
                                 <div className="text-red-600 font-bold text-sm">{new Intl.NumberFormat('vi-VN').format(p.base_price)}</div>
+                                {/* Tìm đoạn code hiển thị variants trong phần return */}
                                 <div className="flex flex-wrap gap-1 mt-2">
                                     {p.variants?.map(v => (
-                                        <button key={v.id} onClick={() => addToCart(p, v)} disabled={v.stock <= 0} className={`text-xs px-2 py-1 border rounded ${v.stock > 0 ? 'hover:bg-stone-800 hover:text-white' : 'bg-stone-100 text-stone-300 line-through'}`}>
-                                            {v.size}-{v.color} ({v.stock})
+                                        <button 
+                                            key={v.id} 
+                                            onClick={() => addToCart(p, v)} 
+                                            // SỬA: v.stock -> v.quantity_remaining
+                                            disabled={v.quantity_remaining <= 0} 
+                                            className={`text-xs px-2 py-1 border rounded ${
+                                                // SỬA: v.stock -> v.quantity_remaining
+                                                v.quantity_remaining > 0 
+                                                ? 'hover:bg-stone-800 hover:text-white' 
+                                                : 'bg-stone-100 text-stone-300 line-through'
+                                            }`}
+                                        >
+                                            {/* SỬA: v.stock -> v.quantity_remaining */}
+                                            {v.size}-{v.color} ({v.quantity_remaining})
                                         </button>
                                     ))}
                                 </div>

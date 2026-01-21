@@ -88,7 +88,7 @@ const Navbar = () => {
                         {categories.map(cat => (
                             <Link 
                                 key={cat.id} 
-                                to={`/collection?search=${cat.slug}`} // Hoặc filter theo category_id
+                                to={`/collection?category=${cat.slug}`} // Hoặc filter theo category_id
                                 className="px-4 py-3 hover:bg-stone-50 text-stone-600 hover:text-stone-900 text-left border-b border-stone-100 last:border-0"
                             >
                                 {cat.name}
@@ -97,6 +97,14 @@ const Navbar = () => {
                     </div>
                 </div>
             </div>
+
+            <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                CHÍNH SÁCH ĐỔI TRẢ
+            </Link>
+
+            <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                CHÍNH SÁCH VẬN CHUYỂN
+            </Link>
 
             <Link to="/about" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
                 {t('nav.about')}

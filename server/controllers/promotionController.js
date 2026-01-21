@@ -62,41 +62,90 @@ exports.checkVoucher = async (req, res) => {
     try {
         const { code, cartTotal } = req.body;
         
-        // Query DB tìm mã
+        console.log(`🔍 Checking voucher: ${code} | Cart: ${cartTotal}`); // Log để debug
+
+        // 1. Tìm mã trong DB (Chuyển hết về chữ hoa để so sánh)
         const { data: promo, error } = await supabase
             .from('promotions')
             .select('*')
-            .eq('code', code.toUpperCase())
-            .eq('is_active', true)
-            .single();
+            .eq('code', code.toUpperCase().trim()) // Trim bỏ khoảng trắng thừa
+            .maybeSingle(); // Dùng maybeSingle để không throw lỗi nếu không tìm thấy
 
-        if (error || !promo) return res.status(400).json({ success: false, message: "Mã không hợp lệ" });
-
-        // Validate Logic
-        const now = new Date();
-        if (new Date(promo.start_date) > now) return res.status(400).json({ success: false, message: "Mã chưa bắt đầu" });
-        if (new Date(promo.end_date) < now) return res.status(400).json({ success: false, message: "Mã đã hết hạn" });
-        if (promo.used_count >= promo.usage_limit) return res.status(400).json({ success: false, message: "Mã đã hết lượt dùng" });
-        if (cartTotal < promo.min_order_value) return res.status(400).json({ success: false, message: `Đơn tối thiểu ${new Intl.NumberFormat().format(promo.min_order_value)}đ` });
-
-        // Tính tiền giảm
-        let discount = 0;
-        
-        // SỬA: Đổi điều kiện so sánh thành 'percent'
-        if (promo.discount_type === 'percent') { 
-            discount = cartTotal * (promo.discount_value / 100);
-            
-            // Logic max_discount_amount giữ nguyên
-            if (promo.max_discount_amount) {
-                discount = Math.min(discount, promo.max_discount_amount);
-            }
-        } else {
-            // Trường hợp fixed
-            discount = promo.discount_value;
+        // 2. Kiểm tra nếu không tìm thấy
+        if (error || !promo) {
+            console.log("❌ Không tìm thấy mã trong DB");
+            return res.status(400).json({ success: false, message: "Mã khuyến mãi không tồn tại" });
         }
 
-        res.json({ success: true, data: { discountAmount: discount, code: promo.code } });
+        console.log("✅ Tìm thấy mã:", promo);
+
+        // 3. Logic Validate chi tiết
+        const now = new Date();
+        const startDate = new Date(promo.start_date);
+        
+        // Xử lý ngày kết thúc: Set về 23:59:59 của ngày đó để khách dùng được đến hết ngày
+        const endDate = new Date(promo.end_date);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Check 1: Ngày bắt đầu
+        if (startDate > now) {
+            return res.status(400).json({ success: false, message: "Mã chưa đến thời gian áp dụng" });
+        }
+
+        // Check 2: Ngày kết thúc
+        if (endDate < now) {
+            return res.status(400).json({ success: false, message: "Mã đã hết hạn sử dụng" });
+        }
+
+        // Check 3: Số lượng
+        if (promo.used_count >= promo.usage_limit) {
+            return res.status(400).json({ success: false, message: "Mã đã hết lượt sử dụng" });
+        }
+
+        // Check 4: Giá trị đơn tối thiểu
+        if (cartTotal < promo.min_order_value) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Đơn hàng phải từ ${new Intl.NumberFormat('vi-VN').format(promo.min_order_value)}đ mới được dùng mã này` 
+            });
+        }
+
+        // 4. Tính toán số tiền giảm
+        console.log("Loại mã trong DB:", promo.discount_type); // <--- LOG ĐỂ KIỂM TRA
+
+        let discountAmount = 0;
+        
+        // SỬA ĐOẠN NÀY: So sánh linh hoạt hơn (chấp nhận cả 'percent', 'percentage', 'PERCENT')
+        const type = promo.discount_type ? promo.discount_type.toLowerCase() : '';
+
+        if (type === 'percent' || type === 'percentage') {
+            // --- LOGIC PHẦN TRĂM ---
+            console.log("Đang tính theo %:", promo.discount_value);
+            discountAmount = (cartTotal * promo.discount_value) / 100;
+            
+            // Kiểm tra giảm tối đa
+            if (promo.max_discount_amount && promo.max_discount_amount > 0) {
+                discountAmount = Math.min(discountAmount, promo.max_discount_amount);
+            }
+        } else {
+            // --- LOGIC TIỀN MẶT (Mặc định) ---
+            console.log("Đang tính theo tiền mặt:", promo.discount_value);
+            discountAmount = promo.discount_value;
+        }
+
+        // Đảm bảo không giảm quá giá trị đơn hàng
+        discountAmount = Math.min(discountAmount, cartTotal);
+
+        res.json({
+            success: true,
+            data: {
+                promo: promo,
+                discountAmount: Math.floor(discountAmount) // Làm tròn số nguyên
+            }
+        });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Check Voucher Error:", error);
+        res.status(500).json({ success: false, message: "Lỗi hệ thống khi kiểm tra mã" });
     }
 };

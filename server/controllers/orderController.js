@@ -135,7 +135,7 @@ exports.createOrder = async (req, res) => {
                 // Kiểm tra hạn sử dụng & số lượng
                 const now = new Date();
                 if (new Date(promo.start_date) <= now && new Date(promo.end_date) >= now) {
-                     if (promo.discount_type === 'percentage') {
+                     if (promo.discount_type === 'percent') {
                         discount_amount = subtotal_check * (promo.discount_value / 100);
                         if (promo.max_discount_amount) discount_amount = Math.min(discount_amount, promo.max_discount_amount);
                     } else {

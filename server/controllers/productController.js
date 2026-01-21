@@ -3,29 +3,47 @@ const supabase = require('../config/supabase');
 // 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
 exports.getProducts = async (req, res) => {
     try {
-        const { search } = req.query;
+        const { search, category } = req.query; // category ở đây là SLUG (ví dụ: 'ao-thun')
 
-        // A. Xây dựng Query cơ bản
+        // 1. Khởi tạo Query cơ bản
         let query = supabase
             .from('products')
             .select(`
                 *,
-                variants (
-                    id, size, color, sku
-                )
+                variants (id, size, color, sku),
+                categories (id, name, slug)
             `)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
-        // B. Thêm điều kiện tìm kiếm nếu có
+        // 2. Logic tìm kiếm theo tên
         if (search) {
             query = query.ilike('name', `%${search}%`);
         }
 
+        // 3. --- [FIX QUAN TRỌNG] LOGIC LỌC DANH MỤC ---
+        if (category) {
+            // A. Tìm ID của danh mục dựa trên Slug trước
+            const { data: catData, error: catError } = await supabase
+                .from('categories')
+                .select('id')
+                .eq('slug', category)
+                .single(); // Lấy 1 dòng duy nhất
+
+            // B. Nếu tìm thấy danh mục -> Lọc sản phẩm theo ID đó
+            if (catData) {
+                query = query.eq('category_id', catData.id);
+            } else {
+                // Nếu slug không tồn tại (ví dụ: ?category=lung-tung) -> Trả về rỗng luôn
+                return res.json({ success: true, data: [] });
+            }
+        }
+
+        // 4. Thực thi Query lấy sản phẩm
         const { data: products, error: prodError } = await query;
         if (prodError) throw prodError;
 
-        // C. Lấy toàn bộ lô hàng còn tồn kho để tính số lượng
+        // 5. Tính toán tồn kho (Giữ nguyên logic cũ của bạn)
         const { data: batches, error: batchError } = await supabase
             .from('inventory_batches')
             .select('variant_id, quantity_remaining')
@@ -33,34 +51,23 @@ exports.getProducts = async (req, res) => {
 
         if (batchError) throw batchError;
 
-        // D. Map dữ liệu: Tính tổng tồn kho cho từng sản phẩm
+        // Map dữ liệu tồn kho
         const processedProducts = products.map(product => {
             const variantsWithStock = product.variants ? product.variants.map(variant => {
-                // Tính tổng tồn kho của variant này từ các lô hàng (batches)
-                const totalStock = batches
+                const stock = batches
                     .filter(b => b.variant_id === variant.id)
-                    .reduce((sum, b) => sum + (b.quantity_remaining || 0), 0);
-
-                return {
-                    ...variant,
-                    stock: totalStock // Trả về số lượng tồn
-                };
+                    .reduce((sum, b) => sum + b.quantity_remaining, 0);
+                return { ...variant, quantity_remaining: stock };
             }) : [];
 
-            // Tổng tồn kho của cả sản phẩm (cộng dồn các variants)
-            const productTotalStock = variantsWithStock.reduce((sum, v) => sum + v.stock, 0);
-
-            return {
-                ...product,
-                variants: variantsWithStock,
-                total_stock: productTotalStock
-            };
+            const totalStock = variantsWithStock.reduce((sum, v) => sum + v.quantity_remaining, 0);
+            return { ...product, variants: variantsWithStock, total_stock: totalStock };
         });
 
         res.json({ success: true, data: processedProducts });
 
     } catch (error) {
-        console.error("Get Products Error:", error);
+        console.error("Get Products Error:", error); // Log lỗi ra terminal để debug
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -89,7 +96,7 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI (Logic mới: Tự tạo Slug, bỏ Category_id)
 exports.createProduct = async (req, res) => {
     try {
-        const { name, base_price, description, images, variants } = req.body;
+        const { name, base_price, description, category_id, images, variants, size_chart_url } = req.body;
 
         // Validation cơ bản
         if (!name || !base_price) {
@@ -111,6 +118,8 @@ exports.createProduct = async (req, res) => {
                 base_price,
                 description,
                 images,
+                category_id: category_id,
+                size_chart_url: size_chart_url,
                 is_active: true
             }])
             .select()
@@ -142,15 +151,18 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, base_price, description, images, variants } = req.body;
+        const { name, slug, base_price, description, category_id, images, variants, size_chart_url } = req.body;
 
         // A. Cập nhật thông tin cơ bản
         const { error: prodError } = await supabase
             .from('products')
             .update({ 
                 name, 
+                slug,
                 base_price, 
                 description, 
+                category_id: category_id,
+                size_chart_url: size_chart_url,
                 images 
             })
             .eq('id', id);

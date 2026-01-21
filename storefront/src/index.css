@@ -21,7 +21,50 @@ body, #root {
   background-color: var(--color-beige);
 }
 
+/* Class tiện ích cho Font *//* src/index.css */
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700&display=swap');
+
+:root {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  /* --- [QUAN TRỌNG] TĂNG CỠ CHỮ TOÀN WEB --- */
+  /* Mặc định trình duyệt là 16px. 
+     Thiết lập 17px sẽ làm tất cả chữ to hơn khoảng 6.25% */
+  font-size: 17px; 
+
+  /* Bảng màu chuẩn BROWN */
+  --color-brown-dark: #292524; /* Stone 800 */
+  --color-brown-main: #44403c; /* Stone 700 */
+  --color-beige: #f5f5f4;      /* Stone 100 */
+}
+
+/* Cấu trúc để Footer luôn nằm dưới đáy */
+body, #root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-beige);
+  
+  /* [MỚI] Thiết lập màu chữ mặc định toàn trang là màu nâu đậm thay vì đen tuyền 
+     -> Giúp mắt dễ chịu và sang hơn */
+  color: var(--color-brown-dark);
+
+  /* [MỚI] Giúp font chữ sắc nét hơn trên MacOS và iOS */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Class tiện ích cho Font */
+.font-serif {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-sans {
+  font-family: 'Inter', sans-serif;
+}
 .font-serif {
   font-family: 'Playfair Display', serif;
 }

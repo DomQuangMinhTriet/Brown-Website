@@ -19,12 +19,14 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [categories, setCategories] = useState([]);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [sizeChart, setSizeChart] = useState('');
   
   // State thêm biến thể con
   const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '' });
   
   const fileInputRef = useRef(null);
 
+  
   // 1. NẠP DỮ LIỆU KHI MỞ MODAL (QUAN TRỌNG NHẤT)
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +45,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
         // Bảo vệ mảng ảnh (nếu null thì thành mảng rỗng)
         setImages(productToEdit.images || []);
+        setSizeChart(productToEdit.size_chart_url || '');
 
         // Bảo vệ variants
         const safeVariants = productToEdit.variants || [];
@@ -58,6 +61,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         setFormData({ name: '', slug: '', base_price: '', description: '', category_id: '' });
         setImages([]);
         setVariants([]);
+        setSizeChart('');
       }
       
       // Reset input variant nhỏ
@@ -104,20 +108,66 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const handleRemoveVariant = (index) => {
       setVariants(variants.filter((_, i) => i !== index));
   };
+    // Hàm chuyển đổi chuỗi thành slug (URL friendly)
+    const toSlug = (str) => {
+        return str
+            .toLowerCase()
+            .normalize('NFD') // Tách dấu ra khỏi ký tự
+            .replace(/[\u0300-\u036f]/g, '') // Xóa các dấu
+            .replace(/[đĐ]/g, 'd') // Chuyển đ -> d
+            .replace(/[^a-z0-9\s-]/g, '') // Xóa ký tự đặc biệt
+            .trim()
+            .replace(/\s+/g, '-'); // Thay khoảng trắng bằng dấu gạch ngang
+    };
+    const handleCreateCategory = async () => {
+        if (!newCatName) return;
 
-  const handleCreateCategory = async () => {
-      if(!newCatName) return;
-      try {
-          const res = await axios.post('http://localhost:5000/api/categories', { name: newCatName });
-          if(res.data.success) {
-              setCategories([...categories, res.data.data]);
-              setFormData({...formData, category_id: res.data.data.id});
-              setIsCreatingCat(false);
-              setNewCatName('');
-          }
-      } catch (err) { toast.error("Lỗi tạo danh mục"); }
-  };
+        // BƯỚC 1: Tạo slug tự động từ tên
+        const generatedSlug = toSlug(newCatName);
 
+        try {
+            // BƯỚC 2: Gửi cả name và slug lên Backend
+            const res = await axios.post('http://localhost:5000/api/categories', { 
+                name: newCatName,
+                slug: generatedSlug // <--- Đã bổ sung trường này
+            });
+
+            if (res.data.success) {
+                setCategories([...categories, res.data.data]);
+                
+                // Tự động chọn danh mục vừa tạo
+                setFormData({ ...formData, category_id: res.data.data.id });
+                
+                // Reset trạng thái
+                setIsCreatingCat(false);
+                setNewCatName('');
+                toast.success("Tạo danh mục thành công!");
+            }
+        } catch (err) { 
+            console.error(err);
+            toast.error(err.response?.data?.message || "Lỗi tạo danh mục"); 
+        }
+    };
+
+  // Hàm upload Size Chart (Copy logic từ handleUploadFile nhưng gán vào setSizeChart)
+    const handleUploadSizeChart = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const toastId = toast.loading("Đang tải ảnh lên...");
+        try {
+            const res = await axios.post('http://localhost:5000/api/upload', formData);
+            if (res.data.success) {
+                setSizeChart(res.data.url); // Lưu URL vào state
+                toast.update(toastId, { render: "Đã tải Size Chart!", type: "success", isLoading: false, autoClose: 2000 });
+            }
+        } catch (err) {
+            toast.update(toastId, { render: "Lỗi upload ảnh", type: "error", isLoading: false, autoClose: 2000 });
+        }
+    };
   // 3. HÀM SUBMIT (LƯU)
   const handleSubmit = async () => {
       if(!formData.name || !formData.base_price) return toast.warn("Tên và giá là bắt buộc");
@@ -125,7 +175,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       const payload = {
           ...formData,
           images,
-          variants
+          variants,
+          size_chart_url: sizeChart
       };
 
       try {
@@ -151,6 +202,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       }
   };
 
+  
   if (!isOpen) return null;
 
   return (
@@ -223,6 +275,39 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         <span className="text-xs font-bold">Thêm ảnh</span>
                     </button>
                     <input type="file" hidden ref={fileInputRef} onChange={handleFileUpload} accept="image/*" />
+                </div>
+            </div>
+
+            <div className="mt-4 p-4 bg-white rounded border border-stone-200">
+                <label className="label">Bảng quy đổi kích cỡ (Size Chart)</label>
+                
+                <div className="flex items-start gap-4">
+                    {/* Nút Upload */}
+                    <div className="relative">
+                        <input 
+                            type="file" 
+                            onChange={handleUploadSizeChart} 
+                            className="hidden" 
+                            id="sizeChartUpload"
+                            accept="image/*"
+                        />
+                        <label htmlFor="sizeChartUpload" className="flex items-center gap-2 px-4 py-2 border border-stone-300 rounded cursor-pointer hover:bg-stone-100 transition-colors">
+                            <FaUpload /> Tải ảnh lên
+                        </label>
+                    </div>
+
+                    {/* Hiển thị ảnh Preview */}
+                    {sizeChart && (
+                        <div className="relative group w-32 h-auto border rounded overflow-hidden">
+                            <img src={sizeChart} alt="Size Chart" className="w-full h-full object-cover" />
+                            <button 
+                                onClick={() => setSizeChart('')}
+                                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <FaTrash size={10} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

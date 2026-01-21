@@ -78,7 +78,7 @@ const Home = () => {
                     {/* [SỬA ĐỔI] Nội dung chữ (Title/Link) sẽ thay đổi theo từng banner */}
                     <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
                         <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
-                            {banner.title || 'MINIMALIST & ELEGANT'}
+                            {banner.title || 'BROWN'}
                         </h2>
                         <Link to={banner.link_to || "/collection"} 
                             className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">

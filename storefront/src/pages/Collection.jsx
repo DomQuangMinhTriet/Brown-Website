@@ -14,22 +14,39 @@ const Collection = () => {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search');
   const isPosMode = searchParams.get('pos') === 'true'; // Kiểm tra chế độ POS
+  const categorySlug = searchParams.get('category'); // <--- LẤY SLUG DANH MỤC
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const endpoint = searchQuery 
-            ? `http://localhost:5000/api/products?search=${encodeURIComponent(searchQuery)}`
-            : 'http://localhost:5000/api/products';
+        // Lấy tham số từ URL trình duyệt
+        // Ví dụ URL: /collection?category=ao-thun -> categorySlug = 'ao-thun'
+        const categorySlug = searchParams.get('category'); 
+        const searchQuery = searchParams.get('search');
 
-        const res = await axios.get(endpoint);
-        if (res.data.success) setProducts(res.data.data);
-      } catch (error) { console.error(error); } 
+        let url = 'http://localhost:5000/api/products?'; // Lưu ý dấu ? ở cuối
+        
+        const params = [];
+        if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
+        
+        // Gửi slug lên với key là 'category' để khớp với req.query.category ở Backend
+        if (categorySlug) params.push(`category=${encodeURIComponent(categorySlug)}`); 
+        
+        // Kết quả sẽ là: http://localhost:5000/api/products?category=ao-thun
+        const res = await axios.get(url + params.join('&'));
+        
+        if (res.data.success) {
+            setProducts(res.data.data);
+        }
+      } catch (error) { 
+          console.error(error); 
+          setProducts([]);
+      } 
       finally { setLoading(false); }
     };
     fetchProducts();
-  }, [searchQuery]);
+  }, [searchParams]); // Dùng searchParams làm dependency là đủ
 
   return (
     <div className={isPosMode ? "bg-stone-100 min-h-screen pb-24" : ""}>
@@ -49,39 +66,50 @@ const Collection = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Title & Search... (Giữ nguyên logic cũ) */}
         <div className="text-center mb-10">
-            <h1 className="text-3xl font-serif text-stone-900 mb-2">
-                {searchQuery ? `Tìm: "${searchQuery}"` : 'Danh Sách Sản Phẩm'}
-            </h1>
+            <h2 className="text-3xl font-serif text-stone-900 mb-8">
+                {searchQuery 
+                    ? `Kết quả tìm kiếm: "${searchQuery}"` 
+                    : categorySlug 
+                        ? `Danh mục: ${products[0]?.categories?.name || 'Sản phẩm'}` 
+                        : "Tất cả sản phẩm"}
+            </h2>
         </div>
 
         {/* LIST SẢN PHẨM */}
         {loading ? (
             <div className="text-center py-20">Đang tải...</div>
         ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
             {products.map(product => (
                 <Link 
                     // QUAN TRỌNG: Nếu đang ở POS, khi bấm vào sản phẩm phải giữ nguyên ?pos=true
                     to={`/product/${product.slug}${isPosMode ? '?pos=true' : ''}`} 
                     key={product.id} 
-                    className="bg-white p-3 rounded shadow-sm hover:shadow-md transition-all group block"
+                    // --- SỬA Ở ĐÂY: Xóa bg-white, p-3, shadow ---
+                    className="group block"
                 >
-                <div className="aspect-[3/4] bg-stone-200 overflow-hidden rounded mb-3 relative">
-                    <img 
-                        src={product.images?.[0]} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    {isPosMode && (
-                        <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">CHỌN MUA</span>
-                        </div>
-                    )}
-                </div>
-                <h3 className="font-medium text-stone-900 text-sm truncate">{product.name}</h3>
-                <p className="text-stone-500 font-bold mt-1">
-                    {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
-                </p>
+                    {/* Khung ảnh: Xóa bg-stone-200 để tránh hiện nền xám khi ảnh đang load */}
+                    <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative">
+                        <img 
+                            src={product.images?.[0]} 
+                            alt={product.name} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        
+                        {/* Overlay nút chọn mua (chỉ hiện khi ở POS) */}
+                        {isPosMode && (
+                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">CHỌN MUA</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
+                        {product.name}
+                    </h3>
+                    <p className="text-stone-500 font-bold mt-1 text-sm">
+                        {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                    </p>
                 </Link>
             ))}
             </div>

@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { FaArrowLeft, FaMoneyBillWave, FaQrcode, FaCheckCircle, FaCopy } from 'react-icons/fa';
+// Thêm icon FaTimes để dùng cho nút xóa mã
+import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 // --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
 const MY_BANK = {
-  BANK_ID: 'SACOMBANK', // Mã ngân hàng (MB, VCB, TCB, ACB, VPB...)
-  ACCOUNT_NO: '0902173763', // Số tài khoản của bạn
+  BANK_ID: 'SACOMBANK', // Mã ngân hàng
+  ACCOUNT_NO: '0902173763', // Số tài khoản
   ACCOUNT_NAME: 'LUU THI PHUONG QUYNH', // Tên chủ tài khoản
   TEMPLATE: 'compact' // Giao diện QR
 };
@@ -25,8 +26,13 @@ const Checkout = () => {
   // Payment Method: Khóa cứng là 'banking'
   const [paymentMethod] = useState('banking'); 
   
-  const [shippingFee] = useState(30000); // Phí mặc định 30k (Backend sẽ xử lý an toàn)
+  const [shippingFee] = useState(30000); // Phí mặc định 30k
   const [loading, setLoading] = useState(false);
+
+  // --- [MỚI] STATE CHO VOUCHER ---
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   // Auto-fill nếu đã đăng nhập
   useEffect(() => {
@@ -46,11 +52,42 @@ const Checkout = () => {
     if (cartItems.length === 0) navigate('/cart');
   }, [cartItems, navigate]);
 
-  const finalTotal = cartTotal + shippingFee;
+  // --- [MỚI] HÀM XỬ LÝ VOUCHER ---
+  const handleApplyVoucher = async () => {
+    if (!voucherCode) return toast.warn("Vui lòng nhập mã!");
+    
+    try {
+        const res = await axios.post('http://localhost:5000/api/promotions/check', {
+            code: voucherCode,
+            cartTotal: cartTotal
+        });
+
+        if (res.data.success) {
+            const { discountAmount, promo } = res.data.data;
+            setDiscountAmount(discountAmount);
+            setAppliedVoucher(promo);
+            toast.success(`Áp dụng mã ${promo.code} giảm ${new Intl.NumberFormat('vi-VN').format(discountAmount)}đ`);
+        }
+    } catch (error) {
+        setDiscountAmount(0);
+        setAppliedVoucher(null);
+        toast.error(error.response?.data?.message || "Mã không hợp lệ");
+    }
+  };
+
+  const removeVoucher = () => {
+    setVoucherCode('');
+    setAppliedVoucher(null);
+    setDiscountAmount(0);
+  };
+
+  // --- [SỬA] TÍNH TỔNG TIỀN CUỐI CÙNG (TRỪ ĐI GIẢM GIÁ) ---
+  const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
 
   // --- TẠO LINK QR CODE (VIETQR) ---
-  // Nội dung CK: "SDT + Ten" (Để dễ đối soát)
+  // Nội dung CK: "SDT + Ten"
   const transferContent = `${formData.phone} ${formData.fullName}`.trim().replace(/\s+/g, '%20').toUpperCase();
+  // URL QR Code sẽ tự động cập nhật khi finalTotal thay đổi (nhờ React re-render)
   const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
 
   const handleSubmit = async (e) => {
@@ -70,13 +107,17 @@ const Checkout = () => {
                 phone: formData.phone,
                 email: formData.email,
                 address: formData.address,
-                // Frontend hiện tại chưa có dropdown chọn Quận/Huyện nên gửi rỗng
                 province: "", district: "", ward: "" 
             },
             items: cartItems,
-            payment_method: 'banking', // Chỉ gửi banking
+            payment_method: 'banking',
             shipping_fee: shippingFee,
-            note: formData.note
+            note: formData.note,
+            
+            // --- [MỚI] GỬI KÈM THÔNG TIN VOUCHER ---
+            voucher_code: appliedVoucher ? appliedVoucher.code : null,
+            discount_amount: discountAmount,
+            final_total: finalTotal 
         };
 
         const res = await axios.post('http://localhost:5000/api/orders', payload);
@@ -90,11 +131,11 @@ const Checkout = () => {
     } catch (error) {
         console.error(error);
         toast.error(error.response?.data?.message || "Lỗi khi đặt hàng. Vui lòng thử lại.");
-
     } finally {
         setLoading(false);
     }
   };
+
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -120,7 +161,7 @@ const Checkout = () => {
                             value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
                         />
                          <input 
-                            type="email" placeholder="Email (để nhận thông báo)"
+                            type="email" placeholder="Email (để nhận thông báo và mã vận đơn)"
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                             value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                         />
@@ -148,19 +189,76 @@ const Checkout = () => {
                         <>
                             <p className="text-sm text-stone-500 mb-4">Vui lòng quét mã bên dưới để thanh toán</p>
                             <div className="flex justify-center mb-4">
+                                {/* QR Code sẽ tự đổi khi finalTotal đổi */}
                                 <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
                             </div>
                             
-                            <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-2 mb-6">
+                            <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-3 mb-6">
+                                {/* --- [MỚI] KHU VỰC NHẬP VOUCHER --- */}
+                                <div className="flex gap-2 mb-2">
+                                    <div className="relative flex-1">
+                                        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                            <FaTag className="text-stone-400 text-xs" />
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            value={voucherCode}
+                                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                                            placeholder="MÃ GIẢM GIÁ"
+                                            disabled={!!appliedVoucher}
+                                            className="w-full pl-7 p-2 text-xs border border-stone-200 rounded uppercase outline-none focus:border-stone-900"
+                                        />
+                                    </div>
+                                    {appliedVoucher ? (
+                                        <button 
+                                            type="button" 
+                                            onClick={removeVoucher}
+                                            className="bg-stone-200 text-stone-600 px-3 py-1 rounded hover:bg-stone-300"
+                                        >
+                                            <FaTimes size={12} />
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleApplyVoucher}
+                                            className="bg-stone-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-black"
+                                        >
+                                            ÁP DỤNG
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {appliedVoucher && (
+                                    <div className="text-green-600 text-xs flex items-center gap-1 mb-2">
+                                        <FaCheckCircle size={10} /> Đã dùng mã: <strong>{appliedVoucher.code}</strong>
+                                    </div>
+                                )}
+                                <hr className="border-stone-200"/>
+                                {/* ----------------------------------- */}
+
                                 <div className="flex justify-between">
-                                    <span className="text-stone-500">Tổng thanh toán:</span>
-                                    <span className="font-bold text-xl text-stone-900">{new Intl.NumberFormat('vi-VN').format(finalTotal)} ₫</span>
+                                    <span className="text-stone-500">Tạm tính:</span>
+                                    <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-stone-500">Chủ tài khoản:</span>
-                                    <span className="font-medium">{MY_BANK.ACCOUNT_NAME}</span>
+                                    <span className="text-stone-500">Phí vận chuyển:</span>
+                                    <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(shippingFee)} ₫</span>
                                 </div>
-                                <div className="flex justify-between">
+
+                                {/* [MỚI] HIỆN DÒNG GIẢM GIÁ NẾU CÓ */}
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-green-600 font-bold">
+                                        <span>Giảm giá:</span>
+                                        <span>- {new Intl.NumberFormat('vi-VN').format(discountAmount)} ₫</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between border-t border-stone-200 pt-2">
+                                    <span className="text-stone-900 font-bold">Tổng thanh toán:</span>
+                                    <span className="font-bold text-xl text-red-600">{new Intl.NumberFormat('vi-VN').format(finalTotal)} ₫</span>
+                                </div>
+                                
+                                <div className="flex justify-between text-xs mt-2 pt-2 border-t border-stone-200 border-dashed">
                                     <span className="text-stone-500">Nội dung CK:</span>
                                     <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
                                 </div>
@@ -172,7 +270,6 @@ const Checkout = () => {
                             <span>Nhập thông tin giao hàng để hiện mã QR</span>
                         </div>
                     )}
-=======
                     <button 
                         type="submit" 
                         form="checkout-form" 

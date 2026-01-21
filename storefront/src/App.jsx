@@ -8,6 +8,8 @@ import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import ReturnPolicy from './pages/policies/ReturnPolicy';
+import ShippingPolicy from './pages/policies/ShippingPolicy';
 
 // Import Context Ngôn ngữ
 import { useLanguage } from './context/LanguageContext';
@@ -33,6 +35,8 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/account" element={<Profile />} />
+            <Route path="/policy/return" element={<ReturnPolicy />} />
+            <Route path="/policy/shipping" element={<ShippingPolicy />} />
           </Routes>
         </main>
         
@@ -52,9 +56,8 @@ function AppContent() {
              <div>
                 <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.follow')}</h3>
                 <div className="flex gap-4">
-                   <a href="#" className="text-stone-400 hover:text-white transition">Facebook</a>
-                   <a href="#" className="text-stone-400 hover:text-white transition">Instagram</a>
-                   <a href="#" className="text-stone-400 hover:text-white transition">Tiktok</a>
+                   
+                   <a href="https://instagram.com/brown.vn" target="_blank" rel="noopener noreferrer" className="text-stone-400 hover:text-white transition">Instagram</a>                   
                 </div>
              </div>
           </div>

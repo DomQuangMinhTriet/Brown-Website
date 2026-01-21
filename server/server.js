@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-require('dotenv').config();
-=======
-<<<<<<< Updated upstream
-require('dotenv').config(); // Load env đầu tiên
->>>>>>> Frontend
-const express = require('express');
-const cors = require('cors');
-
-// Import các Routes
-const productRoutes = require('./routes/productRoutes');
-=======
 // server.js
 require('dotenv').config();
 const express = require('express');
@@ -29,21 +17,6 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const shippingRoutes = require('./routes/shippingRoutes');
 const contentRoutes = require('./routes/contentRoutes');
 const masterRoutes = require('./routes/masterRoutes');
->>>>>>> Stashed changes
-
-const uploadRoutes = require('./routes/uploadRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const masterRoutes = require('./routes/masterRoutes');
-const inventoryRoutes = require('./routes/inventoryRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const expenseRoutes = require('./routes/expenseRoutes'); // <--- MỚI
-const reportRoutes = require('./routes/reportRoutes');   // <--- MỚI
-const customerRoutes = require('./routes/customerRoutes'); // <--- Thêm
-const promotionRoutes = require('./routes/promotionRoutes'); // <--- Thêm
-const shippingRoutes = require('./routes/shippingRoutes');
-const contentRoutes = require('./routes/contentRoutes');
-
-
 
 const app = express();
 
@@ -71,29 +44,7 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan('dev'));
 
-<<<<<<< HEAD
 // --- ĐĂNG KÝ ROUTE (QUAN TRỌNG) ---
-=======
-<<<<<<< Updated upstream
-// Gắn route sản phẩm vào đường dẫn /api/products
->>>>>>> Frontend
-app.use('/api/products', productRoutes);
-
-app.use('/api/upload', uploadRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api', masterRoutes); // stores, suppliers
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/expenses', expenseRoutes); // <--- Đảm bảo dòng này có
-app.use('/api/reports', reportRoutes);   // <--- Đảm bảo dòng này có
-app.use('/api/customers', customerRoutes); // <--- Thêm
-app.use('/api/promotions', promotionRoutes); // <--- Đăng ký
-app.use('/api/shipping', shippingRoutes);
-app.use('/api/content', contentRoutes);
-
-app.get('/', (req, res) => res.send('API Running...'));
-=======
-// --- ĐĂNG KÝ ROUTES ---
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -111,7 +62,6 @@ app.use('/api/master', masterRoutes);
 app.get('/', (req, res) => {
   res.send('API Server is running...');
 });
->>>>>>> Stashed changes
 
 // Start Server
 const PORT = process.env.PORT || 5000;

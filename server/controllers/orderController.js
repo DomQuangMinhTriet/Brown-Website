@@ -18,11 +18,7 @@ const orderSchema = z.object({
         variant_id: z.number().int().positive(),
         quantity: z.number().int().min(1, "Số lượng phải lớn hơn 0")
     })).min(1, "Giỏ hàng không được để trống"),
-<<<<<<< HEAD
-    payment_method: z.enum(['cod', 'banking'], { 
-=======
     payment_method: z.enum(['done', 'banking'], { 
->>>>>>> Frontend
         errorMap: () => ({ message: "Phương thức thanh toán không hợp lệ" }) 
     }),
     voucher_code: z.string().nullable().optional(),
@@ -46,17 +42,12 @@ exports.createOrder = async (req, res) => {
 
         const { customer, items, payment_method, voucher_code, shipping_fee, note } = parseResult.data;
         
-<<<<<<< HEAD
-        // B. LẤY ID KHÁCH HÀNG (Nếu đã đăng nhập)
-        let customerId = null;
-=======
         // ==============================================================================
         // B. [ĐÃ CHỈNH SỬA] XÁC ĐỊNH KHÁCH HÀNG (Ưu tiên Login -> Tìm SĐT -> Tạo mới)
         // ==============================================================================
         let customerId = null;
 
         // 1. Kiểm tra nếu khách đã đăng nhập
->>>>>>> Frontend
         if (req.user && req.user.id) {
              const { data: cusData } = await supabase
                 .from('customers')
@@ -66,8 +57,6 @@ exports.createOrder = async (req, res) => {
              if (cusData) customerId = cusData.id;
         }
 
-<<<<<<< HEAD
-=======
         // 2. Nếu chưa có ID (Khách vãng lai), tìm trong Database bằng Số điện thoại
         // Bước này giúp gộp đơn hàng vào lịch sử của khách cũ
         if (!customerId && customer.phone) {
@@ -100,7 +89,6 @@ exports.createOrder = async (req, res) => {
             }
         }
         // ==============================================================================
->>>>>>> Frontend
         // C. CHUẨN BỊ DỮ LIỆU & BẢO MẬT GIÁ
         // Hacker có thể sửa giá ở Frontend, nên ta phải lấy giá gốc từ Database
         const cleanItems = [];
@@ -161,18 +149,10 @@ exports.createOrder = async (req, res) => {
         }
 
         // E. GỌI DATABASE TRANSACTION (RPC)
-<<<<<<< HEAD
-        // Đây là bước quan trọng nhất: Gửi toàn bộ dữ liệu sạch xuống SQL xử lý
-        const { data, error } = await supabase.rpc('create_order_transaction', {
-            p_customer_id: customerId,
-            p_customer_info: {
-                name: customer.fullName,
-=======
         const { data, error } = await supabase.rpc('create_order_transaction', {
             p_customer_id: customerId,
             p_customer_info: {
                 name: customer.fullName || customer.name || "Khách hàng", // Fallback nhiều trường hợp
->>>>>>> Frontend
                 phone: customer.phone,
                 email: customer.email,
                 address: customer.address + (customer.province ? `, ${customer.district}, ${customer.province}` : '')
@@ -186,20 +166,6 @@ exports.createOrder = async (req, res) => {
 
         if (error) {
             console.error("RPC Error:", error);
-<<<<<<< HEAD
-            // Lỗi từ SQL trả về (ví dụ: "Sản phẩm không đủ hàng")
-            return res.status(400).json({ success: false, message: error.message });
-        }
-
-        // F. GỬI MAIL & PHẢN HỒI
-        // Gửi mail async (không await để khách không phải chờ lâu)
-        const orderInfoForMail = {
-            code: data.order_code,
-            total_amount: data.total_amount, // Lấy tổng tiền chính xác từ SQL trả về
-            shipping_tracking_code: 'Đang cập nhật' 
-        };
-        sendOrderConfirmation(orderInfoForMail, customer.email).catch(console.error);
-=======
             return res.status(400).json({ success: false, message: error.message });
         }
 
@@ -221,7 +187,6 @@ exports.createOrder = async (req, res) => {
             // Gọi hàm gửi mail (không await để phản hồi nhanh)
             sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Error:", err));
         }
->>>>>>> Frontend
 
         res.json({ 
             success: true, 
@@ -231,11 +196,7 @@ exports.createOrder = async (req, res) => {
 
     } catch (error) {
         console.error("Order Controller Error:", error);
-<<<<<<< HEAD
-        res.status(500).json({ success: false, message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
-=======
         res.status(500).json({ success: false, message: 'Lỗi hệ thống: ' + error.message });
->>>>>>> Frontend
     }
 };
 
@@ -319,9 +280,6 @@ exports.updateOrderStatus = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
-<<<<<<< HEAD
-};
-=======
 };
 
 exports.createAdminOrder = async (req, res) => {
@@ -493,4 +451,3 @@ async function decreaseStock(variantId, qtyNeeded) {
         remainingToDeduct -= deduct;
     }
 }
->>>>>>> Frontend

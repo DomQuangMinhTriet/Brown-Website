@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch } from 'react-icons/fa';
+// [THAY ĐỔI 1] Thêm FaExclamationTriangle vào import
+import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 const Orders = () => {
@@ -228,13 +229,35 @@ const Orders = () => {
                         </>
                     )}
 
+                    {/* [THAY ĐỔI 2] LOGIC NÚT BẤM KHI ĐANG SHIPPING */}
                     {selectedOrder.status === 'shipping' && (
-                        <button disabled={processing} onClick={() => handleUpdateStatus('completed')} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2">
-                            <FaCheckCircle/> Hoàn tất đơn hàng
-                        </button>
+                        <>
+                            {/* Nút 1: Giao thất bại -> Hàng lỗi/mất -> Không hoàn kho */}
+                            <button disabled={processing} 
+                                onClick={() => {
+                                    if(confirm("Xác nhận Giao thất bại & Hàng HƯ HỎNG (Không hoàn kho)?")) handleUpdateStatus('returned', false);
+                                }}
+                                className="px-4 py-2 border border-stone-300 text-stone-600 rounded hover:bg-stone-200 flex items-center gap-2">
+                                <FaExclamationTriangle/> Thất bại (Hàng lỗi)
+                            </button>
+
+                            {/* Nút 2: Giao thất bại -> Khách trả -> Nhập lại kho */}
+                            <button disabled={processing} 
+                                onClick={() => {
+                                    if(confirm("Xác nhận Giao thất bại & Khách trả hàng (Nhập lại kho)?")) handleUpdateStatus('returned', true);
+                                }}
+                                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 flex items-center gap-2">
+                                <FaUndo/> Thất bại (Hoàn kho)
+                            </button>
+
+                            {/* Nút 3: Giao thành công */}
+                            <button disabled={processing} onClick={() => handleUpdateStatus('completed')} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2">
+                                <FaCheckCircle/> Giao thành công
+                            </button>
+                        </>
                     )}
                     
-                    {/* Logic Hoàn Trả phức tạp */}
+                    {/* Logic Hoàn Trả phức tạp (Khi đã hoàn thành) */}
                     {selectedOrder.status === 'completed' && (
                         <div className="flex gap-2 items-center">
                             <span className="text-xs text-stone-500 mr-2">Khách trả hàng?</span>

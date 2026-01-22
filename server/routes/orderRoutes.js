@@ -3,15 +3,17 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 
-// Import Middleware và Schema vừa tạo
-const validate = require('../middleware/validateMiddleware');
-const { createOrderSchema } = require('../validators/orderSchema');
+// --- 1. ROUTE TÍNH PHÍ SHIP (BẮT BUỘC PHẢI CÓ) ---
+// Frontend gọi cái này để tính tiền ship GHN trước khi đặt
+router.post('/shipping-fee', orderController.getShippingFee);
 
-// --- CẬP NHẬT ROUTE NÀY ---
-// Thêm validate(createOrderSchema) vào giữa
-router.post('/', validate(createOrderSchema), orderController.createOrder);
+// --- 2. ROUTE TẠO ĐƠN HÀNG ---
+// LƯU Ý QUAN TRỌNG: Tôi đã bỏ "validate(createOrderSchema)" ở đây.
+// Vì trong orderController.createOrder chúng ta đã có Zod Schema mới nhất rồi.
+// Để lại middleware cũ ở đây sẽ khiến dữ liệu ID bị lọc mất -> Gây lỗi.
+router.post('/', orderController.createOrder);
 
-// Các route khác giữ nguyên
+// --- 3. CÁC ROUTE ADMIN ---
 router.get('/', orderController.getAllOrders);
 router.put('/:id/status', orderController.updateOrderStatus);
 router.post('/create-admin', orderController.createAdminOrder);

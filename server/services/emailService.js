@@ -1,3 +1,4 @@
+// server/services/emailService.js
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (to, subject, text, html) => {
@@ -51,7 +52,7 @@ const sendOrderConfirmation = async (order, customerEmail) => {
                 <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code}</b> của bạn đã được khởi tạo.</p>
                 
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount)*1000} đ</p>
+                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount)} đ</p>
                     <p style="margin: 5px 0;"><strong>Hình thức:</strong> Chuyển khoản ngân hàng (QR)</p>
                 </div>
 
@@ -76,4 +77,43 @@ const sendOrderConfirmation = async (order, customerEmail) => {
     return await sendEmail(customerEmail, subject, `Đơn hàng ${order.code} đã được nhận.`, htmlContent);
 };
 
-module.exports = { sendEmail, sendOrderConfirmation };
+// --- [MỚI] THÊM HÀM NÀY ĐỂ FIX LỖI ---
+const sendShippingConfirmation = async (order, trackingCode) => {
+    // Kiểm tra email khách hàng, nếu không có thì bỏ qua
+    // Lưu ý: data trả về từ updateOrderStatus có cấu trúc hơi khác createOrder, 
+    // nên ta cần lấy email từ customer_info nếu có
+    const email = order.customer_info?.email || order.customer_email; 
+    if (!email) return;
+
+    const subject = `[BROWN] Đơn hàng #${order.code} đang được vận chuyển 🚚`;
+    const trackingLink = `https://khachhang.ghn.vn/order-tracking?code=${trackingCode}`;
+
+    const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #292524; color: white; padding: 20px; text-align: center;">
+                <h2 style="margin: 0;">ĐƠN HÀNG ĐANG VẬN CHUYỂN</h2>
+            </div>
+            <div style="padding: 20px;">
+                <p>Xin chào quý khách,</p>
+                <p>Tin vui! Đơn hàng <strong>${order.code}</strong> của bạn đã được bàn giao cho đơn vị vận chuyển.</p>
+
+                <div style="background-color: #f5f5f4; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
+                    <p style="margin: 0 0 10px 0; color: #78716c; font-size: 14px; text-transform: uppercase;">Mã vận đơn (GHN)</p>
+                    <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 15px;">
+                        ${trackingCode}
+                    </div>
+                    <a href="${trackingLink}" target="_blank" style="display: inline-block; background-color: #292524; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">
+                        THEO DÕI ĐƠN HÀNG
+                    </a>
+                </div>
+                
+                <p style="font-size: 13px; color: #57534e;">*Trạng thái đơn hàng có thể mất vài giờ để cập nhật trên hệ thống vận chuyển.</p>
+            </div>
+        </div>
+    `;
+
+    return await sendEmail(email, subject, `Đơn hàng ${order.code} đang vận chuyển.`, htmlContent);
+};
+
+// [QUAN TRỌNG] Nhớ export cả sendShippingConfirmation
+module.exports = { sendEmail, sendOrderConfirmation, sendShippingConfirmation };

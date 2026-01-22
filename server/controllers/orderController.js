@@ -1,18 +1,23 @@
 const supabase = require('../config/supabase');
-const { sendOrderConfirmation } = require('../services/emailService');
+const { sendOrderConfirmation, sendShippingConfirmation } = require('../services/emailService');
+const { calculateShippingFee, createGHNOrder } = require('../services/shippingService'); // <--- IMPORT HELPER
 const { z } = require('zod');
 
-// --- 1. ĐỊNH NGHĨA BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
-// Dùng Zod để đảm bảo dữ liệu đầu vào sạch 100%
+// --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
 const orderSchema = z.object({
     customer: z.object({
         fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
         phone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, "Số điện thoại không hợp lệ"),
         email: z.string().email("Email không hợp lệ").optional().or(z.literal('')),
-        address: z.string().min(5, "Địa chỉ quá ngắn (tối thiểu 5 ký tự)"),
+        // Cho phép nhận cả tên địa chỉ và ID địa chỉ
+        address: z.string().min(5, "Địa chỉ quá ngắn"),
         province: z.string().optional(),
         district: z.string().optional(),
         ward: z.string().optional(),
+        // [MỚI] Thêm ID để lưu vào DB phục vụ GHN sau này
+        province_id: z.any().optional(), 
+        district_id: z.any().optional(),
+        ward_code: z.any().optional()
     }),
     items: z.array(z.object({
         variant_id: z.number().int().positive(),
@@ -25,6 +30,17 @@ const orderSchema = z.object({
     shipping_fee: z.number().min(0).default(0),
     note: z.string().optional()
 });
+
+// --- [MỚI] API TÍNH PHÍ SHIP (Frontend sẽ gọi cái này) ---
+exports.getShippingFee = async (req, res) => {
+    try {
+        const { district_id, ward_code } = req.body;
+        const fee = await calculateShippingFee(district_id, ward_code);
+        res.json({ success: true, fee });
+    } catch (error) {
+        res.status(500).json({ success: false, fee: 30000 });
+    }
+};
 
 // --- 2. API TẠO ĐƠN HÀNG (SỬ DỤNG TRANSACTION) ---
 exports.createOrder = async (req, res) => {
@@ -41,7 +57,7 @@ exports.createOrder = async (req, res) => {
         }
 
         const { customer, items, payment_method, voucher_code, shipping_fee, note } = parseResult.data;
-        
+        console.log("👉 Dữ liệu Customer sau khi Validate:", customer);
         // ==============================================================================
         // B. [ĐÃ CHỈNH SỬA] XÁC ĐỊNH KHÁCH HÀNG (Ưu tiên Login -> Tìm SĐT -> Tạo mới)
         // ==============================================================================
@@ -149,16 +165,22 @@ exports.createOrder = async (req, res) => {
         }
 
         // E. GỌI DATABASE TRANSACTION (RPC)
+        // [QUAN TRỌNG] Gửi thêm thông tin ID địa chỉ vào p_customer_info để lưu DB
         const { data, error } = await supabase.rpc('create_order_transaction', {
             p_customer_id: customerId,
             p_customer_info: {
-                name: customer.fullName || customer.name || "Khách hàng", // Fallback nhiều trường hợp
+                name: customer.fullName,
                 phone: customer.phone,
                 email: customer.email,
-                address: customer.address + (customer.province ? `, ${customer.district}, ${customer.province}` : '')
+                // Lưu địa chỉ dạng chuỗi hiển thị
+                address: customer.address + (customer.province ? `, ${customer.district}, ${customer.province}` : ''),
+                // Lưu ID địa chỉ để dùng cho GHN sau này
+                province_id: customer.province_id,
+                district_id: customer.district_id,
+                ward_code: customer.ward_code
             },
             p_payment_method: payment_method,
-            p_shipping_fee: shipping_fee,
+            p_shipping_fee: shipping_fee, // Sử dụng phí ship frontend gửi lên (đã tính qua GHN)
             p_discount_amount: discount_amount,
             p_voucher_code: voucher_code || null,
             p_items: cleanItems
@@ -228,37 +250,68 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, restock } = req.body; // Thêm tham số restock (true/false)
-        
-        // 1. Lấy thông tin đơn hiện tại
+        const { status, restock } = req.body; 
+
+        // --- LOG DEBUG (Giữ lại để theo dõi) ---
+        console.log("-------------------------------------------------");
+        console.log(`🛠 Đang update đơn #${id} sang trạng thái: ${status}`);
+
+        // 1. Lấy thông tin đơn hàng hiện tại (SỬA LỖI Ở ĐÂY: Thêm error: fetchError)
         const { data: currentOrder, error: fetchError } = await supabase
             .from('orders')
-            .select('status, order_items(variant_id, quantity)')
+            .select('*, order_items(variant_id, quantity)') // Lấy cả items để gửi GHN
             .eq('id', id)
             .single();
 
-        if (fetchError || !currentOrder) return res.status(404).json({success: false, message: "Không tìm thấy đơn hàng"});
+        // Kiểm tra lỗi sau khi query
+        if (fetchError || !currentOrder) {
+            console.error("Lỗi tìm đơn hàng:", fetchError);
+            return res.status(404).json({success: false, message: "Không tìm thấy đơn hàng"});
+        }
 
-        // 2. LOGIC HOÀN KHO (Chỉ chạy khi Admin yêu cầu restock = true)
-        // Áp dụng cho trạng thái: Cancelled (Hủy) hoặc Returned (Hoàn hàng)
+        console.log("Trạng thái cũ:", currentOrder.status);
+        console.log("Mã vận đơn hiện tại (DB):", currentOrder.shipping_tracking_code);
+
+        let trackingCode = currentOrder.shipping_tracking_code;
+        let updateData = { status };
+
+        // ==========================================================
+        // 2. LOGIC TỰ ĐỘNG GHN KHI CHUYỂN SANG SHIPPING
+        // ==========================================================
+        // Chỉ chạy khi: Trạng thái mới là shipping VÀ Chưa có mã vận đơn
+        if (status === 'shipping' && !trackingCode) {
+            console.log(`🚀 Admin xác nhận giao hàng. Đang gọi GHN...`);
+            try {
+                // TỰ ĐỘNG GỌI GHN TẠO VẬN ĐƠN
+                trackingCode = await createGHNOrder(currentOrder);
+                
+                // Cập nhật mã vận đơn vào biến để lưu xuống DB
+                updateData.shipping_tracking_code = trackingCode;
+                console.log(`✅ Đã tạo mã vận đơn: ${trackingCode}`);
+            } catch (ghnError) {
+                // Nếu lỗi GHN, dừng lại báo lỗi ngay cho Admin biết
+                console.error("❌ Lỗi tạo đơn GHN:", ghnError.message);
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Lỗi GHN: ${ghnError.message}. Kiểm tra lại địa chỉ khách!` 
+                });
+            }
+        }
+
+        // 3. LOGIC HOÀN KHO (RESTOCK) - (Giữ nguyên)
         if (restock === true && ['cancelled', 'returned'].includes(status)) {
-            
-            // Chỉ hoàn kho nếu trạng thái cũ CHƯA hoàn (để tránh hoàn 2 lần)
             if (!['cancelled', 'returned'].includes(currentOrder.status)) {
                 for (const item of currentOrder.order_items) {
-                    // Tìm lô hàng nhập sau cùng (LIFO) để cộng lại (hoặc tạo lô mới)
-                    // Ở đây ta cộng vào lô có sẵn để đơn giản hóa
-                    const { data: latestBatch } = await supabase
-                        .from('inventory_batches')
+                    // Logic cộng lại kho FIFO
+                    const { data: latestBatch } = await supabase.from('inventory_batches')
                         .select('id, quantity_remaining')
                         .eq('variant_id', item.variant_id)
                         .order('created_at', { ascending: false })
                         .limit(1)
                         .single();
-                    
+                        
                     if (latestBatch) {
-                        await supabase
-                            .from('inventory_batches')
+                        await supabase.from('inventory_batches')
                             .update({ quantity_remaining: latestBatch.quantity_remaining + item.quantity })
                             .eq('id', latestBatch.id);
                     }
@@ -266,18 +319,26 @@ exports.updateOrderStatus = async (req, res) => {
             }
         }
 
-        // 3. Cập nhật trạng thái mới
+        // 4. CẬP NHẬT DATABASE
         const { data, error } = await supabase
             .from('orders')
-            .update({ status })
+            .update(updateData)
             .eq('id', id)
-            .select();
+            .select()
+            .single();
 
         if (error) throw error;
         
-        res.json({ success: true, message: 'Cập nhật trạng thái thành công', data: data[0] });
+        // 5. GỬI EMAIL TỰ ĐỘNG KÈM LINK TRACKING
+        if (status === 'shipping' && trackingCode) {
+            console.log("📧 Đang gửi email tracking cho khách...");
+            sendShippingConfirmation(data, trackingCode).catch(err => console.error("Mail Error:", err));
+        }
+
+        res.json({ success: true, message: 'Cập nhật thành công & Đã tạo đơn GHN', data: data });
 
     } catch (error) {
+        console.error("Update Order Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

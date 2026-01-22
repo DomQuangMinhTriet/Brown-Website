@@ -151,10 +151,6 @@ const ProductDetail = () => {
                         <div className="mb-auto">
                             <h1 className="text-3xl font-serif text-stone-900 mb-2">{product.name}</h1>
                             <div className="flex items-center gap-2 mb-6">
-                                <div className="flex text-yellow-500 text-xs">
-                                    {[...Array(5)].map((_, i) => <FaStar key={i} />)}
-                                </div>
-                                <span className="text-xs text-stone-400">(Đánh giá: 5.0)</span>
                             </div>
 
                             <p className="text-2xl font-bold text-stone-800 mb-8">

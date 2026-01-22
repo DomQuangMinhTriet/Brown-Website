@@ -26,7 +26,7 @@ export const translations = {
       desc: "Thời trang tối giản, tinh tế dành cho người hiện đại.",
       contact: "Liên hệ",
       follow: "Theo dõi chúng tôi",
-      rights: "Bản quyền thuộc về BROWN FASHION.",
+      rights: "Bản quyền thuộc về BROWN.",
     }
   },
   en: {
@@ -56,7 +56,7 @@ export const translations = {
       desc: "Minimalist and sophisticated fashion for modern people.",
       contact: "Contact Us",
       follow: "Follow Us",
-      rights: "All rights reserved by BROWN FASHION.",
+      rights: "All rights reserved by BROWN.",
     }
   }
 };

@@ -113,7 +113,7 @@ const Home = () => {
         {/* Overlay Text */}
         <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
             <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
-                {banners[0]?.title || 'MINIMALIST & ELEGANT'}
+                {banners[0]?.title || 'BROWN'}
             </h2>
             <Link to={banners[0]?.link_to || "/collection"} 
                 className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">

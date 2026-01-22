@@ -22,10 +22,12 @@ const app = express();
 
 // --- CẤU HÌNH BẢO MẬT (QUAN TRỌNG) ---
 // Cho phép Frontend (Localhost + Production Domain) truy cập
+// Danh sách các domain được phép gọi API
 const allowedOrigins = [
-  'http://localhost:5173', // Frontend Local
-  'http://localhost:3000', // Admin Local (nếu chạy port khác)
-  // 'https://your-domain.com' // Domain thật (hãy uncomment khi deploy)
+  "http://localhost:5173",                 // Localhost của bạn
+  "https://brown-clothing.vercel.app",     // Domain Vercel (sắp có)
+  "https://brown-fashion.com",             // Tên miền thật (nếu mua)
+  "https://www.brown-fashion.com"
 ];
 
 app.use(cors({

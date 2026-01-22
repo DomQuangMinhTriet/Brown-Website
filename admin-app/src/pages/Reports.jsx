@@ -29,7 +29,7 @@ const Reports = () => {
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:5000/api/reports/financial?startDate=${dateRange.start}&endDate=${dateRange.end}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/reports/financial?startDate=${dateRange.start}&endDate=${dateRange.end}`);
       if (res.data.success) {
         setData(res.data.data);
       }

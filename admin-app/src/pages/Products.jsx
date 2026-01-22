@@ -18,7 +18,7 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/products');
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
       if (response.data.success) {
         setProducts(response.data.data);
       }
@@ -33,7 +33,7 @@ const Products = () => {
   const handleDelete = async (id, name) => {
     if (window.confirm(`Bạn có chắc muốn xóa sản phẩm "${name}"? Hành động này không thể hoàn tác.`)) {
         try {
-            const res = await axios.delete(`http://localhost:5000/api/products/${id}`);
+            const res = await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
             if (res.data.success) {
                 toast.success("Đã xóa sản phẩm!");
                 fetchProducts(); // Load lại danh sách

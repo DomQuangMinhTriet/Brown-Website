@@ -43,9 +43,9 @@ const Inventory = () => {
     try {
       const [supRes, storeRes, prodRes] = await Promise.all([
         // Đã sửa đường dẫn đúng
-        axios.get('http://localhost:5000/api/inventory/suppliers'), 
-        axios.get('http://localhost:5000/api/inventory/stores'),
-        axios.get('http://localhost:5000/api/products') 
+        axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/suppliers`), 
+        axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/stores`),
+        axios.get(`${import.meta.env.VITE_API_URL}/api/products`) 
       ]);
       
       if (supRes.data.success) setSuppliers(supRes.data.data);
@@ -64,7 +64,7 @@ const Inventory = () => {
     try {
       // --- [SỬA LẠI ĐƯỜNG DẪN API] ---
       // Thêm /history vào cuối để gọi đúng route lấy lịch sử
-      const res = await axios.get('http://localhost:5000/api/inventory/history');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/history`);
       if (res.data.success) setBatches(res.data.data);
     } catch (error) {
       console.error("Lỗi tải lịch sử:", error);
@@ -75,7 +75,7 @@ const Inventory = () => {
   const handleQuickCreateSupplier = async () => {
       if (!newSupplierName.trim()) return alert("Vui lòng nhập tên NCC!");
       try {
-          const res = await axios.post('http://localhost:5000/api/inventory/suppliers', { name: newSupplierName });
+          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/inventory/suppliers`, { name: newSupplierName });
           if(res.data.success) {
               const newSup = res.data.data;
               setSuppliers([...suppliers, newSup]); // Thêm vào list hiện tại
@@ -91,7 +91,7 @@ const Inventory = () => {
   const handleQuickCreateStore = async () => {
       if (!newStoreName.trim()) return alert("Vui lòng nhập tên Kho!");
       try {
-          const res = await axios.post('http://localhost:5000/api/inventory/stores', { name: newStoreName });
+          const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/inventory/stores`, { name: newStoreName });
           if(res.data.success) {
               const newStore = res.data.data;
               setStores([...stores, newStore]); // Thêm vào list hiện tại
@@ -193,7 +193,7 @@ const Inventory = () => {
         }))
       };
 
-      const res = await axios.post('http://localhost:5000/api/inventory/inbound', payload);
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/inventory/inbound`, payload);
 
       if (res.data.success) {
         alert("✅ Nhập hàng thành công!");

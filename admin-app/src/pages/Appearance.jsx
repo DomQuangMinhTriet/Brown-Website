@@ -18,7 +18,7 @@ const Appearance = () => {
 
   const fetchBanners = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/content/banners');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`);
       if (res.data && Array.isArray(res.data.data)) {
         setBanners(res.data.data);
       } else {
@@ -40,7 +40,7 @@ const Appearance = () => {
     formData.append('image', file);
 
     try {
-        const res = await axios.post('http://localhost:5000/api/upload', formData, {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return res.data.url; // Trả về URL ảnh từ Server
@@ -64,7 +64,7 @@ const Appearance = () => {
         if (!imageUrl) throw new Error("Không lấy được URL ảnh");
 
         // Bước 2: Gửi thông tin xuống DB
-        await axios.post('http://localhost:5000/api/content/banners', {
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/content/banners`, {
             title: newBanner.title,
             link_to: newBanner.link_to,
             display_order: Number(newBanner.display_order),
@@ -91,7 +91,7 @@ const Appearance = () => {
   const handleDelete = async (id) => {
       if(!window.confirm("Bạn chắc chắn muốn xóa banner này?")) return;
       try {
-          await axios.delete(`http://localhost:5000/api/content/banners/${id}`);
+          await axios.delete(`${import.meta.env.VITE_API_URL}/api/content/banners/${id}`);
           toast.success("Đã xóa banner");
           fetchBanners();
       } catch (error) {

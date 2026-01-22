@@ -40,7 +40,7 @@ const ProductDetail = () => {
         const fetchProductData = async () => {
             try {
                 // Lấy tất cả sản phẩm về để check
-                const res = await axios.get('http://localhost:5000/api/products'); 
+                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`); 
                 if (res.data.success) {
                     const allProducts = res.data.data;
                     const found = allProducts.find(p => p.slug === slug);

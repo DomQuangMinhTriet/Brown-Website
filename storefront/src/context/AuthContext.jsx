@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   // Lấy Profile từ Backend của mình (Bảng customers)
   const fetchProfile = async (authUser, token) => {
     try {
-        const res = await axios.get('http://localhost:5000/api/customers/me/profile', {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/customers/me/profile`, {
             headers: { Authorization: `Bearer ${token}` } // Gửi Token lên Server check
         });
         if(res.data.success) {

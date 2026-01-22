@@ -24,7 +24,7 @@ const CreateOrder = () => {
         const fetchProducts = async () => {
             try {
                 // Gọi API lấy sản phẩm (đã bao gồm logic tính tồn kho ở backend)
-                const res = await axios.get('http://localhost:5000/api/products');
+                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
                 if (res.data.success) setProducts(res.data.data);
             } catch (err) { console.error(err); }
         };
@@ -104,7 +104,7 @@ const CreateOrder = () => {
         };
 
         try {
-            const res = await axios.post('http://localhost:5000/api/orders/create-admin', payload);
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/create-admin`, payload);
             if (res.data.success) {
                 toast.success("Tạo đơn hàng thành công!");
                 // Reset form

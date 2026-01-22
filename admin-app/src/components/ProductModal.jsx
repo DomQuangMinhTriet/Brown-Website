@@ -71,7 +71,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/categories');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
       if(res.data.success) setCategories(res.data.data);
     } catch (err) { console.error(err); }
   };
@@ -86,7 +86,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
     try {
       // Đang upload...
-      const res = await axios.post('http://localhost:5000/api/upload', formDataUpload);
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formDataUpload);
       if (res.data.success) {
          setImages(prev => [...prev, res.data.url]); // Backend phải trả về { success: true, url: "..." }
          toast.success("Đã tải ảnh lên");
@@ -127,7 +127,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
         try {
             // BƯỚC 2: Gửi cả name và slug lên Backend
-            const res = await axios.post('http://localhost:5000/api/categories', { 
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/categories`, { 
                 name: newCatName,
                 slug: generatedSlug // <--- Đã bổ sung trường này
             });
@@ -159,7 +159,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
         const toastId = toast.loading("Đang tải ảnh lên...");
         try {
-            const res = await axios.post('http://localhost:5000/api/upload', formData);
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formData);
             if (res.data.success) {
                 setSizeChart(res.data.url); // Lưu URL vào state
                 toast.update(toastId, { render: "Đã tải Size Chart!", type: "success", isLoading: false, autoClose: 2000 });
@@ -182,7 +182,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       try {
           if (productToEdit) {
               // GỌI API SỬA (PUT)
-              const res = await axios.put(`http://localhost:5000/api/products/${productToEdit.id}`, payload);
+              const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${productToEdit.id}`, payload);
               if(res.data.success) {
                   toast.success(res.data.message); // Hiển thị thông báo từ backend
                   onSuccess();
@@ -190,7 +190,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
               }
           } else {
               // GỌI API TẠO MỚI (POST)
-              const res = await axios.post('http://localhost:5000/api/products', payload);
+              const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, payload);
               if(res.data.success) {
                   toast.success("Tạo sản phẩm thành công");
                   onSuccess();

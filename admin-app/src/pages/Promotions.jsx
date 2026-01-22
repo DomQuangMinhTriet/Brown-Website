@@ -27,7 +27,7 @@ const Promotions = () => {
 
   const fetchPromotions = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/promotions');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/promotions`);
       
       if(res.data.success && Array.isArray(res.data.data)) {
           setPromotions(res.data.data);
@@ -57,7 +57,7 @@ const Promotions = () => {
     if (!payload.code) { setLoading(false); return toast.warning("Nhập mã code!"); }
 
     try {
-      await axios.post('http://localhost:5000/api/promotions', payload);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions`, payload);
       toast.success("Tạo mã thành công!");
       setShowModal(false);
       fetchPromotions();
@@ -73,7 +73,7 @@ const Promotions = () => {
   const handleDelete = async (id) => {
       if(!window.confirm("Xóa mã này?")) return;
       try {
-          await axios.delete(`http://localhost:5000/api/promotions/${id}`);
+          await axios.delete(`${import.meta.env.VITE_API_URL}/api/promotions/${id}`);
           toast.success("Đã xóa mã");
           fetchPromotions();
       } catch (error) {

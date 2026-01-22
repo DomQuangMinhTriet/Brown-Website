@@ -40,7 +40,7 @@ const Collection = () => {
         const categorySlug = searchParams.get('category'); 
         const searchQuery = searchParams.get('search');
 
-        let url = 'http://localhost:5000/api/products?'; // Lưu ý dấu ? ở cuối
+        let url = `${import.meta.env.VITE_API_URL}/api/products?`; // Lưu ý dấu ? ở cuối
         
         const params = [];
         if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
@@ -48,7 +48,7 @@ const Collection = () => {
         // Gửi slug lên với key là 'category' để khớp với req.query.category ở Backend
         if (categorySlug) params.push(`category=${encodeURIComponent(categorySlug)}`); 
         
-        // Kết quả sẽ là: http://localhost:5000/api/products?category=ao-thun
+        // Kết quả sẽ là: ${import.meta.env.VITE_API_URL}/api/products?category=ao-thun
         const res = await axios.get(url + params.join('&'));
         
         if (res.data.success) {

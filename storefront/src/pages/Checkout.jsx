@@ -121,7 +121,7 @@ const Checkout = () => {
   const handleApplyVoucher = async () => {
     if (!voucherCode) return toast.warn("Vui lòng nhập mã!");
     try {
-        const res = await axios.post('http://localhost:5000/api/promotions/check', {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions/check`, {
             code: voucherCode,
             cartTotal: cartTotal
         });
@@ -186,7 +186,7 @@ const Checkout = () => {
             final_total: finalTotal 
         };
 
-        const res = await axios.post('http://localhost:5000/api/orders', payload);
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, payload);
         
         if (res.data.success) {
             toast.success("🎉 Đặt hàng thành công!");

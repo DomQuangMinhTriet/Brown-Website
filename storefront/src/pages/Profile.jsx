@@ -26,7 +26,7 @@ const Profile = () => {
     e.preventDefault();
     try {
       const token = getToken();
-      await axios.put('http://localhost:5000/api/customers/me/profile', formData, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/customers/me/profile`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMsg('✅ Cập nhật thành công!');

@@ -33,7 +33,7 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/orders');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
       setOrders(res.data.data);
       setFilteredOrders(res.data.data);
     } catch (error) {
@@ -48,7 +48,7 @@ const Orders = () => {
     if (!selectedOrder) return;
     setProcessing(true);
     try {
-      await axios.put(`http://localhost:5000/api/orders/${selectedOrder.id}/status`, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrder.id}/status`, {
         status: newStatus,
         restock: restock // Gửi kèm yêu cầu hoàn kho hay không
       });

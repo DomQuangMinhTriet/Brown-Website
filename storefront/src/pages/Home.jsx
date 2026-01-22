@@ -16,8 +16,8 @@ const Home = () => {
     const fetchData = async () => {
       try {
         const [prodRes, banRes] = await Promise.all([
-            axios.get('http://localhost:5000/api/products'),
-            axios.get('http://localhost:5000/api/content/banners')
+            axios.get(`${import.meta.env.VITE_API_URL}/api/products`),
+            axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`)
         ]);
         if (prodRes.data.success) setProducts(prodRes.data.data);
         if (banRes.data.success) setBanners(banRes.data.data);

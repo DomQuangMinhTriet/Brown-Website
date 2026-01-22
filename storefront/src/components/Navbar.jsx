@@ -25,7 +25,7 @@ const Navbar = () => {
   useEffect(() => {
     const fetchCats = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/categories');
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
             if(res.data.success) setCategories(res.data.data);
         } catch(e) { console.error(e); }
     };

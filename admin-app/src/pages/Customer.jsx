@@ -18,7 +18,7 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/customers');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/customers`);
       if (res.data.success) {
         setCustomers(res.data.data);
       }
@@ -32,7 +32,7 @@ const Customers = () => {
   const handleViewHistory = async (customer) => {
     setSelectedCustomer(customer);
     try {
-      const res = await axios.get(`http://localhost:5000/api/customers/${customer.id}/history`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/customers/${customer.id}/history`);
       setHistory(res.data.data);
       setShowModal(true);
     } catch (error) {

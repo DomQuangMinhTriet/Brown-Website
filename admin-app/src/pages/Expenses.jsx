@@ -30,14 +30,14 @@ const Expenses = () => {
 
     const fetchExpenses = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/expenses');
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/expenses`);
             if (res.data.success) setExpenses(res.data.data);
         } catch (err) { console.error(err); }
     };
 
     const fetchStores = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/inventory/stores');
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/stores`);
             if (res.data.success) {
                 setStores(res.data.data);
                 if (res.data.data.length > 0) {
@@ -50,7 +50,7 @@ const Expenses = () => {
     const fetchCategories = async () => {
         try {
             // Gọi API lấy danh sách danh mục
-            const res = await axios.get('http://localhost:5000/api/expenses/categories'); 
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/expenses/categories`); 
             if (res.data.success) {
                 setCategories(res.data.data);
                 if (res.data.data.length > 0) {
@@ -65,7 +65,7 @@ const Expenses = () => {
         if (!newTypeName.trim()) return;
         try {
             // Gọi API vừa thêm ở Bước 1
-            const res = await axios.post('http://localhost:5000/api/expenses/categories', { name: newTypeName });
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/expenses/categories`, { name: newTypeName });
             
             if (res.data.success) {
                 const newCat = res.data.data;
@@ -85,7 +85,7 @@ const Expenses = () => {
         if (!newExpense.amount || !newExpense.category_id) return toast.warn("Vui lòng nhập đủ tiền và loại chi phí");
         
         try {
-            await axios.post('http://localhost:5000/api/expenses', newExpense);
+            await axios.post(`${import.meta.env.VITE_API_URL}/api/expenses`, newExpense);
             toast.success("Đã lưu chi phí");
             setNewExpense(prev => ({ ...prev, note: '', amount: '' })); 
             fetchExpenses();
@@ -97,7 +97,7 @@ const Expenses = () => {
     const handleDelete = async (id) => {
         if(!confirm("Xóa khoản chi này?")) return;
         try {
-            await axios.delete(`http://localhost:5000/api/expenses/${id}`);
+            await axios.delete(`${import.meta.env.VITE_API_URL}/api/expenses/${id}`);
             toast.success("Đã xóa");
             fetchExpenses();
         } catch (err) { toast.error("Lỗi xóa"); }

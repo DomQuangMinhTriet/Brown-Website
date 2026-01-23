@@ -5,7 +5,9 @@ exports.getCustomers = async (req, res) => {
         const { data, error } = await supabase
             .from('customers')
             .select('*, orders(id, total_amount, created_at)') // Join bảng orders
+            .neq('role', 'admin')
             .order('created_at', { ascending: false });
+            
 
         if (error) throw error;
 

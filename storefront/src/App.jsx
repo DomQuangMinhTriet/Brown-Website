@@ -1,3 +1,5 @@
+
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 
 // ==============================
@@ -23,6 +25,7 @@ import { useLanguage } from './context/LanguageContext';
 // Nếu chưa, hãy sửa đường dẫn bên dưới cho đúng file của bạn
 import useRealtimeOrder from './hooks/useRealtimeOrder';
 import Sidebar from './components/Sidebar';
+import Header from './components/Header';
 import AdminRoute from './components/AdminRoute';
 import AdminLogin from './pages/admin/Login'; // Hoặc './pages/LoginAdmin'
 import Dashboard from './pages/admin/Dashboard';
@@ -38,12 +41,37 @@ import CreateOrder from './pages/admin/CreateOrder';
 
 // --- Layout Wrapper cho Admin (Realtime & Sidebar) ---
 const AdminLayoutWrapper = () => {
-  useRealtimeOrder(); // Hook chỉ chạy trong admin
+  useRealtimeOrder();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State quản lý menu
+
   return (
-    <div className="flex min-h-screen bg-stone-50 text-stone-800 text-base">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        <Outlet /> {/* Nơi hiển thị các trang con của Admin */}
+    <div className="flex min-h-screen bg-stone-50 text-stone-800 text-base font-sans">
+      {/* 1. OVERLAY ĐEN (Chỉ hiện trên mobile khi mở menu) */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+        ></div>
+      )}
+
+      {/* 2. SIDEBAR (Ẩn hiện trên mobile, Cố định trên desktop) */}
+      <aside className={`
+        fixed top-0 left-0 z-50 h-full w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+        md:translate-x-0
+      `}>
+        {/* Truyền hàm đóng menu vào Sidebar */}
+        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+      </aside>
+
+      {/* 3. NỘI DUNG CHÍNH */}
+      <div className="flex-1 flex flex-col min-w-0 md:ml-64 transition-all duration-300">
+        {/* Header chứa nút 3 gạch */}
+        <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        
+        <main className="flex-1 p-4 md:p-8 mt-16 overflow-x-hidden">
+          <Outlet /> 
+        </main>
       </div>
     </div>
   );

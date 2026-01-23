@@ -41,3 +41,16 @@ body, #root {
 .font-sans {
   font-family: 'Inter', sans-serif;
 }
+
+#root {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  width: 100% !important;
+}
+
+/* Đảm bảo bảng luôn có thanh cuộn mượt */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}

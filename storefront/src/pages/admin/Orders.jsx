@@ -101,8 +101,9 @@ const Orders = () => {
       </div>
 
       {/* Bảng Đơn hàng */}
-      <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="overflow-x-auto">
+                {/* [QUAN TRỌNG] min-w-[1000px] ép bảng luôn rộng, không bị vỡ chữ */}
+        <table className="w-full text-left border-collapse min-w-[1000px]">
           <thead className="bg-stone-50 border-b border-stone-200">
             <tr>
               <th className="p-4">Mã đơn</th>

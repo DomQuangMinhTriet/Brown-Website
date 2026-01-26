@@ -8,7 +8,7 @@ const AdminRoute = () => {
   
   // 1. Nếu chưa đăng nhập -> Đá về Login
   if (!admin) {
-      return <Navigate to="/login" />;
+      return <Navigate to="/admin/login" />;
   }
 
   // 2. LOGIC PHÂN QUYỀN CỐ ĐỊNH:
@@ -16,7 +16,7 @@ const AdminRoute = () => {
   if (admin.email !== 'brownvn25@gmail.com') {
       alert("⛔ Bạn không có quyền truy cập trang Quản trị!");
       logout(); // Đăng xuất tài khoản khách này ra
-      return <Navigate to="/login" />;
+      return <Navigate to="/admin/login" />;
   }
 
   // 3. Đúng là Admin xịn -> Cho vào

@@ -5,7 +5,7 @@ const SEO = ({ title, description, image, url }) => {
   const defaultTitle = 'BROWN - Thời trang tối giản & Thanh lịch';
   const defaultDesc = 'Thương hiệu thời trang thiết kế cao cấp, phong cách tối giản dành cho người hiện đại.';
   const defaultImage = 'https://your-domain.com/banner-default.jpg'; // Bạn nên thay bằng link ảnh banner thật
-  const siteUrl = 'https://brownfashion.vn'; // Domain thật của bạn sau này
+  const siteUrl = 'https://brownvn.com'; // Domain thật của bạn sau này
 
   return (
     <Helmet>

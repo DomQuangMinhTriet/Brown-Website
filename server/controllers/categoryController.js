@@ -48,3 +48,22 @@ exports.deleteCategory = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// 4. [MỚI] Toggle ẩn/hiện danh mục trên web
+exports.toggleCategoryVisibility = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_visible_on_home } = req.body;
+        
+        const { data, error } = await supabase
+            .from('categories')
+            .update({ is_visible_on_home })
+            .eq('id', id)
+            .select();
+            
+        if (error) throw error;
+        res.json({ success: true, data: data[0] });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

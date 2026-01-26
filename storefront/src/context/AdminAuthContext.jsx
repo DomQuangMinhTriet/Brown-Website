@@ -1,12 +1,11 @@
+// client/src/context/AdminAuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// Khởi tạo Supabase Client riêng cho Admin
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// [QUAN TRỌNG] Import client chung, KHÔNG ĐƯỢC TỰ TẠO CLIENT MỚI
+import { supabase } from '../supabaseClient'; 
 
 const AdminAuthContext = createContext();
+
+export const useAdminAuth = () => useContext(AdminAuthContext);
 
 export const AdminAuthProvider = ({ children }) => {
   const [admin, setAdmin] = useState(null);
@@ -37,15 +36,25 @@ export const AdminAuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+        await supabase.auth.signOut();
+    } catch (error) {
+        console.error("Admin logout error:", error);
+    } finally {
+        // Xóa sạch trạng thái Admin
+        setAdmin(null);
+        
+        // Xóa Token trong LocalStorage
+        localStorage.removeItem('sb-dbuwgocouxlpxulnlajl-auth-token'); 
+        
+        // Điều hướng về trang login admin
+        window.location.href = '/admin/login';
+    }
   };
 
   return (
-    <AdminAuthContext.Provider value={{ admin, login, logout, loading }}>
+    <AdminAuthContext.Provider value={{ admin, loading, login, logout, supabase }}>
       {children}
     </AdminAuthContext.Provider>
   );
 };
-
-export const useAdminAuth = () => useContext(AdminAuthContext);
-

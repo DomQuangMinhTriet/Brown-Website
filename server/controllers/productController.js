@@ -3,38 +3,37 @@ const supabase = require('../config/supabase');
 // 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
 exports.getProducts = async (req, res) => {
     try {
-        const { search, category } = req.query; // category ở đây là SLUG (ví dụ: 'ao-thun')
+        const { search, category } = req.query; 
 
-        // 1. Khởi tạo Query cơ bản
+        // [FIX LỖI PGRST201]
+        // Sử dụng cú pháp: tên_bảng!tên_constraint (...)
         let query = supabase
             .from('products')
             .select(`
                 *,
                 variants (id, size, color, sku),
-                categories (id, name, slug)
+                categories!fk_products_main_category (id, name, slug)
             `)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
-        // 2. Logic tìm kiếm theo tên
         if (search) {
             query = query.ilike('name', `%${search}%`);
         }
 
-        // 3. --- [FIX QUAN TRỌNG] LOGIC LỌC DANH MỤC ---
         if (category) {
-            // A. Tìm ID của danh mục dựa trên Slug trước
-            const { data: catData, error: catError } = await supabase
+            // Tìm ID danh mục
+            const { data: catData } = await supabase
                 .from('categories')
                 .select('id')
                 .eq('slug', category)
-                .single(); // Lấy 1 dòng duy nhất
+                .single();
 
-            // B. Nếu tìm thấy danh mục -> Lọc sản phẩm theo ID đó
             if (catData) {
+                // Hoặc lọc theo danh mục chính OR lọc theo collection
+                // Lưu ý: Logic lọc phức tạp hơn khi có collection, ở đây ta tạm giữ lọc theo category_id
                 query = query.eq('category_id', catData.id);
             } else {
-                // Nếu slug không tồn tại (ví dụ: ?category=lung-tung) -> Trả về rỗng luôn
                 return res.json({ success: true, data: [] });
             }
         }
@@ -81,7 +80,11 @@ exports.getProductBySlug = async (req, res) => {
             .from('products')
             .select(`
                 *,
-                variants (id, size, color, sku)
+                variants (id, size, color, sku, image_url),
+                categories!fk_products_main_category (id, name, slug),
+                product_collections (
+                    categories (id, name, slug)
+                )
             `)
             .eq('slug', slug)
             .single();
@@ -93,47 +96,55 @@ exports.getProductBySlug = async (req, res) => {
     }
 };
 
-// 3. TẠO SẢN PHẨM MỚI (Logic mới: Tự tạo Slug, bỏ Category_id)
+// 3. TẠO SẢN PHẨM MỚI
+// 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, base_price, description, category_id, images, variants, size_chart_url } = req.body;
+        // [MỚI] Nhận thêm collection_ids từ frontend
+        const { name, base_price, description, category_id, images, variants, size_chart_url, collection_ids } = req.body;
 
         // Validation cơ bản
         if (!name || !base_price) {
             return res.status(400).json({ success: false, message: 'Tên và giá là bắt buộc' });
         }
 
-        // Tạo slug tự động từ tên
+        // Tạo slug
         const slug = name.toLowerCase()
             .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             .replace(/đ/g, "d").replace(/[^a-z0-9]/g, "-") 
             + '-' + Date.now();
 
-        // A. Insert vào bảng Products
+        // A. Tạo Product
         const { data: product, error: prodError } = await supabase
             .from('products')
             .insert([{
-                name,
-                slug,
-                base_price,
-                description,
-                images,
-                category_id: category_id,
-                size_chart_url: size_chart_url,
-                is_active: true
+                name, slug, base_price, description, images,
+                category_id: category_id, // Vẫn giữ category chính để sort
+                size_chart_url, is_active: true
             }])
             .select()
             .single();
 
         if (prodError) throw prodError;
 
-        // B. Insert vào bảng Variants (nếu có)
+        // B. [MỚI] Lưu danh sách Collection phụ (product_collections)
+        if (collection_ids && Array.isArray(collection_ids) && collection_ids.length > 0) {
+            const collectionData = collection_ids.map(catId => ({
+                product_id: product.id,
+                category_id: catId
+            }));
+            const { error: collError } = await supabase.from('product_collections').insert(collectionData);
+            if (collError) throw collError;
+        }
+
+        // C. [CẬP NHẬT] Lưu Variants kèm Ảnh
         if (variants && variants.length > 0) {
             const variantData = variants.map(v => ({
                 product_id: product.id,
                 size: v.size,
                 color: v.color,
-                sku: v.sku
+                sku: v.sku,
+                image_url: v.image_url || null // [MỚI] Lưu link ảnh biến thể
             }));
             const { error: varError } = await supabase.from('variants').insert(variantData);
             if (varError) throw varError;
@@ -147,29 +158,37 @@ exports.createProduct = async (req, res) => {
     }
 };
 
-// 4. CẬP NHẬT SẢN PHẨM (Logic: Update theo ID, kiểm tra lịch sử kho)
+// 4. CẬP NHẬT SẢN PHẨM
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, base_price, description, category_id, images, variants, size_chart_url } = req.body;
+        // [MỚI] Nhận collection_ids
+        const { name, slug, base_price, description, category_id, images, variants, size_chart_url, collection_ids } = req.body;
 
-        // A. Cập nhật thông tin cơ bản
+        // 1. Update bảng Products
         const { error: prodError } = await supabase
             .from('products')
-            .update({ 
-                name, 
-                slug,
-                base_price, 
-                description, 
-                category_id: category_id,
-                size_chart_url: size_chart_url,
-                images 
-            })
+            .update({ name, slug, base_price, description, category_id, size_chart_url, images })
             .eq('id', id);
 
         if (prodError) throw prodError;
 
-        // B. Xử lý Biến thể (Size/Màu) - Logic an toàn kho hàng
+        // 2. [MỚI] Update Collections (Xóa cũ -> Thêm mới)
+        if (collection_ids) {
+            // Xóa hết collection cũ của sp này
+            await supabase.from('product_collections').delete().eq('product_id', id);
+            
+            // Thêm mới nếu có chọn
+            if (collection_ids.length > 0) {
+                const collectionData = collection_ids.map(catId => ({
+                    product_id: id,
+                    category_id: catId
+                }));
+                await supabase.from('product_collections').insert(collectionData);
+            }
+        }
+
+        // 3. Xử lý Biến thể (Size/Màu) - Logic an toàn kho hàng
         if (variants && variants.length > 0) {
             // Kiểm tra xem sản phẩm này đã từng nhập kho chưa?
             const { data: oldVariants } = await supabase.from('variants').select('id').eq('product_id', id);
@@ -199,18 +218,17 @@ exports.updateProduct = async (req, res) => {
             // Xóa variant cũ
             await supabase.from('variants').delete().eq('product_id', id);
             
-            // Tạo variant mới
             const variantData = variants.map(v => ({
                 product_id: id,
                 size: v.size,
                 color: v.color,
-                sku: v.sku
+                sku: v.sku,
+                image_url: v.image_url || null // [MỚI]
             }));
             await supabase.from('variants').insert(variantData);
         }
 
         res.json({ success: true, message: 'Cập nhật sản phẩm thành công!' });
-
     } catch (error) {
         console.error("Update Error:", error);
         res.status(500).json({ success: false, message: error.message });

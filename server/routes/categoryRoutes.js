@@ -11,4 +11,6 @@ router.post('/', categoryController.createCategory);
 // DELETE /api/categories/:id -> Xóa
 router.delete('/:id', categoryController.deleteCategory);
 
+router.put('/:id/visibility', categoryController.toggleCategoryVisibility);
+
 module.exports = router;

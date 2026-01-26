@@ -1,11 +1,8 @@
+// client/src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
-
-// Dùng biến môi trường từ Vite
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL; 
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// [QUAN TRỌNG] Import từ file cấu hình chung, KHÔNG tự tạo client ở đây nữa
+import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext();
 
@@ -48,29 +45,58 @@ export const AuthProvider = ({ children }) => {
   const fetchProfile = async (authUser, token) => {
     try {
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/customers/me/profile`, {
-            headers: { Authorization: `Bearer ${token}` } // Gửi Token lên Server check
+            headers: { Authorization: `Bearer ${token}` }
         });
         if(res.data.success) {
-            // Gộp thông tin Auth và thông tin DB
             setUser({ ...authUser, ...res.data.data }); 
         }
     } catch (error) {
         console.error("Lỗi lấy profile:", error);
-        // Fallback: Nếu lỗi API thì vẫn cho login với thông tin cơ bản
-        setUser(authUser);
+        
+        // [QUAN TRỌNG] BẮT LỖI 401 ĐỂ CẮT VÒNG LẶP
+        // Nếu Server báo 401 (Unauthorized) -> Token hỏng -> Buộc đăng xuất ngay
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            console.warn("Token hết hạn/lỗi. Đang đăng xuất sạch sẽ...");
+            
+            // 1. Đăng xuất trên Supabase
+            await supabase.auth.signOut();
+            
+            // 2. Xóa sạch State
+            setSession(null);
+            setUser(null);
+            
+            // 3. Xóa sạch LocalStorage (Xóa tận gốc)
+            localStorage.clear(); 
+        } else {
+            // Nếu lỗi khác (ví dụ 500, hoặc chưa có profile) thì vẫn giữ user cơ bản để không bị văng ra
+            setUser(authUser);
+        }
     } finally {
         setLoading(false);
     }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    try {
+        // 1. Gửi lệnh đăng xuất lên Server
+        await supabase.auth.signOut();
+    } catch (error) {
+        console.error("Lỗi API đăng xuất:", error);
+    } finally {
+        // 2. [QUAN TRỌNG] Bất kể API có lỗi hay không, Client PHẢI xóa sạch dữ liệu
+        setUser(null);
+        setSession(null);
+        
+        // 3. Xóa sạch LocalStorage (Token, Giỏ hàng...)
+        localStorage.clear(); 
+        
+        // 4. Force Reload trang về Home để đảm bảo sạch bộ nhớ đệm
+        window.location.href = '/'; 
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout, getToken }}>
+    <AuthContext.Provider value={{ user, session, loading, logout, getToken }}>
       {children}
     </AuthContext.Provider>
   );

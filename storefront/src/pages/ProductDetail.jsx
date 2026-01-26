@@ -34,6 +34,7 @@ const ProductDetail = () => {
     // State cho 2 mục mới
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [viewedProducts, setViewedProducts] = useState([]);
+    const [mainImage, setMainImage] = useState(null); // [MỚI] State ảnh chính
 
     // 1. Fetch sản phẩm chính + Sản phẩm liên quan + Xử lý đã xem
     useEffect(() => {
@@ -84,6 +85,13 @@ const ProductDetail = () => {
         window.scrollTo(0, 0); 
     }, [slug]);
 
+    // [MỚI] Effect để set ảnh mặc định khi sản phẩm thay đổi
+    useEffect(() => {
+        if (product?.images?.length > 0) {
+            setMainImage(product.images[0]);
+        }
+    }, [product]);
+
     // 2. Hàm lưu lịch sử xem
     const saveToViewedHistory = (currentProduct) => {
         try {
@@ -128,17 +136,25 @@ const ProductDetail = () => {
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
                         <div className="rounded-xl overflow-hidden aspect-[3/4]">
+                            {/* [ĐÃ SỬA] Hiển thị mainImage thay vì fix cứng ảnh đầu tiên */}
                             <img 
-                                src={product.images?.[0] || 'https://via.placeholder.com/500'} 
+                                src={mainImage || product.images?.[0] || 'https://via.placeholder.com/500'} 
                                 alt={product.name} 
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover transition-all duration-300"
                             />
                         </div>
                         {/* Ảnh nhỏ (Thumbnails) nếu có nhiều ảnh */}
                         {product.images?.length > 1 && (
                             <div className="grid grid-cols-4 gap-2">
                                 {product.images.map((img, idx) => (
-                                    <div key={idx} className="aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80">
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => setMainImage(img)} // [MỚI] Click đổi ảnh
+                                        className={`
+                                            aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-all
+                                            ${mainImage === img ? 'ring-2 ring-stone-900' : 'border border-transparent'}
+                                        `}
+                                    >
                                         <img src={img} className="w-full h-full object-cover" alt="" />
                                     </div>
                                 ))}
@@ -164,7 +180,13 @@ const ProductDetail = () => {
                                     {product.variants?.map(variant => (
                                         <button
                                             key={variant.id}
-                                            onClick={() => setSelectedVariant(variant)}
+                                            onClick={() => {
+                                                setSelectedVariant(variant);
+                                                // [MỚI] Nếu biến thể có ảnh riêng -> đổi ảnh chính
+                                                if (variant.image_url) {
+                                                    setMainImage(variant.image_url);
+                                                }
+                                            }}
                                             className={`
                                                 min-w-[80px] px-4 py-2 border rounded-lg text-sm transition-all relative overflow-hidden
                                                 ${selectedVariant?.id === variant.id 
@@ -236,16 +258,6 @@ const ProductDetail = () => {
                                     )}
                                 </div>
                             </div>
-                        </div>
-                        
-                        {/* Cam kết */}
-                        <div className="grid grid-cols-2 gap-4 mt-6">
-                             <div className="flex items-center gap-2 text-xs text-stone-500">
-                                 <FaCheck className="text-green-500"/> Hàng chính hãng
-                             </div>
-                             <div className="flex items-center gap-2 text-xs text-stone-500">
-                                 <FaCheck className="text-green-500"/> Đổi trả 7 ngày
-                             </div>
                         </div>
                     </div>
                 </div>

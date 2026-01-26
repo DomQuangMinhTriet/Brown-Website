@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { supabase } from '../context/AdminAuthContext'; // Import client admin
+import { supabase } from '../supabaseClient'; 
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 

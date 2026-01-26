@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../context/AuthContext'; // Import từ Context
+import { supabase } from '../supabaseClient'; 
 import { Link, useNavigate } from 'react-router-dom';
 
 const Register = () => {

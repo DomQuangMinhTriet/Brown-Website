@@ -21,8 +21,9 @@ exports.getProducts = async (req, res) => {
             query = query.ilike('name', `%${search}%`);
         }
 
+        // --- PHẦN CHỈNH SỬA DUY NHẤT Ở ĐÂY ---
         if (category) {
-            // Tìm ID danh mục
+            // 1. Tìm ID danh mục từ slug
             const { data: catData } = await supabase
                 .from('categories')
                 .select('id')
@@ -30,13 +31,30 @@ exports.getProducts = async (req, res) => {
                 .single();
 
             if (catData) {
-                // Hoặc lọc theo danh mục chính OR lọc theo collection
-                // Lưu ý: Logic lọc phức tạp hơn khi có collection, ở đây ta tạm giữ lọc theo category_id
-                query = query.eq('category_id', catData.id);
+                const targetCatId = catData.id;
+
+                // 2. [MỚI] Tìm thêm các sản phẩm nằm trong bảng phụ (product_collections)
+                const { data: collectionItems } = await supabase
+                    .from('product_collections')
+                    .select('product_id')
+                    .eq('category_id', targetCatId);
+                
+                // Gom ID lại thành mảng: [1, 5, 9...]
+                const idsInCollection = collectionItems ? collectionItems.map(i => i.product_id) : [];
+
+                // 3. [MỚI] Áp dụng bộ lọc OR (Hoặc là danh mục chính, Hoặc là nằm trong collection)
+                if (idsInCollection.length > 0) {
+                    // Cú pháp: .or('col1.eq.val1,col2.in.(val2,val3)')
+                    query = query.or(`category_id.eq.${targetCatId},id.in.(${idsInCollection.join(',')})`);
+                } else {
+                    // Nếu không có trong collection nào, chỉ lọc theo danh mục chính như cũ
+                    query = query.eq('category_id', targetCatId);
+                }
             } else {
                 return res.json({ success: true, data: [] });
             }
         }
+        // --- HẾT PHẦN CHỈNH SỬA ---
 
         // 4. Thực thi Query lấy sản phẩm
         const { data: products, error: prodError } = await query;

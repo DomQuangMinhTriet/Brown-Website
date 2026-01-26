@@ -5,14 +5,15 @@ exports.getProducts = async (req, res) => {
     try {
         const { search, category } = req.query; 
 
-        // [FIX LỖI PGRST201]
-        // Sử dụng cú pháp: tên_bảng!tên_constraint (...)
+        // [ĐÃ SỬA LỖI] Xóa 'quantity_remaining' khỏi variants (vì cột này không có trong bảng variants)
+        // [GIỮ NGUYÊN] Vẫn lấy product_collections để hiển thị checkbox bên Admin
         let query = supabase
             .from('products')
             .select(`
                 *,
-                variants (id, size, color, sku),
-                categories!fk_products_main_category (id, name, slug)
+                variants (id, size, color, sku, image_url),
+                categories!fk_products_main_category (id, name, slug),
+                product_collections ( category_id ) 
             `)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
@@ -21,46 +22,29 @@ exports.getProducts = async (req, res) => {
             query = query.ilike('name', `%${search}%`);
         }
 
-        // --- PHẦN CHỈNH SỬA DUY NHẤT Ở ĐÂY ---
         if (category) {
-            // 1. Tìm ID danh mục từ slug
-            const { data: catData } = await supabase
-                .from('categories')
-                .select('id')
-                .eq('slug', category)
-                .single();
-
-            if (catData) {
+             const { data: catData } = await supabase.from('categories').select('id').eq('slug', category).single();
+             if (catData) {
                 const targetCatId = catData.id;
-
-                // 2. [MỚI] Tìm thêm các sản phẩm nằm trong bảng phụ (product_collections)
-                const { data: collectionItems } = await supabase
-                    .from('product_collections')
-                    .select('product_id')
-                    .eq('category_id', targetCatId);
-                
-                // Gom ID lại thành mảng: [1, 5, 9...]
+                // Tìm sản phẩm trong bộ sưu tập phụ
+                const { data: collectionItems } = await supabase.from('product_collections').select('product_id').eq('category_id', targetCatId);
                 const idsInCollection = collectionItems ? collectionItems.map(i => i.product_id) : [];
-
-                // 3. [MỚI] Áp dụng bộ lọc OR (Hoặc là danh mục chính, Hoặc là nằm trong collection)
+                
+                // Lọc: Hoặc là danh mục chính, Hoặc nằm trong bộ sưu tập
                 if (idsInCollection.length > 0) {
-                    // Cú pháp: .or('col1.eq.val1,col2.in.(val2,val3)')
                     query = query.or(`category_id.eq.${targetCatId},id.in.(${idsInCollection.join(',')})`);
                 } else {
-                    // Nếu không có trong collection nào, chỉ lọc theo danh mục chính như cũ
                     query = query.eq('category_id', targetCatId);
                 }
-            } else {
-                return res.json({ success: true, data: [] });
-            }
+             } else {
+                 return res.json({ success: true, data: [] });
+             }
         }
-        // --- HẾT PHẦN CHỈNH SỬA ---
 
-        // 4. Thực thi Query lấy sản phẩm
         const { data: products, error: prodError } = await query;
         if (prodError) throw prodError;
 
-        // 5. Tính toán tồn kho (Giữ nguyên logic cũ của bạn)
+        // --- TÍNH TOÁN TỒN KHO TỪ BẢNG INVENTORY_BATCHES (GIỮ NGUYÊN) ---
         const { data: batches, error: batchError } = await supabase
             .from('inventory_batches')
             .select('variant_id, quantity_remaining')
@@ -68,9 +52,9 @@ exports.getProducts = async (req, res) => {
 
         if (batchError) throw batchError;
 
-        // Map dữ liệu tồn kho
         const processedProducts = products.map(product => {
             const variantsWithStock = product.variants ? product.variants.map(variant => {
+                // Cộng tổng số lượng từ các lô hàng (batches)
                 const stock = batches
                     .filter(b => b.variant_id === variant.id)
                     .reduce((sum, b) => sum + b.quantity_remaining, 0);
@@ -84,7 +68,7 @@ exports.getProducts = async (req, res) => {
         res.json({ success: true, data: processedProducts });
 
     } catch (error) {
-        console.error("Get Products Error:", error); // Log lỗi ra terminal để debug
+        console.error("Get Products Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

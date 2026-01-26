@@ -2,11 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-// [QUAN TRỌNG] Import Supabase Client để upload ảnh
 import { supabase } from '../supabaseClient';
 
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
-  // --- 1. KHỞI TẠO STATE (Luôn có giá trị mặc định để tránh lỗi Uncontrolled Input) ---
+  // State Form
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -18,39 +17,48 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
   const [images, setImages] = useState([]);
   const [variants, setVariants] = useState([]);
-  const [uploading, setUploading] = useState(false); // [SỬA] Thêm state này để hiện loading khi up ảnh
-
-  // State phụ trợ
+  const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState([]);
+  
+  // State phụ
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
-  
-  // State thêm biến thể con
   const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '' });
-  
   const fileInputRef = useRef(null);
 
-  // --- 2. NẠP DỮ LIỆU ---
+  // --- 1. NẠP DỮ LIỆU ---
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
 
       if (productToEdit) {
-        // [FIX LỖI UNCONTROLLED] Dùng || '' để đảm bảo không bao giờ bị undefined
+        console.log("========================================");
+        console.log("1️⃣ [INIT] Backend Data:", productToEdit);
+
+        // [LOGIC MỚI] Đọc cấu trúc phẳng { category_id: ... }
+        let loadedCollectionIds = [];
+        if (productToEdit.product_collections && Array.isArray(productToEdit.product_collections)) {
+            loadedCollectionIds = productToEdit.product_collections
+                .map(item => item.category_id) // Lấy trực tiếp field category_id
+                .filter(id => id !== null && id !== undefined)
+                .map(Number); // Ép kiểu số
+        }
+
+        console.log("3️⃣ [RESULT] IDs đã tick:", loadedCollectionIds);
+
         setFormData({
             name: productToEdit.name || '',
             slug: productToEdit.slug || '',
             base_price: productToEdit.base_price || 0,
             description: productToEdit.description || '',
             category_id: productToEdit.category_id || '',
-            collection_ids: [] // Cần logic backend trả về nếu muốn edit collection
+            collection_ids: loadedCollectionIds // <--- Gán vào đây
         });
 
         setImages(productToEdit.images || []);
         setSizeChart(productToEdit.size_chart_url || '');
 
-        // Map variants để đảm bảo cấu trúc
         const safeVariants = productToEdit.variants || [];
         setVariants(safeVariants.map(v => ({
             size: v.size || '',
@@ -60,7 +68,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         })));
 
       } else {
-        // Reset form khi tạo mới
+        // Reset form
+        console.log("🆕 Chế độ tạo mới - Reset Form");
         setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [] });
         setImages([]);
         setVariants([]);
@@ -73,51 +82,54 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const fetchCategories = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
-      if(res.data.success) setCategories(res.data.data);
+      if(res.data.success) {
+          console.log("📚 Danh sách Category tải về:", res.data.data);
+          setCategories(res.data.data);
+      }
     } catch (err) { console.error(err); }
   };
 
-  // --- 3. XỬ LÝ UPLOAD ẢNH (Đã sửa lỗi) ---
+  // --- 2. XỬ LÝ CLICK CHECKBOX (DEBUG KỸ) ---
+  const handleToggleCollection = (catId) => {
+      const targetId = Number(catId);
+      const currentIds = formData.collection_ids.map(Number); // Đảm bảo tất cả là số
+      
+      console.log(`🖱️ [CLICK] Bạn click vào ID: ${targetId} (Kiểu: ${typeof targetId})`);
+      console.log(`   [STATE] Danh sách hiện tại:`, currentIds);
+
+      let newIds;
+      if (currentIds.includes(targetId)) {
+          console.log("   -> ID đã tồn tại => XÓA");
+          newIds = currentIds.filter(id => id !== targetId);
+      } else {
+          console.log("   -> ID chưa có => THÊM");
+          newIds = [...currentIds, targetId];
+      }
+
+      console.log("   [NEW STATE] Danh sách mới:", newIds);
+      setFormData({ ...formData, collection_ids: newIds });
+  };
+
+  // --- 3. UPLOAD ẢNH ---
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-
-    setUploading(true); // Bắt đầu loading
+    setUploading(true);
     const newImages = [];
-
     try {
         for (const file of files) {
-            // Tạo tên file random để tránh trùng
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-            // Upload lên Supabase Storage (Bucket 'products')
             const { error } = await supabase.storage.from('products').upload(fileName, file);
-            
-            if (error) {
-                console.error("Supabase Upload Error:", error);
-                throw error;
-            }
-
-            // Lấy link ảnh công khai
+            if (error) throw error;
             const { data } = supabase.storage.from('products').getPublicUrl(fileName);
             newImages.push(data.publicUrl);
         }
-        
-        // Cập nhật State
         setImages(prev => [...prev, ...newImages]);
-        toast.success(`Đã tải lên ${newImages.length} ảnh`);
-
-    } catch (error) {
-        console.error(error);
-        toast.error('Lỗi upload: Kiểm tra lại Bucket "products" trên Supabase');
-    } finally {
-        setUploading(false); // Tắt loading
-        if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
-    }
+    } catch (error) { toast.error('Lỗi upload ảnh'); } finally { setUploading(false); }
   };
 
-  // --- 4. CÁC HÀM XỬ LÝ KHÁC ---
+  // --- 4. CÁC HÀM KHÁC ---
   const handleAddVariant = () => {
       if(!currentVariant.size || !currentVariant.color || !currentVariant.sku) {
           return toast.warn("Vui lòng nhập đủ Size, Màu, SKU");
@@ -130,7 +142,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       setVariants(variants.filter((_, i) => i !== index));
   };
 
-  // Hàm tạo danh mục nhanh
   const toSlug = (str) => {
       return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-');
   };
@@ -167,7 +178,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       }
   };
 
-  // Hàm sắp xếp ảnh
   const moveImage = (index, direction) => {
       const newImgs = [...images];
       const target = index + direction;
@@ -183,7 +193,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
       const payload = {
           ...formData,
-          base_price: Number(formData.base_price), // Đảm bảo là số
+          base_price: Number(formData.base_price),
           images,
           variants,
           size_chart_url: sizeChart
@@ -257,21 +267,19 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         </div>
                     </div>
 
-                    {/* COLLECTION CHECKBOX */}
+                    {/* [SỬA] CHECKBOX COLLECTION: Ép kiểu Number để so sánh chuẩn */}
                     <div>
                         <label className="label">Bộ sưu tập (Phụ)</label>
                         <div className="border border-stone-200 p-2 rounded max-h-[100px] overflow-y-auto bg-stone-50 grid grid-cols-2 gap-2">
                             {categories.map(c => (
-                                <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-stone-100 p-1 rounded">
+                                <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-stone-100 p-1 rounded select-none">
                                     <input 
                                         type="checkbox"
-                                        className="accent-stone-900"
-                                        checked={formData.collection_ids?.includes(c.id)}
-                                        onChange={(e) => {
-                                            const ids = formData.collection_ids || [];
-                                            if (e.target.checked) setFormData({...formData, collection_ids: [...ids, c.id]});
-                                            else setFormData({...formData, collection_ids: ids.filter(x => x !== c.id)});
-                                        }}
+                                        className="accent-stone-900 w-4 h-4"
+                                        // Kiểm tra kiểu Số === Số
+                                        checked={formData.collection_ids?.some(id => Number(id) === Number(c.id))}
+                                        // Hàm toggle
+                                        onChange={() => handleToggleCollection(c.id)}
                                     />
                                     <span className="text-sm text-stone-700">{c.name}</span>
                                 </label>
@@ -294,7 +302,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 </div>
             </div>
 
-            {/* HÌNH ẢNH (GRID UPLOAD) */}
+            {/* HÌNH ẢNH */}
             <div>
                 <label className="label mb-2 flex justify-between">
                     <span>Hình ảnh sản phẩm</span>
@@ -312,7 +320,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         </div>
                     ))}
                     
-                    <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 hover:text-stone-800 transition-colors bg-white">
+                    <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
                         <FaUpload size={20} className="mb-2"/>
                         <span className="text-xs font-bold">{uploading ? '...' : 'Thêm ảnh'}</span>
                     </button>
@@ -339,7 +347,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 )}
             </div>
 
-            {/* BIẾN THỂ (VARIANTS) */}
+            {/* BIẾN THỂ */}
             <div className="bg-stone-50 p-4 rounded-lg border border-stone-200">
                 <label className="label mb-3 block text-stone-700">Phân loại hàng (Size / Màu sắc)</label>
                 
@@ -368,7 +376,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                 <span className="font-bold w-10 text-center bg-stone-100 rounded">{v.size}</span>
                                 <span className="text-stone-600 min-w-[60px]">{v.color}</span>
                                 <span className="font-mono text-stone-400 text-xs py-0.5">{v.sku}</span>
-                                
                                 <select 
                                     className="border border-stone-300 rounded text-xs p-1 max-w-[120px] ml-auto"
                                     value={v.image_url || ""}

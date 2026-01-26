@@ -45,69 +45,53 @@ const Home = () => {
     <>
       <SEO title="Trang chủ" />
       
-      {/* 1. HERO BANNER (Đã sửa lại: Render danh sách & Tự động chuyển) */}
-      <div className="relative w-full h-[85vh] bg-stone-200 overflow-hidden group">
-        {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">BROWN LOADING...</div>
-        ) : banners.length > 0 ? (
-            // [SỬA ĐỔI] Thay vì chỉ hiện banners[0], ta map qua TOÀN BỘ banners
-            banners.map((banner, index) => (
-                <div 
-                    key={banner.id}
-                    // Class này giúp xếp chồng ảnh lên nhau và tạo hiệu ứng mờ dần (Fade)
-                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out
-                        ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}
-                    `}
-                >
-                    {/* Kiểm tra Video hoặc Ảnh */}
-                    {isVideo(banner.image_url) ? (
-                        <video 
-                            autoPlay loop muted playsInline 
-                            className="w-full h-full object-cover"
-                        >
-                            <source src={banner.image_url} type="video/mp4" />
-                        </video>
-                    ) : (
-                        <img 
-                            src={banner.image_url} 
-                            alt={banner.title} 
-                            className="w-full h-full object-cover"
-                        />
-                    )}
-
-                    {/* [SỬA ĐỔI] Nội dung chữ (Title/Link) sẽ thay đổi theo từng banner */}
-                    <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
-                        <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
-                            {banner.title || 'BROWN'}
-                        </h2>
-                        <Link to={banner.link_to || "/collection"} 
-                            className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
-                            {t('home.hero_btn')}
-                        </Link>
-                    </div>
-                </div>
-            ))
-        ) : (
-            // Banner mặc định nếu chưa có dữ liệu
-            <div className="w-full h-full bg-[#292524] flex items-center justify-center">
-                 <h2 className="text-white text-4xl font-serif"></h2>
-            </div>
-        )}
-
-        {/* [THÊM MỚI] Dấu chấm điều hướng bên dưới (Indicator Dots) */}
-        {!loading && banners.length > 1 && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-                {banners.map((_, idx) => (
-                    <button 
-                        key={idx}
-                        onClick={() => setCurrentBanner(idx)}
-                        className={`h-1.5 rounded-full transition-all duration-500 
-                            ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white'}
+      {/* 1. HERO BANNER */}
+        <div className="relative w-full h-[85vh] bg-stone-200 overflow-hidden group">
+            {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">BROWN LOADING...</div>
+            ) : banners.length > 0 ? (
+                banners.map((banner, index) => (
+                    <div 
+                        key={banner.id}
+                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out
+                            ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}
                         `}
-                    />
-                ))}
-            </div>
-        )}
+                    >
+                        {/* ẢNH / VIDEO */}
+                        {isVideo(banner.image_url) ? (
+                            <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                                <source src={banner.image_url} type="video/mp4" />
+                            </video>
+                        ) : (
+                            <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
+                        )}
+
+                        {/* [ĐÃ SỬA] CHỮ NẰM TRONG VÒNG LẶP ĐỂ ĐỔI THEO ẢNH */}
+                        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
+                            <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg animate-fade-in-up">
+                                {banner.title || 'BROWN'}
+                            </h2>
+                            <Link to={banner.link_to || "/collection"} 
+                                className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
+                                {t('home.hero_btn')}
+                            </Link>
+                        </div>
+                    </div>
+                ))
+            ) : (
+                <div className="w-full h-full bg-[#292524] flex items-center justify-center"></div>
+            )}
+
+            {/* NÚT CHẤM TRÒN (INDICATORS) - GIỮ NGUYÊN */}
+            {!loading && banners.length > 1 && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {banners.map((_, idx) => (
+                        <button key={idx} onClick={() => setCurrentBanner(idx)}
+                            className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white'}`}
+                        />
+                    ))}
+                </div>
+            )}
 
 
         {/* Overlay Text */}

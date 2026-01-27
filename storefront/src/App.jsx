@@ -88,7 +88,7 @@ const StorefrontLayout = () => {
       </main>
       
       {/* Footer */}
-      <footer className="bg-[#292524] text-[#f5f5f4] py-12 border-t-4 border-stone-800">
+      <footer className="bg-[#573425] text-[#f5f5f4] py-12 border-t-4 border-stone-800">
           <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
              <div>
                 <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.about')}</h3>
@@ -107,7 +107,7 @@ const StorefrontLayout = () => {
                 </div>
              </div>
           </div>
-          <div className="text-center mt-12 text-stone-600 text-xs">
+          <div className="text-center mt-12 text-[#f5f5f4] text-xs">
              © 2026 {t('footer.rights')}
           </div>
        </footer>

@@ -58,7 +58,7 @@ const Navbar = () => {
           </button>
 
           {/* Logo */}
-          <Link to="/" className="text-3xl font-serif font-bold tracking-[0.15em] text-[#292524]">
+          <Link to="/" className="text-2xl md:text-3xl font-bold tracking-widest uppercase font-sugo text-[#573425]">
             BROWN
           </Link>
 

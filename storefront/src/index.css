@@ -1,46 +1,50 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* --- 1. CẤU HÌNH FONT SUGO CLASSIC --- */
+@font-face {
+  font-family: 'Sugo Classic';
+  /* Đảm bảo bạn đã bỏ file SugoClassic.ttf vào thư mục public/fonts/ */
+  src: url('/fonts/Sugo-Pro-Classic-Regular-trial.ttf') format('truetype'); 
+  font-weight: normal;
+  font-style: normal;
+}
 
 :root {
   font-family: 'Inter', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  
-  /* --- [QUAN TRỌNG] TĂNG CỠ CHỮ TOÀN WEB --- */
-  /* Mặc định trình duyệt là 16px. 
-     Thiết lập 17px sẽ làm tất cả chữ to hơn khoảng 6.25% */
   font-size: 17px; 
 
-  /* Bảng màu chuẩn BROWN */
-  --color-brown-dark: #292524; /* Stone 800 */
-  --color-brown-main: #44403c; /* Stone 700 */
-  --color-beige: #f5f5f4;      /* Stone 100 */
+  --color-brown-dark: #292524;
+  --color-brown-main: #44403c;
+  
+  /* [ĐÃ ĐỔI] Nền website thành màu TRẮNG #FFFFFF */
+  --color-beige: #FFFFFF; 
+  
+  /* [MỚI] Màu Logo Nâu #573425 */
+  --color-logo-brown: #573425;
 }
 
-/* Cấu trúc để Footer luôn nằm dưới đáy */
 body, #root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-beige);
-  
-  /* [MỚI] Thiết lập màu chữ mặc định toàn trang là màu nâu đậm thay vì đen tuyền 
-     -> Giúp mắt dễ chịu và sang hơn */
+  background-color: var(--color-beige); /* Bây giờ là màu trắng */
   color: var(--color-brown-dark);
-
-  /* [MỚI] Giúp font chữ sắc nét hơn trên MacOS và iOS */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Class tiện ích cho Font */
-.font-serif {
-  font-family: 'Playfair Display', serif;
+/* Class tiện ích cho font Logo */
+.font-sugo {
+  font-family: 'Sugo Classic', 'Impact', sans-serif; /* Fallback là Impact nếu chưa tải font */
+  letter-spacing: 0.05em; /* Font này thường cần giãn chữ một chút cho đẹp */
 }
 
-.font-sans {
-  font-family: 'Inter', sans-serif;
-}
+/* Các class cũ giữ nguyên để tương thích */
+.font-serif { font-family: 'Inter', sans-serif !important; }
+.font-sans { font-family: 'Inter', sans-serif; }
 
 #root {
   max-width: none !important;
@@ -50,7 +54,4 @@ body, #root {
   width: 100% !important;
 }
 
-/* Đảm bảo bảng luôn có thanh cuộn mượt */
-.overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
-}
+.overflow-x-auto { -webkit-overflow-scrolling: touch; }

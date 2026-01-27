@@ -90,7 +90,7 @@ const Collection = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* [SỬA] Hiển thị PageTitle từ State mới */}
         <div className="text-center mb-10">
-            <h2 className="text-3xl font-serif text-stone-900 mb-8 uppercase">
+            <h2 className="text-3xl font-bold text-[#573425] mb-8 uppercase">
                 {pageTitle}
             </h2>
         </div>
@@ -104,7 +104,7 @@ const Collection = () => {
                 <Link 
                     to={`/product/${product.slug}${isPosMode ? '?pos=true' : ''}`} 
                     key={product.id} 
-                    className="group block"
+                    className="group block text-center"
                 >
                     <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative">
                         <img 

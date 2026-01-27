@@ -123,25 +123,33 @@ const Home = () => {
 
          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
             {products.slice(0, 8).map(product => (
-                <Link key={product.id} to={`/product/${product.slug}`} className="group block">
-                  <div className="relative overflow-hidden mb-4 bg-stone-100 aspect-[3/4]">
-                    <img 
-                      src={product.images?.[0]} 
-                      alt={product.name} 
-                      className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-                    />
+                <Link 
+                    key={product.id} 
+                    to={`/product/${product.slug}`} 
+                    // [SỬA ĐỔI] Thêm 'text-center' vào đây
+                    className="group block text-center"
+                >
+                    <div className="relative overflow-hidden mb-4 bg-stone-100 aspect-[3/4]">
+                        <img 
+                            src={product.images?.[0]} 
+                            alt={product.name} 
+                            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                        />
                     {/* Nút xem nhanh (Desktop only) */}
                     <div className="absolute bottom-0 left-0 w-full bg-white/90 text-center py-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 hidden md:block">
                         <span className="text-xs font-bold uppercase tracking-wider text-stone-900">Xem chi tiết</span>
                     </div>
                   </div>
                   
-                  <h3 className="text-stone-900 font-medium text-sm group-hover:text-stone-600 transition-colors truncate px-1">
-                    {product.name}
-                  </h3>
-                  <p className="text-stone-500 mt-1 font-bold text-sm px-1">
-                    {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
-                  </p>
+                  {/* Tên sản phẩm */}
+                    <h3 className="text-stone-900 font-medium text-sm group-hover:text-stone-600 transition-colors truncate px-1">
+                        {product.name}
+                    </h3>
+                    
+                    {/* Giá tiền */}
+                    <p className="text-stone-500 mt-1 font-bold text-sm px-1">
+                        {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                    </p>
                 </Link>
             ))}
          </div>

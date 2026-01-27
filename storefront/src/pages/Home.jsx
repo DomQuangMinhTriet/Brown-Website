@@ -45,49 +45,57 @@ const Home = () => {
     <>
       <SEO title="Trang chủ" />
       
-      {/* 1. HERO BANNER */}
-        <div className="relative w-full h-[85vh] bg-stone-200 overflow-hidden group">
+      {/* 1. HERO BANNER - CLICKABLE & FIXED RATIO */}
+        {/* aspect-[3/1]: Tỷ lệ chuẩn cho banner ngang (VD: 1920x640px) */}
+        <div className="relative w-full aspect-[3/1] bg-stone-200 overflow-hidden group">
+            
             {loading ? (
-                <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">BROWN LOADING...</div>
+                <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">LOADING...</div>
             ) : banners.length > 0 ? (
                 banners.map((banner, index) => (
-                    <div 
+                    <Link 
+                        to={banner.link_to || "/collection"} 
                         key={banner.id}
-                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out
+                        // Thay thẻ div bằng Link để click được toàn bộ banner
+                        className={`absolute inset-0 block w-full h-full transition-opacity duration-1000 ease-in-out
                             ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}
                         `}
                     >
-                        {/* ẢNH / VIDEO */}
                         {isVideo(banner.image_url) ? (
-                            <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                            <video 
+                                autoPlay loop muted playsInline 
+                                className="w-full h-full object-cover" // object-cover giúp lấp đầy khung aspect-ratio
+                            >
                                 <source src={banner.image_url} type="video/mp4" />
                             </video>
                         ) : (
-                            <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
+                            <img 
+                                src={banner.image_url} 
+                                alt={banner.title} 
+                                className="w-full h-full object-cover" 
+                            />
                         )}
-
-                        {/* [ĐÃ SỬA] CHỮ NẰM TRONG VÒNG LẶP ĐỂ ĐỔI THEO ẢNH */}
-                        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
-                            <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg animate-fade-in-up">
-                                {banner.title || 'BROWN'}
-                            </h2>
-                            <Link to={banner.link_to || "/collection"} 
-                                className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
-                                {t('home.hero_btn')}
-                            </Link>
-                        </div>
-                    </div>
+                        
+                        {/* Đã xóa phần Text Overlay và Button ở đây */}
+                    </Link>
                 ))
             ) : (
-                <div className="w-full h-full bg-[#292524] flex items-center justify-center"></div>
+                <div className="w-full h-full bg-[#292524]"></div>
             )}
 
-            {/* NÚT CHẤM TRÒN (INDICATORS) - GIỮ NGUYÊN */}
+            {/* NÚT CHẤM TRÒN ĐIỀU HƯỚNG (Giữ lại để khách biết có nhiều banner) */}
             {!loading && banners.length > 1 && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
                     {banners.map((_, idx) => (
-                        <button key={idx} onClick={() => setCurrentBanner(idx)}
-                            className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white'}`}
+                        <button 
+                            key={idx} 
+                            onClick={(e) => {
+                                e.preventDefault(); // Ngăn click nhầm vào Link banner
+                                setCurrentBanner(idx);
+                            }}
+                            className={`h-1.5 rounded-full transition-all duration-500 shadow-sm
+                                ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/60 w-2 hover:bg-white'}
+                            `}
                         />
                     ))}
                 </div>

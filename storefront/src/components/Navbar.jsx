@@ -106,9 +106,9 @@ const Navbar = () => {
                 CHÍNH SÁCH VẬN CHUYỂN
             </Link>
 
-            <Link to="/about" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+            {/* <Link to="/about" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
                 {t('nav.about')}
-            </Link>
+            </Link> */}
           </div>
 
           {/* Icons Right */}

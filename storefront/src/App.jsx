@@ -97,7 +97,7 @@ const StorefrontLayout = () => {
              </div>
              <div>
                 <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.contact')}</h3>
-                <p className="text-stone-400">Hotline: 0902.173.763</p>
+                <p className="text-stone-400">Hotline: 090.695.4860</p>
                 <p className="text-stone-400">Email: brownvn25@gmail.com</p>
                 <p className="text-stone-400">Add: Ho Chi Minh City, Vietnam</p>
              </div>

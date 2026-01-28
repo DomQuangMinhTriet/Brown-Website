@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // <--- Quan trọng nhất là dòng này
 import axios from 'axios';
-import { FaHistory, FaPlus, FaSave, FaTrash, FaWarehouse, FaBoxOpen, FaSearch, FaUndo, FaCheck, FaMinus, FaEdit, FaSpinner } from 'react-icons/fa';
-import { toast } from 'react-toastify'; 
-// [MỚI] Import Hook
-import { useAsync, useKeyedAsync } from '../../hooks/useAsync'; 
+import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+// Import các hook của bạn (nếu file nằm ở thư mục hooks ngang cấp pages thì sửa đường dẫn)
+import { useAsync, useKeyedAsync } from '../../hooks/useAsync';
 
 const Inventory = () => {
   const [activeTab, setActiveTab] = useState('inbound'); 
@@ -12,6 +12,12 @@ const Inventory = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]); 
+  
+  // [MỚI] State cho Tồn kho hiện tại & Tổng giá trị
+  const [inventory, setInventory] = useState([]); 
+  const [totalStockValue, setTotalStockValue] = useState(0); // <--- Biến chứa tổng tiền
+  
+  // State cho Lịch sử nhập xuất
   const [batches, setBatches] = useState([]);   
 
   // --- FORM NHẬP HÀNG ---
@@ -44,7 +50,26 @@ const Inventory = () => {
   useEffect(() => {
     fetchMasterData();
     fetchHistory();
+    fetchInventory(); // [MỚI] Gọi hàm lấy tồn kho ngay khi load trang
   }, []);
+
+  // --- [MỚI] HÀM LẤY TỒN KHO & TỔNG GIÁ TRỊ ---
+  const fetchInventory = async () => {
+    try {
+      // Giả sử route bên backend là /api/inventory/stock (trỏ tới hàm getStock)
+      // Bạn cần kiểm tra lại file inventoryRoutes.js để xem đường dẫn chính xác là gì
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/stock`);
+      
+      if (res.data.success) {
+        setInventory(res.data.data); // List danh sách tồn kho
+        
+        // [QUAN TRỌNG] Cập nhật tổng giá trị từ Backend gửi về
+        setTotalStockValue(res.data.totalValue || 0); 
+      }
+    } catch (error) {
+      console.error("Lỗi tải tồn kho:", error);
+    }
+  };
 
   const fetchMasterData = async () => {
     try {
@@ -441,11 +466,35 @@ const Inventory = () => {
 
       {/* --- TAB 2: TỒN KHO HIỆN TẠI --- */}
       {activeTab === 'stock' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+            
+            {/* [MỚI] CARD HIỂN THỊ TỔNG GIÁ TRỊ TỒN KHO */}
+            {/* Đây là phần quan trọng để giải quyết yêu cầu đồng bộ giá trị */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-stone-500 text-xs font-bold uppercase tracking-wider">Tổng giá trị kho</p>
+                        <h3 className="text-2xl font-bold text-stone-800 mt-1">
+                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalStockValue)}
+                        </h3>
+                    </div>
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                        <span className="text-lg font-bold">$</span>
+                    </div>
+                </div>
+                {/* Bạn có thể thêm các card khác như: Tổng số sản phẩm, Sản phẩm sắp hết... */}
+            </div>
+
             <div className="flex gap-4">
                 <div className="relative flex-1 max-w-md">
                     <FaSearch className="absolute left-3 top-3 text-stone-400" />
-                    <input type="text" placeholder="Tìm theo tên sản phẩm hoặc mã SKU..." className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-stone-800" value={stockSearch} onChange={e => setStockSearch(e.target.value)} />
+                    <input 
+                        type="text" 
+                        placeholder="Tìm theo tên sản phẩm hoặc mã SKU..." 
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-stone-800" 
+                        value={stockSearch} 
+                        onChange={e => setStockSearch(e.target.value)} 
+                    />
                 </div>
             </div>
 
@@ -456,65 +505,69 @@ const Inventory = () => {
                             <th className="p-4">Sản phẩm</th>
                             <th className="p-4">SKU</th>
                             <th className="p-4">Phân loại</th>
-                            <th className="p-4 text-center">Tồn kho (Nhập trực tiếp)</th>
-                            <th className="p-4 text-right">Giá trị tồn (Ước tính)</th>
+                            <th className="p-4 text-center">Tồn kho</th>
+                            <th className="p-4 text-right">Giá trị lô (Vốn)</th>
                             <th className="p-4 text-center">Trạng thái</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100 text-sm">
                         {inventorySummary.length > 0 ? inventorySummary.map((item) => (
-                            <tr key={item.id} className="hover:bg-stone-50">
+                            <tr key={item.id} className="hover:bg-stone-50 transition-colors">
                                 <td className="p-4 flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-stone-200 rounded overflow-hidden">
-                                        {item.image && <img src={item.image} className="w-full h-full object-cover"/>}
+                                    <div className="w-10 h-10 bg-stone-200 rounded overflow-hidden flex-shrink-0 border border-stone-100">
+                                        {item.image ? (
+                                            <img src={item.image} className="w-full h-full object-cover"/>
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-xs text-stone-400">No Img</div>
+                                        )}
                                     </div>
-                                    <span className="font-medium text-stone-800">{item.product_name}</span>
+                                    <span className="font-medium text-stone-800 line-clamp-2">{item.product_name}</span>
                                 </td>
                                 <td className="p-4 font-mono text-stone-500 text-xs">{item.sku}</td>
-                                <td className="p-4 text-stone-600">{item.color} / {item.size}</td>
+                                <td className="p-4 text-stone-600 whitespace-nowrap">{item.color} / {item.size}</td>
                                 
-                                {/* CỘT ĐIỀU CHỈNH TRỰC TIẾP (CÓ LOADING) */}
+                                {/* CỘT ĐIỀU CHỈNH TRỰC TIẾP */}
                                 <td className="p-4 text-center">
                                     <div className="relative inline-block group">
-                                        {/* Nếu đang loading (Check bằng Hook) */}
                                         {isKeyLoading(item.id) ? (
                                             <div className="relative">
                                                 <input 
                                                     type="number" disabled
-                                                    className="w-24 h-10 text-center border-2 border-stone-100 bg-stone-50 rounded-lg font-bold text-stone-400 cursor-not-allowed"
+                                                    className="w-20 h-9 text-center border bg-stone-100 rounded text-stone-400"
                                                     value={item.stock}
                                                 />
                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                    <FaSpinner className="animate-spin text-stone-600" size={16}/>
+                                                    <FaSpinner className="animate-spin text-stone-600" size={14}/>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <>
-                                                <input 
-                                                    type="number" 
-                                                    className="w-24 h-10 text-center border-2 border-stone-200 rounded-lg font-bold text-stone-800 focus:border-stone-800 outline-none transition-all focus:shadow-md"
-                                                    value={editingStock[item.id] !== undefined ? editingStock[item.id] : item.stock}
-                                                    onChange={(e) => handleStockInputChange(item.id, e.target.value)}
-                                                    onBlur={() => commitStockChange(item.id, item.stock)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.target.blur(); // Chỉ blur, sự kiện onBlur sẽ lo phần còn lại
-                                                        }
-                                                    }}
-                                                />
-                                                <FaEdit className="absolute top-3 right-2 text-stone-300 pointer-events-none text-[10px] opacity-50 group-hover:opacity-100 transition-opacity" />
-                                            </>
+                                            <input 
+                                                type="number" 
+                                                className="w-20 h-9 text-center border border-stone-200 rounded font-bold text-stone-800 focus:border-stone-800 focus:ring-1 focus:ring-stone-800 outline-none transition-all"
+                                                value={editingStock[item.id] !== undefined ? editingStock[item.id] : item.stock}
+                                                onChange={(e) => handleStockInputChange(item.id, e.target.value)}
+                                                onBlur={() => commitStockChange(item.id, item.stock)}
+                                                onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                                            />
                                         )}
                                     </div>
                                 </td>
                                 
-                                <td className="p-4 text-right text-stone-600">{new Intl.NumberFormat('vi-VN').format(item.value)} ₫</td>
+                                <td className="p-4 text-right text-stone-600 font-mono">
+                                    {new Intl.NumberFormat('vi-VN').format(item.value)} ₫
+                                </td>
                                 <td className="p-4 text-center">
-                                    {item.stock > 0 ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Sẵn hàng</span> : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Hết hàng</span>}
+                                    {item.stock > 5 ? (
+                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sẵn hàng</span>
+                                    ) : item.stock > 0 ? (
+                                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sắp hết</span>
+                                    ) : (
+                                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Hết hàng</span>
+                                    )}
                                 </td>
                             </tr>
                         )) : (
-                            <tr><td colSpan="6" className="p-8 text-center text-stone-400">Không tìm thấy dữ liệu tồn kho</td></tr>
+                            <tr><td colSpan="6" className="p-12 text-center text-stone-400">Không tìm thấy dữ liệu tồn kho</td></tr>
                         )}
                     </tbody>
                 </table>

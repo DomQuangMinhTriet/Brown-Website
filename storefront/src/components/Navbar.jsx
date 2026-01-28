@@ -99,7 +99,7 @@ const Navbar = () => {
             </div>
 
             <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
-                CHÍNH SÁCH ĐỔI TRẢ
+                CHÍNH SÁCH ĐỔI HÀNG
             </Link>
 
             <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">

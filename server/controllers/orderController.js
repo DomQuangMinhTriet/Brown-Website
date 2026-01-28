@@ -1,5 +1,5 @@
 const supabase = require('../config/supabase');
-const { sendOrderConfirmation, sendShippingConfirmation } = require('../services/emailService');
+const { sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdmin } = require('../services/emailService');
 const { calculateShippingFee, createGHNOrder } = require('../services/shippingService'); // <--- IMPORT HELPER
 const { z } = require('zod');
 
@@ -191,25 +191,41 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: error.message });
         }
 
-        // --- F. SỬA LỖI EMAIL (QUAN TRỌNG) ---
-        // Lấy dữ liệu từ req.body làm chuẩn nếu RPC trả về thiếu
+        // ==============================================================================
+        // F. [ĐÃ CHỈNH SỬA] GỬI EMAIL THÔNG BÁO (CHO KHÁCH & ADMIN)
+        // ==============================================================================
+        
+        // Chuẩn bị dữ liệu hiển thị cho email
         const emailCustomerName = data.customer_name || customer.fullName || customer.name || "Quý khách";
-        const emailTotalAmount = data.total_amount || (subtotal_check + shipping_fee - discount_amount);
-        const emailAddress = customer.email; // Email người nhận
+        const rawTotalAmount = data.total_amount || (subtotal_check + shipping_fee - discount_amount);
+        const emailTotalAmountFormatted = new Intl.NumberFormat('vi-VN').format(Number(rawTotalAmount));
+        const emailAddress = customer.email;
 
+        // 1. Gửi mail xác nhận cho Khách Hàng (nếu có email)
         if (emailAddress) {
             const orderInfoForMail = {
                 customer_name: emailCustomerName,
                 code: data.order_code,
-                // Ép kiểu số và format ngay tại đây để tránh NaN
-                total_amount: new Intl.NumberFormat('vi-VN').format(Number(emailTotalAmount)), 
+                total_amount: emailTotalAmountFormatted, 
                 shipping_tracking_code: 'Đang cập nhật' 
             };
-            
-            // Gọi hàm gửi mail (không await để phản hồi nhanh)
-            sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Error:", err));
+            sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Khách Error:", err));
         }
 
+        // 2. [MỚI] Gửi mail thông báo cho Admin (brownvn25@gmail.com)
+        const adminOrderData = {
+            id: data.order_code,            // Mã đơn hàng (ví dụ: #ORD-123)
+            customer_name: emailCustomerName, // Tên khách
+            phone: customer.phone,          // Số điện thoại
+            total_amount: rawTotalAmount,   // Tổng tiền (để format lại trong service)
+            payment_method: payment_method  // COD hoặc Banking
+        };
+
+        // Gọi hàm gửi mail Admin - dùng .catch để không làm lỗi request nếu mail server lỗi
+        sendNewOrderNotifyToAdmin(adminOrderData).catch(err => console.error("Mail Admin Error:", err));
+
+        // ==============================================================================
+        
         res.json({ 
             success: true, 
             orderCode: data.order_code, 

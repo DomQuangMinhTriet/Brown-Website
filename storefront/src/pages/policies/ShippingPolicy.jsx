@@ -8,19 +8,14 @@ const ShippingPolicy = () => {
       <div className="space-y-6">
         <section>
           <h2 className="font-bold text-lg text-stone-900 mb-2">1. Phí vận chuyển</h2>
-          <p>Brown áp dụng mức phí vận chuyển đồng giá:</p>
-          <ul className="list-disc pl-5 mt-2">
-            <li>Nội thành TP.HCM: 20.000đ</li>
-            <li>Các tỉnh thành khác: 30.000đ</li>
-            <li><strong>Miễn phí vận chuyển</strong> cho đơn hàng từ 1.000.000đ.</li>
-          </ul>
+          <p>Brown áp dụng mức phí vận chuyển đồng giá: 20.000đ</p>
         </section>
 
         <section>
           <h2 className="font-bold text-lg text-stone-900 mb-2">2. Thời gian giao hàng</h2>
           <p>
             Thời gian giao hàng dự kiến từ <strong>2-5 ngày</strong> tùy thuộc vào địa chỉ nhận hàng của quý khách.
-            Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Fanpage).
+            Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Instagram).
           </p>
         </section>
       </div>

@@ -121,14 +121,14 @@ exports.inboundStock = async (req, res) => {
     }
 };
 
-// --- 5. LẤY TỒN KHO (Sửa lại cú pháp join bảng stores) ---
+// --- 5. LẤY TỒN KHO (Đã sửa: Tính toán Tổng giá trị tồn kho) ---
 exports.getStock = async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('inventory_batches')
             .select(`
                 *,
-                stores (name),  -- Join bảng stores lấy name
+                stores (name),
                 variants (
                     id, sku, size, color,
                     products (name, images)
@@ -138,7 +138,23 @@ exports.getStock = async (req, res) => {
             .order('created_at', { ascending: true }); // FIFO
 
         if (error) throw error;
-        res.json({ success: true, data });
+
+        // --- [FIX BẮT ĐẦU] ---
+        // Tính tổng giá trị tồn kho ngay tại Backend để đảm bảo đồng bộ
+        // Logic: Tổng = Tổng (Số lượng còn lại * Giá vốn lô hàng)
+        const totalStockValue = data.reduce((sum, batch) => {
+            const quantity = batch.quantity_remaining || 0;
+            const cost = batch.cost_price || 0; 
+            return sum + (quantity * cost);
+        }, 0);
+        // --- [FIX KẾT THÚC] ---
+
+        res.json({ 
+            success: true, 
+            data: data, 
+            totalValue: totalStockValue // <--- Frontend lấy số này hiển thị vào thẻ "Tổng giá trị tồn"
+        });
+
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -173,58 +189,116 @@ exports.getHistory = async (req, res) => {
 };
 
 exports.adjustStock = async (req, res) => {
+  // Đảm bảo import đúng client (nếu chưa có ở đầu file thì uncomment dòng dưới)
+  // const supabase = require('../config/supabase'); 
+
   try {
     const { variant_id, quantity_change, store_id, reason } = req.body;
-
-    // 1. Validate dữ liệu đầu vào
-    if (!variant_id || quantity_change === undefined) {
-      return res.status(400).json({ success: false, message: 'Thiếu thông tin' });
-    }
-    
     const changeAmount = Number(quantity_change);
-    if (changeAmount === 0) return res.json({ success: true, message: 'Không thay đổi' });
 
-    // 2. [QUAN TRỌNG] Nếu là phép TRỪ (số âm), phải kiểm tra tồn kho hiện tại
+    // 1. Validate cơ bản
+    if (!variant_id || changeAmount === 0) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ hoặc không có thay đổi' });
+    }
+
+    // ==================================================================
+    // TRƯỜNG HỢP A: GIẢM KHO (changeAmount < 0)
+    // Sửa lỗi: Trừ trực tiếp vào lô hàng có sẵn (FIFO) để giảm đúng giá trị tiền
+    // ==================================================================
     if (changeAmount < 0) {
-        // Lấy tất cả các batch của sản phẩm này để tính tổng
-        const { data: currentBatches, error: fetchError } = await supabase
+        let qtyToDeduct = Math.abs(changeAmount);
+
+        // Lấy các lô hàng còn tồn, sắp xếp theo CŨ NHẤT (FIFO)
+        const { data: batches, error: fetchError } = await supabase
             .from('inventory_batches')
-            .select('quantity_remaining')
-            .eq('variant_id', variant_id);
-        
+            .select('id, quantity_remaining, cost_price')
+            .eq('variant_id', variant_id)
+            .gt('quantity_remaining', 0)
+            .order('created_at', { ascending: true });
+
         if (fetchError) throw fetchError;
 
-        // Tính tổng hiện tại
-        const currentTotal = currentBatches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0);
-
-        // Kiểm tra: Nếu Hiện tại + Số trừ < 0 => BÁO LỖI
-        if (currentTotal + changeAmount < 0) {
+        // Kiểm tra tổng tồn
+        const currentTotal = batches.reduce((sum, b) => sum + b.quantity_remaining, 0);
+        if (currentTotal < qtyToDeduct) {
             return res.status(400).json({ 
                 success: false, 
-                message: `Không thể giảm! Tồn kho hiện tại (${currentTotal}) không đủ để trừ (${Math.abs(changeAmount)}).` 
+                message: `Không đủ hàng để trừ! Tồn kho hiện tại: ${currentTotal}, Cần trừ: ${qtyToDeduct}` 
             });
         }
+
+        // Thực hiện trừ dần từng lô
+        for (const batch of batches) {
+            if (qtyToDeduct <= 0) break;
+
+            const deduct = Math.min(batch.quantity_remaining, qtyToDeduct);
+            
+            // Cập nhật lô hàng này
+            await supabase
+                .from('inventory_batches')
+                .update({ quantity_remaining: batch.quantity_remaining - deduct })
+                .eq('id', batch.id);
+
+            qtyToDeduct -= deduct;
+        }
+
+        return res.json({ success: true, message: 'Đã cập nhật giảm tồn kho thành công' });
     }
 
-    // 3. Nếu đủ điều kiện, mới cho phép chèn dòng âm vào DB
-    const { data, error } = await supabase
-      .from('inventory_batches')
-      .insert([
-        {
-          variant_id: variant_id,
-          store_id: store_id || null,
-          original_quantity: changeAmount, // VD: -5
-          quantity_remaining: changeAmount, // VD: -5 (Cộng dồn vào tổng sẽ giảm đi 5)
-          cost_price: 0,
-          is_adjustment: true,
-          notes: reason || 'Điều chỉnh thủ công'
+    // ==================================================================
+    // TRƯỜNG HỢP B: TĂNG KHO (changeAmount > 0)
+    // Sửa lỗi: Phải lấy GIÁ VỐN GẦN NHẤT thay vì để 0
+    // ==================================================================
+    else {
+        let estimatedCost = 0;
+
+        // Tìm giá vốn của lô nhập gần nhất có giá > 0
+        const { data: lastBatch } = await supabase
+            .from('inventory_batches')
+            .select('cost_price')
+            .eq('variant_id', variant_id)
+            .gt('cost_price', 0)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (lastBatch) {
+            estimatedCost = lastBatch.cost_price;
+        } else {
+            // Nếu là sản phẩm mới tinh chưa từng nhập, lấy tạm giá gốc từ bảng variants
+            const { data: variantInfo } = await supabase
+                .from('variants')
+                .select('original_price, products(base_price)')
+                .eq('id', variant_id)
+                .single();
+            
+            if (variantInfo) {
+                estimatedCost = variantInfo.original_price || variantInfo.products?.base_price || 0;
+            }
         }
-      ])
-      .select();
 
-    if (error) throw error;
+        // Tạo lô hàng mới với giá vốn vừa tìm được
+        const { data, error } = await supabase
+            .from('inventory_batches')
+            .insert([{
+                variant_id: variant_id,
+                store_id: store_id || null,
+                original_quantity: changeAmount,
+                quantity_remaining: changeAmount,
+                cost_price: estimatedCost, // <--- ĐÃ FIX: Lưu giá vốn để tính đúng tổng tiền
+                is_adjustment: true,
+                notes: reason || 'Điều chỉnh tăng thủ công'
+            }])
+            .select();
 
-    res.json({ success: true, data: data[0], message: 'Cập nhật thành công' });
+        if (error) throw error;
+
+        return res.json({ 
+            success: true, 
+            message: 'Đã cập nhật tăng tồn kho thành công', 
+            data: data[0] 
+        });
+    }
 
   } catch (error) {
     console.error("Lỗi Adjust Stock:", error);

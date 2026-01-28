@@ -115,5 +115,66 @@ const sendShippingConfirmation = async (order, trackingCode) => {
     return await sendEmail(email, subject, `Đơn hàng ${order.code} đang vận chuyển.`, htmlContent);
 };
 
+// 2. THÊM HÀM MỚI NÀY VÀO:
+const sendNewOrderNotifyToAdmin = async (orderData) => {
+  try {
+    const adminEmail = 'brownvn25@gmail.com'; // Email nhận cố định của bạn
+    
+    // Format tiền tệ cho đẹp
+    const formattedPrice = new Intl.NumberFormat('vi-VN', { 
+      style: 'currency', 
+      currency: 'VND' 
+    }).format(orderData.total_amount || orderData.total_price);
+
+    const mailOptions = {
+      from: `"Brown System" <${process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `[ĐƠN HÀNG MỚI] #${orderData.id} - ${formattedPrice}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
+          <h2 style="color: #573425;">🔔 Có đơn hàng mới!</h2>
+          <p>Xin chào Admin, hệ thống vừa ghi nhận một đơn hàng mới.</p>
+          
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Mã đơn hàng:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">#${orderData.id}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Khách hàng:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.full_name || orderData.customer_name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Số điện thoại:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.phone}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Tổng tiền:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd; color: #d32f2f; font-weight: bold;">${formattedPrice}</td>
+            </tr>
+             <tr>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Phương thức TT:</strong></td>
+              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.payment_method}</td>
+            </tr>
+          </table>
+
+          <p style="margin-top: 20px;">
+            <a href="https://your-website.com/admin/orders/${orderData.id}" 
+               style="background-color: #573425; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+               Xem chi tiết đơn hàng
+            </a>
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Email thông báo đơn hàng #${orderData.id} đã gửi tới ${adminEmail}`);
+  } catch (error) {
+    console.error('Lỗi khi gửi email thông báo cho Admin:', error);
+    // Không throw error để tránh làm lỗi quy trình đặt hàng của khách
+  }
+};
+
 // [QUAN TRỌNG] Nhớ export cả sendShippingConfirmation
-module.exports = { sendEmail, sendOrderConfirmation, sendShippingConfirmation };
+module.exports = { sendEmail, sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdmin };

@@ -26,7 +26,16 @@ const Navbar = () => {
     const fetchCats = async () => {
         try {
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
-            if(res.data.success) setCategories(res.data.data);
+            if(res.data.success) {
+                // [SỬA LỖI TẠI ĐÂY]
+                // Chỉ lấy những danh mục có is_visible_on_home === true
+                const allCats = res.data.data;
+                
+                // Lọc: Chỉ hiện cái nào True (hoặc null/undefined thì coi như true)
+                const visibleCats = allCats.filter(cat => cat.is_visible_on_home !== false);
+                
+                setCategories(visibleCats);
+            }
         } catch(e) { console.error(e); }
     };
     fetchCats();
@@ -196,10 +205,17 @@ const Navbar = () => {
                              ))}
                         </div>
                     </div>
-
-                    <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200">
-                        {t('nav.about')}
+                    
+                    <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                        CHÍNH SÁCH ĐỔI HÀNG
                     </Link>
+
+                    <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                        CHÍNH SÁCH VẬN CHUYỂN
+                    </Link>
+                    {/* <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200">
+                        {t('nav.about')}
+                    </Link> */}
                 </div>
 
                 {/* Footer Mobile Menu */}

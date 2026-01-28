@@ -71,7 +71,7 @@ const Cart = () => {
             </div>
             <div className="flex justify-between mb-4 text-stone-600">
               <span>Vận chuyển</span>
-              <span>Miễn phí</span>
+              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(20000)}</span>
             </div>
             
             <hr className="border-stone-200 my-4" />

@@ -226,7 +226,7 @@ const Checkout = () => {
                             value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
                         />
                          <input 
-                            type="email" placeholder="Email (để nhận thông báo)"
+                            type="email" placeholder="Email (để nhận thông báo, MVĐ,...)"
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                             value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                         />

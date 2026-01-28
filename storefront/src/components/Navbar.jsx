@@ -196,7 +196,7 @@ const Navbar = () => {
                              {categories.map(cat => (
                                 <Link 
                                     key={cat.id} 
-                                    to={`/collection?search=${cat.slug}`}
+                                    to={`/collection?category=${cat.slug}`}
                                     onClick={() => setIsMobileMenuOpen(false)} 
                                     className="text-stone-600 py-1"
                                 >

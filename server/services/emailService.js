@@ -1,15 +1,7 @@
 // server/services/emailService.js
 const nodemailer = require('nodemailer');
 
-const sendEmail = async (to, subject, text, html) => {
-  // Kiểm tra biến môi trường
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('⚠️ EMAIL WARNING: Chưa cấu hình SMTP. Email không được gửi.');
-    return null; 
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
       secure: false,
@@ -19,6 +11,14 @@ const sendEmail = async (to, subject, text, html) => {
       },
     });
 
+const sendEmail = async (to, subject, text, html) => {
+  // Kiểm tra biến môi trường
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️ EMAIL WARNING: Chưa cấu hình SMTP. Email không được gửi.');
+    return null; 
+  }
+
+  try {    
     const info = await transporter.sendMail({
       from: `"BROWN" <${process.env.SMTP_USER}>`,
       to: to, 
@@ -52,7 +52,7 @@ const sendOrderConfirmation = async (order, customerEmail) => {
                 <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code}</b> của bạn đã được khởi tạo.</p>
                 
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount)} đ</p>
+                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount * 1000)} đ</p>
                     <p style="margin: 5px 0;"><strong>Hình thức:</strong> Chuyển khoản ngân hàng (QR)</p>
                 </div>
 
@@ -118,61 +118,32 @@ const sendShippingConfirmation = async (order, trackingCode) => {
 // 2. THÊM HÀM MỚI NÀY VÀO:
 const sendNewOrderNotifyToAdmin = async (orderData) => {
   try {
-    const adminEmail = 'brownvn25@gmail.com'; // Email nhận cố định của bạn
+    const adminEmail = process.env.SMTP_USER; // Gửi cho chính mình
     
-    // Format tiền tệ cho đẹp
+    // Format tiền tệ
     const formattedPrice = new Intl.NumberFormat('vi-VN', { 
       style: 'currency', 
       currency: 'VND' 
-    }).format(orderData.total_amount || orderData.total_price);
+    }).format(orderData.total_amount);
 
     const mailOptions = {
-      from: `"Brown System" <${process.env.EMAIL_USER}>`,
+      from: `"BROWN System" <${process.env.SMTP_USER}>`,
       to: adminEmail,
-      subject: `[ĐƠN HÀNG MỚI] #${orderData.id} - ${formattedPrice}`,
+      subject: `🔔 Đơn mới #${orderData.id} - ${formattedPrice}`,
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
-          <h2 style="color: #573425;">🔔 Có đơn hàng mới!</h2>
-          <p>Xin chào Admin, hệ thống vừa ghi nhận một đơn hàng mới.</p>
-          
-          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-            <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Mã đơn hàng:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">#${orderData.id}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Khách hàng:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.full_name || orderData.customer_name}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Số điện thoại:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.phone}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Tổng tiền:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd; color: #d32f2f; font-weight: bold;">${formattedPrice}</td>
-            </tr>
-             <tr>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Phương thức TT:</strong></td>
-              <td style="padding: 8px; border-bottom: 1px solid #ddd;">${orderData.payment_method}</td>
-            </tr>
-          </table>
-
-          <p style="margin-top: 20px;">
-            <a href="https://your-website.com/admin/orders/${orderData.id}" 
-               style="background-color: #573425; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-               Xem chi tiết đơn hàng
-            </a>
-          </p>
-        </div>
+        <h3>Bạn có đơn hàng mới!</h3>
+        <p>Mã đơn: <strong>${orderData.id}</strong></p>
+        <p>Khách hàng: ${orderData.customer_name}</p>
+        <p>SĐT: ${orderData.phone}</p>
+        <p>Tổng tiền: <span style="color:red; font-weight:bold">${formattedPrice}</span></p>
+        <p>Thanh toán: ${orderData.payment_method}</p>
       `
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`Email thông báo đơn hàng #${orderData.id} đã gửi tới ${adminEmail}`);
+    console.log(`✅ Đã gửi mail thông báo đơn hàng #${orderData.id}`);
   } catch (error) {
-    console.error('Lỗi khi gửi email thông báo cho Admin:', error);
-    // Không throw error để tránh làm lỗi quy trình đặt hàng của khách
+    console.error('❌ Lỗi gửi mail Admin:', error);
   }
 };
 

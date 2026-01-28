@@ -78,7 +78,7 @@ const Cart = () => {
             
             <div className="flex justify-between mb-8 text-lg font-bold text-stone-900">
               <span>Tổng cộng</span>
-              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cartTotal)}</span>
+              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cartTotal + 20000)}</span>
             </div>
 
             <Link to="/checkout" className="block w-full bg-stone-900 text-white text-center py-4 uppercase tracking-widest text-sm font-bold hover:bg-stone-800 transition-colors flex items-center justify-center gap-2">

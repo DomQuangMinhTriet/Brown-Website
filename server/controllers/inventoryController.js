@@ -171,3 +171,63 @@ exports.getHistory = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+exports.adjustStock = async (req, res) => {
+  try {
+    const { variant_id, quantity_change, store_id, reason } = req.body;
+
+    // 1. Validate dữ liệu đầu vào
+    if (!variant_id || quantity_change === undefined) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin' });
+    }
+    
+    const changeAmount = Number(quantity_change);
+    if (changeAmount === 0) return res.json({ success: true, message: 'Không thay đổi' });
+
+    // 2. [QUAN TRỌNG] Nếu là phép TRỪ (số âm), phải kiểm tra tồn kho hiện tại
+    if (changeAmount < 0) {
+        // Lấy tất cả các batch của sản phẩm này để tính tổng
+        const { data: currentBatches, error: fetchError } = await supabase
+            .from('inventory_batches')
+            .select('quantity_remaining')
+            .eq('variant_id', variant_id);
+        
+        if (fetchError) throw fetchError;
+
+        // Tính tổng hiện tại
+        const currentTotal = currentBatches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0);
+
+        // Kiểm tra: Nếu Hiện tại + Số trừ < 0 => BÁO LỖI
+        if (currentTotal + changeAmount < 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Không thể giảm! Tồn kho hiện tại (${currentTotal}) không đủ để trừ (${Math.abs(changeAmount)}).` 
+            });
+        }
+    }
+
+    // 3. Nếu đủ điều kiện, mới cho phép chèn dòng âm vào DB
+    const { data, error } = await supabase
+      .from('inventory_batches')
+      .insert([
+        {
+          variant_id: variant_id,
+          store_id: store_id || null,
+          original_quantity: changeAmount, // VD: -5
+          quantity_remaining: changeAmount, // VD: -5 (Cộng dồn vào tổng sẽ giảm đi 5)
+          cost_price: 0,
+          is_adjustment: true,
+          notes: reason || 'Điều chỉnh thủ công'
+        }
+      ])
+      .select();
+
+    if (error) throw error;
+
+    res.json({ success: true, data: data[0], message: 'Cập nhật thành công' });
+
+  } catch (error) {
+    console.error("Lỗi Adjust Stock:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -12,5 +12,5 @@ router.post('/stores', inventoryController.createStore);
 router.get('/stock', inventoryController.getStock);      // Lấy tồn kho (Số lượng > 0)
 router.get('/history', inventoryController.getHistory);  // <--- [MỚI] Lấy lịch sử nhập
 router.post('/inbound', inventoryController.inboundStock);
-
+router.post('/adjust', inventoryController.adjustStock);
 module.exports = router;

@@ -44,20 +44,20 @@ exports.getProducts = async (req, res) => {
         const { data: products, error: prodError } = await query;
         if (prodError) throw prodError;
 
-        // --- TÍNH TOÁN TỒN KHO TỪ BẢNG INVENTORY_BATCHES (GIỮ NGUYÊN) ---
+        // --- TÍNH TOÁN TỒN KHO TỪ BẢNG INVENTORY_BATCHES ---
+        // [ĐÃ SỬA] Bỏ điều kiện .gt('quantity_remaining', 0) để lấy cả các dòng điều chỉnh âm
         const { data: batches, error: batchError } = await supabase
             .from('inventory_batches')
-            .select('variant_id, quantity_remaining')
-            .gt('quantity_remaining', 0);
+            .select('variant_id, quantity_remaining');
 
         if (batchError) throw batchError;
 
         const processedProducts = products.map(product => {
             const variantsWithStock = product.variants ? product.variants.map(variant => {
-                // Cộng tổng số lượng từ các lô hàng (batches)
+                // Cộng tổng số lượng từ các lô hàng (batches) - bao gồm cả số âm
                 const stock = batches
                     .filter(b => b.variant_id === variant.id)
-                    .reduce((sum, b) => sum + b.quantity_remaining, 0);
+                    .reduce((sum, b) => sum + (b.quantity_remaining || 0), 0);
                 return { ...variant, quantity_remaining: stock };
             }) : [];
 

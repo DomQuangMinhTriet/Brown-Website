@@ -14,6 +14,9 @@ const ProductCard = ({ product }) => (
                 src={product.images?.[0]} 
                 alt={product.name} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                // [THÊM] Lazy load
+                loading="lazy"
+                decoding="async"
             />
         </div>
         <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
@@ -141,6 +144,8 @@ const ProductDetail = () => {
                                 src={mainImage || product.images?.[0] || 'https://via.placeholder.com/500'} 
                                 alt={product.name} 
                                 className="w-full h-full object-cover transition-all duration-300"
+                                // Ảnh chính nên tải ngay (priority), không dùng lazy ở đây để tránh nháy hình
+                                fetchPriority="high"
                             />
                         </div>
                         {/* Ảnh nhỏ (Thumbnails) nếu có nhiều ảnh */}
@@ -155,7 +160,7 @@ const ProductDetail = () => {
                                             ${mainImage === img ? 'ring-2 ring-stone-900' : 'border border-transparent'}
                                         `}
                                     >
-                                        <img src={img} className="w-full h-full object-cover" alt="" />
+                                        <img src={img} className="w-full h-full object-cover" alt="" loading="lazy" decoding="async" />
                                     </div>
                                 ))}
                             </div>

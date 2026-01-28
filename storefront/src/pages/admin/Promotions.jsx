@@ -21,6 +21,13 @@ const Promotions = () => {
   };
   const [formData, setFormData] = useState(initialFormState);
 
+  // --- [MỚI] HELPER FORMAT TIỀN TỆ ---
+  const formatCurrencyInput = (value) => {
+      if (!value) return '';
+      const number = Number(value.toString().replace(/\D/g, ''));
+      return new Intl.NumberFormat('vi-VN').format(number);
+  };
+
   useEffect(() => {
     fetchPromotions();
   }, []);
@@ -174,25 +181,45 @@ const Promotions = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold block mb-1">Giá trị giảm</label>
-                            <input type="number" className="w-full p-2 border rounded" required
-                                placeholder={formData.discount_type === 'percent' ? "VD: 10 (=10%)" : "VD: 50000"}
-                                value={formData.discount_value}
-                                onChange={e => setFormData({...formData, discount_value: e.target.value})} />
+                            {/* [SỬA] ĐIỀU KIỆN INPUT CÓ FORMAT */}
+                            {formData.discount_type === 'percent' ? (
+                                <input type="number" className="w-full p-2 border rounded" required
+                                    placeholder="VD: 10 (=10%)"
+                                    value={formData.discount_value}
+                                    onChange={e => setFormData({...formData, discount_value: e.target.value})} />
+                            ) : (
+                                <input type="text" className="w-full p-2 border rounded" required
+                                    placeholder="VD: 50.000"
+                                    value={formatCurrencyInput(formData.discount_value)}
+                                    onChange={e => {
+                                        const raw = e.target.value.replace(/\./g, '');
+                                        if(!isNaN(raw)) setFormData({...formData, discount_value: raw});
+                                    }} />
+                            )}
                         </div>
                         <div>
                             <label className="text-xs font-bold block mb-1">Đơn tối thiểu</label>
-                            <input type="number" className="w-full p-2 border rounded"
-                                value={formData.min_order_value}
-                                onChange={e => setFormData({...formData, min_order_value: e.target.value})} />
+                            {/* [SỬA] INPUT CÓ FORMAT */}
+                            <input type="text" className="w-full p-2 border rounded"
+                                placeholder="0"
+                                value={formatCurrencyInput(formData.min_order_value)}
+                                onChange={e => {
+                                    const raw = e.target.value.replace(/\./g, '');
+                                    if(!isNaN(raw)) setFormData({...formData, min_order_value: raw});
+                                }} />
                         </div>
                     </div>
 
                     {formData.discount_type === 'percent' && (
                         <div>
                             <label className="text-xs font-bold block mb-1">Giảm tối đa (VNĐ)</label>
-                            <input type="number" placeholder="VD: 50000 (Để trống nếu không giới hạn)" className="w-full p-2 border rounded"
-                                value={formData.max_discount_amount}
-                                onChange={e => setFormData({...formData, max_discount_amount: e.target.value})} />
+                            {/* [SỬA] INPUT CÓ FORMAT */}
+                            <input type="text" placeholder="VD: 50.000 (Để trống nếu không giới hạn)" className="w-full p-2 border rounded"
+                                value={formatCurrencyInput(formData.max_discount_amount)}
+                                onChange={e => {
+                                    const raw = e.target.value.replace(/\./g, '');
+                                    if(!isNaN(raw)) setFormData({...formData, max_discount_amount: raw});
+                                }} />
                         </div>
                     )}
 

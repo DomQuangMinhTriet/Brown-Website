@@ -17,6 +17,7 @@ import Profile from './pages/Profile';
 import ReturnPolicy from './pages/policies/ReturnPolicy';
 import ShippingPolicy from './pages/policies/ShippingPolicy';
 import { useLanguage } from './context/LanguageContext';
+import About from './pages/About';
 
 // ==============================
 // 2. IMPORTS CHO ADMIN
@@ -158,6 +159,7 @@ function App() {
            <Route path="account" element={<Profile />} />
            <Route path="policy/return" element={<ReturnPolicy />} />
            <Route path="policy/shipping" element={<ShippingPolicy />} />
+           <Route path="/about" element={<About />} />
            {/* Trang 404 cho Storefront (Tùy chọn) */}
            <Route path="*" element={<div className="p-20 text-center">404 - Page Not Found</div>} />
         </Route>

@@ -22,6 +22,13 @@ const Expenses = () => {
     const [isAddingType, setIsAddingType] = useState(false);
     const [newTypeName, setNewTypeName] = useState('');
 
+    // --- [MỚI] HELPER FORMAT TIỀN TỆ ---
+    const formatCurrencyInput = (value) => {
+        if (!value) return '';
+        const number = Number(value.toString().replace(/\D/g, ''));
+        return new Intl.NumberFormat('vi-VN').format(number);
+    };
+
     useEffect(() => {
         fetchExpenses();
         fetchStores();
@@ -169,11 +176,14 @@ const Expenses = () => {
                     <div>
                         <label className="block text-xs font-bold text-stone-500 mb-1">Số tiền (VNĐ)</label>
                         <input 
-                            type="number" 
+                            type="text" 
                             className="w-full p-2 border rounded bg-stone-50 focus:bg-white outline-none focus:border-stone-800 font-bold text-stone-800"
                             placeholder="0"
-                            value={newExpense.amount}
-                            onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                            value={formatCurrencyInput(newExpense.amount)}
+                            onChange={e => {
+                                const raw = e.target.value.replace(/\./g, '');
+                                if (!isNaN(raw)) setNewExpense({...newExpense, amount: raw});
+                            }}
                         />
                     </div>
 

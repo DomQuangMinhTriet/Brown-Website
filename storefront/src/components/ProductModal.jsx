@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { supabase } from '../supabaseClient';
+import { useAsync } from '../hooks/useAsync';
 
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   // State Form
@@ -26,6 +27,20 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [sizeChart, setSizeChart] = useState('');
   const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '' });
   const fileInputRef = useRef(null);
+
+  // --- [MỚI] HELPER FORMAT TIỀN TỆ ---
+  const formatCurrencyInput = (value) => {
+      if (!value) return '';
+      const number = Number(value.toString().replace(/\D/g, ''));
+      return new Intl.NumberFormat('vi-VN').format(number);
+  };
+
+  const handlePriceChange = (e) => {
+      const raw = e.target.value.replace(/\./g, '');
+      if (!isNaN(raw)) {
+          setFormData({ ...formData, base_price: raw });
+      }
+  };
 
   // --- 1. NẠP DỮ LIỆU ---
   useEffect(() => {
@@ -111,23 +126,44 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   };
 
   // --- 3. UPLOAD ẢNH ---
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-    setUploading(true);
-    const newImages = [];
-    try {
-        for (const file of files) {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const { error } = await supabase.storage.from('products').upload(fileName, file);
-            if (error) throw error;
-            const { data } = supabase.storage.from('products').getPublicUrl(fileName);
-            newImages.push(data.publicUrl);
+    const handleImageUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        setUploading(true);
+        const newImages = [];
+
+        // Cấu hình nén
+        const options = {
+            maxSizeMB: 0.5,          // Giới hạn 500KB
+            maxWidthOrHeight: 1200,  // Giới hạn kích thước 1200px
+            useWebWorker: true,
+            fileType: 'image/webp'   // Chuyển sang WebP cho nhẹ
+        };
+
+        try {
+            for (const file of files) {
+                // [MỚI] Nén file trước khi upload
+                const compressedFile = await imageCompression(file, options);
+                
+                const fileExt = 'webp'; // Luôn là webp sau khi nén
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                
+                // Upload file đã nén (compressedFile) thay vì file gốc
+                const { error } = await supabase.storage.from('products').upload(fileName, compressedFile);
+                
+                if (error) throw error;
+                const { data } = supabase.storage.from('products').getPublicUrl(fileName);
+                newImages.push(data.publicUrl);
+            }
+            setImages(prev => [...prev, ...newImages]);
+            toast.success(`Đã tải lên ${newImages.length} ảnh (Đã tối ưu)`);
+        } catch (error) { 
+            console.error(error);
+            toast.error('Lỗi upload ảnh: ' + error.message); 
+        } finally { 
+            setUploading(false); 
         }
-        setImages(prev => [...prev, ...newImages]);
-    } catch (error) { toast.error('Lỗi upload ảnh'); } finally { setUploading(false); }
-  };
+    };
 
   // --- 4. CÁC HÀM KHÁC ---
   const handleAddVariant = () => {
@@ -290,7 +326,13 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
                 <div>
                     <label className="label">Giá bán (VNĐ)</label>
-                    <input type="number" className="input" value={formData.base_price} onChange={e => setFormData({...formData, base_price: e.target.value})} />
+                    <input 
+                        type="text" 
+                        className="input" 
+                        placeholder="0"
+                        value={formatCurrencyInput(formData.base_price)} 
+                        onChange={handlePriceChange} 
+                    />
                 </div>
                 <div>
                     <label className="label">Slug (Tự động)</label>

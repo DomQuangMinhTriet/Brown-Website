@@ -1,59 +1,50 @@
 // server/services/emailService.js
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
-// CẤU HÌNH TỐI ƯU CHO RAILWAY/CLOUD
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",  // Khai báo rõ host thay vì dùng service: 'gmail'
-  port: 465,               // Dùng Port 465 (SSL) thay vì 587. Port này ít bị chặn hơn.
-  secure: true,            // Bắt buộc dùng SSL
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  },
-  // Các option phụ để tránh timeout
-  tls: {
-    // Không check chứng chỉ lỗi (giúp vượt qua một số firewall chặt)
-    rejectUnauthorized: false, // Thêm các options này để thử bypass
-    ciphers: 'SSLv3'
-  },
-  // Tăng thời gian chờ kết nối (mặc định là quá ngắn với server cloud)
-  connectionTimeout: 10000, // 10 giây
-  greetingTimeout: 5000,    // 5 giây
-  socketTimeout: 10000      // 10 giây
-});
+// KHỞI TẠO RESEND (Thay thế cho Nodemailer Transporter)
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-const sendEmail = async (to, subject, text, html) => {
-  // Kiểm tra biến môi trường
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('⚠️ EMAIL WARNING: Chưa cấu hình SMTP. Email không được gửi.');
-    return null; 
-  }
+// CẤU HÌNH CỐ ĐỊNH (Vì bạn đã có domain brownvn.com)
+const SENDER_EMAIL = 'BROWN <donhang@brownvn.com>'; 
+const ADMIN_EMAIL = 'brownvn25@gmail.com'; 
 
-  try {    
-    const info = await transporter.sendMail({
-      from: `"BROWN" <${process.env.SMTP_USER}>`,
-      to: to, 
-      subject: subject, 
-      text: text, 
-      html: html, 
-    });
+// --- HÀM GỬI MAIL LÕI (DÙNG API RESEND) ---
+const sendViaResend = async (toEmail, subject, htmlContent) => {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: SENDER_EMAIL,
+            to: [toEmail],
+            subject: subject,
+            html: htmlContent,
+        });
 
-    console.log('✅ Email sent: %s', info.messageId);
-    return info;
+        if (error) {
+            console.error('❌ Lỗi Resend:', error);
+            return null;
+        }
 
-  } catch (error) {
-    console.error('❌ Email Error:', error.message);
-    return null; 
-  }
+        console.log(`✅ Đã gửi mail tới ${toEmail} | ID: ${data.id}`);
+        return data;
+    } catch (err) {
+        console.error('❌ Lỗi ngoại lệ gửi mail:', err.message);
+        return null;
+    }
 };
 
+// 1. HÀM GỬI MAIL CƠ BẢN (Giữ nguyên tên để không lỗi Controller)
+const sendEmail = async (to, subject, text, html) => {
+    // Gọi hàm lõi ở trên
+    return await sendViaResend(to, subject, html || text);
+};
+
+// 2. GỬI XÁC NHẬN ĐƠN HÀNG (Giữ nguyên HTML cũ của bạn)
 const sendOrderConfirmation = async (order, customerEmail) => {
     if (!customerEmail) return;
 
-    const subject = `[BROWN] Xác nhận đơn hàng #${order.code}`;
+    const subject = `[BROWN] Xác nhận đơn hàng #${order.code || order.id}`; // Fallback nếu code null
     
-    // NỘI DUNG EMAIL MỚI (DÀNH CHO CHUYỂN KHOẢN)
+    // GIỮ NGUYÊN HTML CŨ CỦA BẠN
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #1c1917; color: white; padding: 20px; text-align: center;">
@@ -61,10 +52,10 @@ const sendOrderConfirmation = async (order, customerEmail) => {
             </div>
             <div style="padding: 20px;">
                 <p>Xin chào <b>${order.customer_name}</b>,</p>
-                <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code}</b> của bạn đã được khởi tạo.</p>
+                <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code || order.id}</b> của bạn đã được khởi tạo.</p>
                 
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount * 1000)} đ</p>
+                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount)} đ</p>
                     <p style="margin: 5px 0;"><strong>Hình thức:</strong> Chuyển khoản ngân hàng (QR)</p>
                 </div>
 
@@ -86,14 +77,11 @@ const sendOrderConfirmation = async (order, customerEmail) => {
         </div>
     `;
 
-    return await sendEmail(customerEmail, subject, `Đơn hàng ${order.code} đã được nhận.`, htmlContent);
+    return await sendViaResend(customerEmail, subject, htmlContent);
 };
 
-// --- [MỚI] THÊM HÀM NÀY ĐỂ FIX LỖI ---
+// 3. GỬI THÔNG BÁO VẬN CHUYỂN (Giữ nguyên HTML cũ)
 const sendShippingConfirmation = async (order, trackingCode) => {
-    // Kiểm tra email khách hàng, nếu không có thì bỏ qua
-    // Lưu ý: data trả về từ updateOrderStatus có cấu trúc hơi khác createOrder, 
-    // nên ta cần lấy email từ customer_info nếu có
     const email = order.customer_info?.email || order.customer_email; 
     if (!email) return;
 
@@ -124,40 +112,31 @@ const sendShippingConfirmation = async (order, trackingCode) => {
         </div>
     `;
 
-    return await sendEmail(email, subject, `Đơn hàng ${order.code} đang vận chuyển.`, htmlContent);
+    return await sendViaResend(email, subject, htmlContent);
 };
 
-// 2. THÊM HÀM MỚI NÀY VÀO:
+// 4. GỬI THÔNG BÁO CHO ADMIN (Sửa để dùng Resend gửi về Gmail của bạn)
 const sendNewOrderNotifyToAdmin = async (orderData) => {
-  try {
-    const adminEmail = process.env.SMTP_USER; // Gửi cho chính mình
-    
     // Format tiền tệ
     const formattedPrice = new Intl.NumberFormat('vi-VN', { 
       style: 'currency', 
       currency: 'VND' 
     }).format(orderData.total_amount);
 
-    const mailOptions = {
-      from: `"BROWN System" <${process.env.SMTP_USER}>`,
-      to: adminEmail,
-      subject: `🔔 Đơn mới #${orderData.id} - ${formattedPrice}`,
-      html: `
+    const subject = `🔔 Đơn mới #${orderData.id} - ${formattedPrice}`;
+    
+    // GIỮ NGUYÊN HTML CŨ
+    const htmlContent = `
         <h3>Bạn có đơn hàng mới!</h3>
         <p>Mã đơn: <strong>${orderData.id}</strong></p>
         <p>Khách hàng: ${orderData.customer_name}</p>
         <p>SĐT: ${orderData.phone}</p>
         <p>Tổng tiền: <span style="color:red; font-weight:bold">${formattedPrice}</span></p>
         <p>Thanh toán: ${orderData.payment_method}</p>
-      `
-    };
+    `;
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Đã gửi mail thông báo đơn hàng #${orderData.id}`);
-  } catch (error) {
-    console.error('❌ Lỗi gửi mail Admin:', error);
-  }
+    // Gửi trực tiếp vào email ADMIN_EMAIL (brownvn25@gmail.com)
+    return await sendViaResend(ADMIN_EMAIL, subject, htmlContent);
 };
 
-// [QUAN TRỌNG] Nhớ export cả sendShippingConfirmation
 module.exports = { sendEmail, sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdmin };

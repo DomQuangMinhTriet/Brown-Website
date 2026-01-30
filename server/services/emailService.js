@@ -14,7 +14,8 @@ const transporter = nodemailer.createTransport({
   // Các option phụ để tránh timeout
   tls: {
     // Không check chứng chỉ lỗi (giúp vượt qua một số firewall chặt)
-    rejectUnauthorized: false 
+    rejectUnauthorized: false, // Thêm các options này để thử bypass
+    ciphers: 'SSLv3'
   },
   // Tăng thời gian chờ kết nối (mặc định là quá ngắn với server cloud)
   connectionTimeout: 10000, // 10 giây

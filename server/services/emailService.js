@@ -1,15 +1,26 @@
 // server/services/emailService.js
 const nodemailer = require('nodemailer');
+require('dotenv').config();
 
+// CẤU HÌNH TỐI ƯU CHO RAILWAY/CLOUD
 const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+  host: "smtp.gmail.com",  // Khai báo rõ host thay vì dùng service: 'gmail'
+  port: 465,               // Dùng Port 465 (SSL) thay vì 587. Port này ít bị chặn hơn.
+  secure: true,            // Bắt buộc dùng SSL
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  },
+  // Các option phụ để tránh timeout
+  tls: {
+    // Không check chứng chỉ lỗi (giúp vượt qua một số firewall chặt)
+    rejectUnauthorized: false 
+  },
+  // Tăng thời gian chờ kết nối (mặc định là quá ngắn với server cloud)
+  connectionTimeout: 10000, // 10 giây
+  greetingTimeout: 5000,    // 5 giây
+  socketTimeout: 10000      // 10 giây
+});
 
 const sendEmail = async (to, subject, text, html) => {
   // Kiểm tra biến môi trường

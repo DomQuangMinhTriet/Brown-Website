@@ -9,6 +9,43 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const SENDER_EMAIL = 'BROWN <donhang@brownvn.com>'; 
 const ADMIN_EMAIL = 'brownvn25@gmail.com'; 
 
+// --- [MỚI] HELPER: FORMAT TIỀN TỆ ---
+const formatMoney = (amount) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+};
+
+// --- [MỚI] HELPER: TẠO HTML DANH SÁCH SẢN PHẨM ---
+const generateProductRows = (items) => {
+    if (!items || items.length === 0) return '';
+
+    return items.map(item => {
+        // Xử lý lấy tên: Ưu tiên lấy từ cấu trúc lồng nhau (variants -> products -> name)
+        let productName = "Sản phẩm";
+        if (item.variants?.products?.name) productName = item.variants.products.name;
+        else if (item.product_name) productName = item.product_name; // Fallback
+        else if (item.name) productName = item.name;
+
+        // Xử lý lấy Size/Màu
+        let variantInfo = "";
+        if (item.variants) {
+            variantInfo = `${item.variants.size || ''} / ${item.variants.color || ''}`;
+        } else {
+            variantInfo = `${item.size || ''} / ${item.color || ''}`;
+        }
+
+        return `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px 0; color: #444;">
+                    <div style="font-weight: bold; font-size: 13px;">${productName}</div>
+                    <div style="font-size: 11px; color: #888;">${variantInfo}</div>
+                </td>
+                <td style="padding: 8px 0; text-align: center; font-size: 13px;">x${item.quantity}</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold; font-size: 13px;">${formatMoney(item.price)}</td>
+            </tr>
+        `;
+    }).join('');
+};
+
 // --- HÀM GỬI MAIL LÕI (DÙNG API RESEND) ---
 const sendViaResend = async (toEmail, subject, htmlContent) => {
     try {
@@ -38,13 +75,19 @@ const sendEmail = async (to, subject, text, html) => {
     return await sendViaResend(to, subject, html || text);
 };
 
-// 2. GỬI XÁC NHẬN ĐƠN HÀNG (Giữ nguyên HTML cũ của bạn)
+// 2. GỬI XÁC NHẬN ĐƠN HÀNG (Đã chèn thêm bảng sản phẩm)
 const sendOrderConfirmation = async (order, customerEmail) => {
     if (!customerEmail) return;
 
+    const formattedPrice = formatMoney(order.total_amount);
+    
+    // [MỚI] Tạo danh sách sản phẩm
+    const items = order.items || order.order_items || [];
+    const productRows = generateProductRows(items);
+
     const subject = `[BROWN] Xác nhận đơn hàng #${order.code || order.id}`; // Fallback nếu code null
     
-    // GIỮ NGUYÊN HTML CŨ CỦA BẠN
+    // GIỮ NGUYÊN HTML CŨ CỦA BẠN & CHÈN THÊM BẢNG SẢN PHẨM
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #1c1917; color: white; padding: 20px; text-align: center;">
@@ -54,8 +97,14 @@ const sendOrderConfirmation = async (order, customerEmail) => {
                 <p>Xin chào <b>${order.customer_name}</b>,</p>
                 <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code || order.id}</b> của bạn đã được khởi tạo.</p>
                 
+                <div style="margin: 20px 0;">
+                    <p style="font-weight:bold; border-bottom: 2px solid #1c1917; padding-bottom: 5px;">Chi tiết đơn hàng:</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        ${productRows}
+                    </table>
+                </div>
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${new Intl.NumberFormat('vi-VN').format(order.total_amount)} đ</p>
+                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${formattedPrice}</p>
                     <p style="margin: 5px 0;"><strong>Hình thức:</strong> Chuyển khoản ngân hàng (QR)</p>
                 </div>
 
@@ -118,21 +167,33 @@ const sendShippingConfirmation = async (order, trackingCode) => {
 // 4. GỬI THÔNG BÁO CHO ADMIN (Sửa để dùng Resend gửi về Gmail của bạn)
 const sendNewOrderNotifyToAdmin = async (orderData) => {
     // Format tiền tệ
-    const formattedPrice = new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency: 'VND' 
-    }).format(orderData.total_amount);
+    const formattedPrice = formatMoney(orderData.total_amount);
+    
+    // [MỚI] Tạo danh sách sản phẩm
+    const items = orderData.items || orderData.order_items || [];
+    const productRows = generateProductRows(items);
 
     const subject = `🔔 Đơn mới #${orderData.id} - ${formattedPrice}`;
     
-    // GIỮ NGUYÊN HTML CŨ
+    // GIỮ NGUYÊN HTML CŨ & CHÈN THÊM BẢNG
     const htmlContent = `
-        <h3>Bạn có đơn hàng mới!</h3>
-        <p>Mã đơn: <strong>${orderData.id}</strong></p>
-        <p>Khách hàng: ${orderData.customer_name}</p>
-        <p>SĐT: ${orderData.phone}</p>
-        <p>Tổng tiền: <span style="color:red; font-weight:bold">${formattedPrice}</span></p>
-        <p>Thanh toán: ${orderData.payment_method}</p>
+        <div style="font-family: Arial, sans-serif;">
+            <h3>Bạn có đơn hàng mới!</h3>
+            <p>Mã đơn: <strong>${orderData.id}</strong></p>
+            <p>Khách hàng: ${orderData.customer_name}</p>
+            <p>SĐT: ${orderData.phone}</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 15px 0; border: 1px solid #ddd;">
+                <tr style="background:#f9f9f9; font-weight:bold;">
+                    <td style="padding:8px; border:1px solid #ddd;">Sản phẩm</td>
+                    <td style="padding:8px; border:1px solid #ddd;">SL</td>
+                    <td style="padding:8px; border:1px solid #ddd;">Giá</td>
+                </tr>
+                ${productRows}
+            </table>
+            <p>Tổng tiền: <span style="color:red; font-weight:bold">${formattedPrice}</span></p>
+            <p>Thanh toán: ${orderData.payment_method}</p>
+        </div>
     `;
 
     // Gửi trực tiếp vào email ADMIN_EMAIL (brownvn25@gmail.com)

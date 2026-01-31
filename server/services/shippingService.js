@@ -95,7 +95,7 @@ const createGHNOrder = async (order) => {
         }
 
         const payload = {
-            "payment_type_id": 1, // Shop trả ship
+            "payment_type_id": 1, // Người gửi trả phí (Shop trả)
             "note": order.note || "Cho xem hàng, không cho thử",
             "required_note": "CHOXEMHANGKHONGTHU",
             
@@ -105,16 +105,32 @@ const createGHNOrder = async (order) => {
             "to_ward_code": String(wardCode),
             "to_district_id": parseInt(districtId),
             
-            "cod_amount": order.payment_method === 'banking' ? 0 : order.total_amount,
-            "weight": 200, "length": 10, "width": 10, "height": 10,
+            // COD: Nếu thanh toán Banking rồi thì thu 0đ, ngược lại thu tổng tiền
+            "cod_amount": order.payment_method === 'banking' ? 0 : Math.round(order.total_amount),
+            
+            // Cân nặng: Tính tổng từ các món hàng (Mặc định 200g/món nếu chưa nhập weight)
+            "weight": order.order_items.reduce((acc, item) => acc + (item.variants?.weight || 200) * item.quantity, 0),
+            "length": 10, "width": 10, "height": 10,
+            
             "service_id": 53320, 
             "service_type_id": 2,
             
-            "items": order.order_items ? order.order_items.map(item => ({
-                "name": "Thời trang Brown", // Tên chung để tránh lỗi ký tự lạ
-                "quantity": item.quantity,
-                "price": 0 // Để 0 để GHN không thu tiền thêm (đã tính trong COD)
-            })) : []
+            // [QUAN TRỌNG] MAP DỮ LIỆU SẢN PHẨM THẬT
+            "items": order.order_items ? order.order_items.map(item => {
+                const productInfo = item.variants?.products;
+                const variantInfo = item.variants;
+                
+                // Tạo tên đầy đủ: "Áo Polo Basic - L / Đen"
+                const fullName = `${productInfo?.name || 'Sản phẩm'} - ${variantInfo?.size || ''}/${variantInfo?.color || ''}`;
+
+                return {
+                    "name": fullName, 
+                    "code": variantInfo?.sku || String(item.variant_id),
+                    "quantity": item.quantity,
+                    "price": Number(item.price), // Giá khai báo bảo hiểm (quan trọng khi mất hàng)
+                    "weight": variantInfo?.weight || 200
+                };
+            }) : []
         };
 
         console.log("📦 Đang gửi Payload sang GHN...");

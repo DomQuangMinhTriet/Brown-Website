@@ -198,7 +198,6 @@ exports.createOrder = async (req, res) => {
         // Chuẩn bị dữ liệu hiển thị cho email
         const emailCustomerName = data.customer_name || customer.fullName || customer.name || "Quý khách";
         const rawTotalAmount = data.total_amount || (subtotal_check + shipping_fee - discount_amount);
-        const emailTotalAmountFormatted = new Intl.NumberFormat('vi-VN').format(Number(rawTotalAmount));
         const emailAddress = customer.email;
 
         // 1. Gửi mail xác nhận cho Khách Hàng (nếu có email)
@@ -206,7 +205,7 @@ exports.createOrder = async (req, res) => {
             const orderInfoForMail = {
                 customer_name: emailCustomerName,
                 code: data.order_code,
-                total_amount: emailTotalAmountFormatted, 
+                total_amount: rawTotalAmount, 
                 shipping_tracking_code: 'Đang cập nhật' 
             };
             sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Khách Error:", err));
@@ -275,7 +274,21 @@ exports.updateOrderStatus = async (req, res) => {
         // 1. Lấy thông tin đơn hàng hiện tại (SỬA LỖI Ở ĐÂY: Thêm error: fetchError)
         const { data: currentOrder, error: fetchError } = await supabase
             .from('orders')
-            .select('*, order_items(variant_id, quantity)') // Lấy cả items để gửi GHN
+            .select(`
+                *,
+                order_items (
+                    quantity,
+                    price_at_purchase,
+                    variant_id,
+                    variants (
+                        sku,
+                        size,
+                        color,
+                        weight, 
+                        products ( name )
+                    )
+                )
+            `)
             .eq('id', id)
             .single();
 

@@ -3,6 +3,7 @@ import axios from 'axios';
 // [THAY ĐỔI 1] Thêm FaExclamationTriangle vào import
 import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { ORDER_STATUS_MAP } from '../../utils/translations';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -124,7 +125,9 @@ const Orders = () => {
                     <p className="text-xs text-stone-500">{order.customer_phone}</p>
                 </td>
                 <td className="p-4 font-bold">{new Intl.NumberFormat('vi-VN').format(order.total_amount)}đ</td>
-                <td className="p-4">{getStatusBadge(order.status)}</td>
+                <td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${ORDER_STATUS_MAP[order.status]?.color}`}>
+                    {ORDER_STATUS_MAP[order.status]?.label || order.status}
+                </span></td>
                 <td className="p-4 text-sm text-stone-500">
                     {new Date(order.created_at).toLocaleDateString('vi-VN')}
                 </td>

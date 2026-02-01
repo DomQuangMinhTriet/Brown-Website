@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { ORDER_STATUS_MAP } from '../utils/translations';
 
 const Profile = () => {
   const { user, logout, getToken } = useAuth();
@@ -87,7 +88,7 @@ const Profile = () => {
                         <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase 
                             ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 
                               order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {order.status}
+                            {ORDER_STATUS_MAP[order.status]?.label || order.status}
                         </span>
                         {order.shipping_tracking_code && (
                             <p className="text-xs text-stone-500 mt-2">Vận đơn: {order.shipping_tracking_code}</p>

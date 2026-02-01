@@ -60,3 +60,12 @@ export const translations = {
     }
   }
 };
+
+export const ORDER_STATUS_MAP = {
+    pending: { label: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800' },
+    processing: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-800' },
+    shipping: { label: 'Đang giao', color: 'bg-purple-100 text-purple-800' },
+    completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800' },
+    cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-800' },
+    returned: { label: 'Trả hàng', color: 'bg-gray-100 text-gray-800' }
+};

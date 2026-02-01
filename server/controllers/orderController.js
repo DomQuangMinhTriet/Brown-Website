@@ -327,28 +327,56 @@ exports.updateOrderStatus = async (req, res) => {
             }
         }
 
-        // 3. LOGIC HOÀN KHO (RESTOCK) - (Giữ nguyên)
-        if (restock === true && ['cancelled', 'returned'].includes(status)) {
-            if (!['cancelled', 'returned'].includes(currentOrder.status)) {
-                for (const item of currentOrder.order_items) {
-                    // Logic cộng lại kho FIFO
-                    const { data: latestBatch } = await supabase.from('inventory_batches')
-                        .select('id, quantity_remaining')
-                        .eq('variant_id', item.variant_id)
-                        .order('created_at', { ascending: false })
-                        .limit(1)
-                        .single();
+        // ==========================================================
+        // 3. LOGIC HOÀN KHO (ĐÃ SỬA LỖI GẤP ĐÔI)
+        // ==========================================================
+        
+        // TRƯỜNG HỢP A: HỦY ĐƠN (CANCELLED)
+        // -> KHÔNG LÀM GÌ CẢ. Database đã có Trigger "restore_inventory_on_cancel" tự lo rồi.
+        // Nếu code chạy thêm ở đây sẽ bị cộng dồn thành gấp đôi.
+        if (status === 'cancelled') {
+             console.log("ℹ️ Đơn hủy: Để Database Trigger tự động hoàn kho.");
+        }
+
+        // TRƯỜNG HỢP B: TRẢ HÀNG (RETURNED)
+        // -> Database KHÔNG tự làm, nên Code phải tự tính toán.
+        else if (status === 'returned' && restock === true) {
+            // Chặn nếu đơn đã trả trước đó để không cộng nhiều lần
+            if (currentOrder.status === 'returned') {
+                console.warn("⚠️ Đơn này đã trả hàng rồi, không cộng kho nữa.");
+            } else {
+                console.log("🔄 Đang xử lý trả hàng (Code hoàn kho thủ công)...");
+                const orderItems = currentOrder.order_items;
+                if (orderItems && orderItems.length > 0) {
+                    for (const item of orderItems) {
+                        // Cộng vào lô hàng mới nhất (LIFO)
+                        const { data: latestBatch } = await supabase.from('inventory_batches')
+                            .select('id, quantity_remaining')
+                            .eq('variant_id', item.variant_id)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
                         
-                    if (latestBatch) {
-                        await supabase.from('inventory_batches')
-                            .update({ quantity_remaining: latestBatch.quantity_remaining + item.quantity })
-                            .eq('id', latestBatch.id);
+                        if (latestBatch) {
+                            await supabase.from('inventory_batches')
+                                .update({ quantity_remaining: latestBatch.quantity_remaining + item.quantity })
+                                .eq('id', latestBatch.id);
+                        } else {
+                            // Nếu không tìm thấy lô nào, tạo lô điều chỉnh
+                            await supabase.from('inventory_batches').insert([{
+                                variant_id: item.variant_id,
+                                original_quantity: item.quantity,
+                                quantity_remaining: item.quantity,
+                                cost_price: 0, is_adjustment: true,
+                                notes: `Hoàn kho từ đơn trả hàng #${id}`
+                            }]);
+                        }
                     }
                 }
             }
         }
 
-        // 4. CẬP NHẬT DATABASE
+        // 4. CẬP NHẬT TRẠNG THÁI VÀO DB
         const { data, error } = await supabase
             .from('orders')
             .update(updateData)

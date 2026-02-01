@@ -418,8 +418,27 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                 <span className="font-bold w-10 text-center bg-stone-100 rounded">{v.size}</span>
                                 <span className="text-stone-600 min-w-[60px]">{v.color}</span>
                                 <span className="font-mono text-stone-400 text-xs py-0.5">{v.sku}</span>
+                                
+                                {/* --- [MỚI] HIỂN THỊ ẢNH THUMBNAIL --- */}
+                                {/* Nếu đã chọn ảnh thì hiện ảnh, chưa thì hiện ô trống */}
+                                {v.image_url ? (
+                                    <div className="w-10 h-10 rounded border border-stone-200 overflow-hidden relative group cursor-pointer">
+                                        <img src={v.image_url} alt="Variant" className="w-full h-full object-cover" />
+                                        
+                                        {/* Tooltip: Rê chuột vào hiện ảnh to để soi chi tiết */}
+                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 hidden group-hover:block z-50 bg-white border border-stone-300 shadow-xl rounded p-1">
+                                            <img src={v.image_url} className="w-full h-auto object-cover" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="w-10 h-10 bg-stone-50 rounded border border-stone-200 flex items-center justify-center text-[10px] text-stone-400 text-center leading-tight">
+                                        No<br/>Img
+                                    </div>
+                                )}
+
+                                {/* MENU CHỌN ẢNH (GIỮ NGUYÊN LOGIC CŨ CỦA BẠN) */}
                                 <select 
-                                    className="border border-stone-300 rounded text-xs p-1 max-w-[120px] ml-auto"
+                                    className="border border-stone-300 rounded text-xs p-1 max-w-[120px] ml-auto focus:border-stone-800 outline-none"
                                     value={v.image_url || ""}
                                     onChange={(e) => {
                                         const newVars = [...variants];
@@ -427,11 +446,15 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                         setVariants(newVars);
                                     }}
                                 >
-                                    <option value="">-- Ảnh --</option>
-                                    {images.map((img, i) => <option key={i} value={img}>Ảnh {i + 1}</option>)}
+                                    <option value="">-- Chọn ảnh --</option>
+                                    {images.map((img, i) => (
+                                        <option key={i} value={img}>Ảnh {i + 1}</option>
+                                    ))}
                                 </select>
                             </div>
-                            <button onClick={() => handleRemoveVariant(idx)} className="text-red-400 hover:text-red-600 px-2"><FaTrash/></button>
+                            <button onClick={() => handleRemoveVariant(idx)} className="text-red-400 hover:text-red-600 px-2 ml-2 transition-colors">
+                                <FaTrash/>
+                            </button>
                         </div>
                     ))}
                 </div>

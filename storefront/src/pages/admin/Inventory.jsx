@@ -124,7 +124,7 @@ const Inventory = () => {
       } catch (error) { alert("Lỗi tạo Kho: " + error.message); }
   };
 
-  // --- TÍNH TỔN KHO HIỆN TẠI (Tab 2) ---
+  // --- TÍNH TỒN KHO HIỆN TẠI (Tab 2) ---
   const inventorySummary = useMemo(() => {
     if (!products.length || !batches.length) return [];
     let summaryList = [];
@@ -137,10 +137,12 @@ const Inventory = () => {
             const totalValue = batches
                 .filter(b => b.variant_id == variant.id)
                 .reduce((sum, b) => sum + ((Number(b.quantity_remaining) || 0) * (Number(b.cost_price) || 0)), 0);
+            
+            // [ĐÃ SỬA] Ưu tiên lấy ảnh biến thể, nếu không có mới lấy ảnh sản phẩm
             summaryList.push({
                 id: variant.id,
                 product_name: prod.name,
-                image: prod.images?.[0],
+                image: variant.image_url || prod.images?.[0], 
                 sku: variant.sku,
                 size: variant.size,
                 color: variant.color,
@@ -159,7 +161,7 @@ const Inventory = () => {
     return summaryList;
   }, [products, batches, stockSearch]);
 
-  // --- [MỚI] TÍNH TỔN KHO LŨY KẾ (Tab 3 - Giải quyết vấn đề lệch tồn kho) ---
+  // --- [MỚI] TÍNH TỒN KHO LŨY KẾ (Tab 3 - Giải quyết vấn đề lệch tồn kho) ---
   const processedBatches = useMemo(() => {
       if (!batches.length) return [];
 

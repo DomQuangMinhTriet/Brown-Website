@@ -1,16 +1,20 @@
 const supabase = require('../config/supabase');
 
 // 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
+// 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
 exports.getProducts = async (req, res) => {
     try {
         const { search, category } = req.query; 
 
-        // [GIỮ NGUYÊN]
+        // [SỬA ĐỔI QUAN TRỌNG]: Join thêm inventory_batches để lấy số lượng tồn
         let query = supabase
             .from('products')
             .select(`
                 *,
-                variants (id, size, color, sku, image_url),
+                variants (
+                    id, size, color, sku, image_url,
+                    inventory_batches ( quantity_remaining ) 
+                ),
                 categories!fk_products_main_category (id, name, slug),
                 product_collections ( category_id ) 
             `)
@@ -39,7 +43,27 @@ exports.getProducts = async (req, res) => {
         const { data, error } = await query;
         if (error) throw error;
 
-        res.json({ success: true, data: data });
+        // [LOGIC MỚI]: Tính tổng tồn kho từ các lô hàng (batches)
+        const productsWithStock = data.map(product => {
+            const variantsWithStock = product.variants.map(v => {
+                // Cộng dồn quantity_remaining từ mảng inventory_batches
+                const totalStock = v.inventory_batches 
+                    ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
+                    : 0;
+
+                // Loại bỏ mảng batches thừa, chỉ giữ lại con số tổng
+                const { inventory_batches, ...variantProps } = v;
+                
+                return {
+                    ...variantProps,
+                    quantity_remaining: totalStock // <-- Frontend cần trường này để biết còn hàng hay không
+                };
+            });
+
+            return { ...product, variants: variantsWithStock };
+        });
+
+        res.json({ success: true, data: productsWithStock });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

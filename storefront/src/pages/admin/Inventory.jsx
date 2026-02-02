@@ -322,30 +322,32 @@ const Inventory = () => {
   const totalImportValue = importItems.reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-screen">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">Quản lý Kho hàng</h1>
-          <p className="text-stone-500">Theo dõi nhập xuất và tồn kho thời gian thực</p>
+          <h1 className="text-xl md:text-2xl font-bold text-stone-800">Quản lý Kho hàng</h1>
+          <p className="text-sm text-stone-500">Theo dõi nhập xuất và tồn kho thời gian thực</p>
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="flex gap-6 border-b border-stone-200 mb-6 overflow-x-auto">
-        <button onClick={() => setActiveTab('inbound')} className={`pb-3 px-2 font-medium whitespace-nowrap ${activeTab === 'inbound' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaPlus className="inline mb-1 mr-2"/> Nhập hàng</button>
-        <button onClick={() => setActiveTab('stock')} className={`pb-3 px-2 font-medium whitespace-nowrap ${activeTab === 'stock' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaBoxOpen className="inline mb-1 mr-2"/> Tồn kho hiện tại</button>
-        <button onClick={() => setActiveTab('history')} className={`pb-3 px-2 font-medium whitespace-nowrap ${activeTab === 'history' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaHistory className="inline mb-1 mr-2"/> Lịch sử nhập</button>
+      {/* TABS - RESPONSIVE: Thêm scrollbar-hide và overflow-x-auto */}
+      <div className="flex gap-4 md:gap-6 border-b border-stone-200 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+        <button onClick={() => setActiveTab('inbound')} className={`pb-3 px-2 font-medium whitespace-nowrap text-sm md:text-base ${activeTab === 'inbound' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaPlus className="inline mb-1 mr-2"/> Nhập hàng</button>
+        <button onClick={() => setActiveTab('stock')} className={`pb-3 px-2 font-medium whitespace-nowrap text-sm md:text-base ${activeTab === 'stock' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaBoxOpen className="inline mb-1 mr-2"/> Tồn kho hiện tại</button>
+        <button onClick={() => setActiveTab('history')} className={`pb-3 px-2 font-medium whitespace-nowrap text-sm md:text-base ${activeTab === 'history' ? 'text-stone-900 border-b-2 border-stone-900' : 'text-stone-400 hover:text-stone-600'}`}><FaHistory className="inline mb-1 mr-2"/> Lịch sử nhập</button>
       </div>
 
       {/* --- TAB 1: NHẬP HÀNG --- */}
       {activeTab === 'inbound' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           <div className="lg:col-span-2 space-y-6">
             
             {/* Form chọn NCC & Kho */}
-            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+            <div className="bg-white p-4 md:p-6 rounded-xl border border-stone-200 shadow-sm">
                 <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><FaWarehouse/> Thông tin phiếu nhập</h3>
-                <div className="grid grid-cols-2 gap-4">
+                
+                {/* [RESPONSIVE] GRID 1 CỘT MOBILE, 2 CỘT PC */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-stone-600 mb-1">Nhà cung cấp</label>
                         <div className="flex gap-2">
@@ -355,7 +357,7 @@ const Inventory = () => {
                                     <button onClick={handleQuickCreateSupplier} className="bg-blue-600 text-white px-3 rounded"><FaCheck/></button>
                                 </>
                             ) : (
-                                <select className="w-full p-2 border rounded bg-stone-50" value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
+                                <select className="w-full p-2 border rounded bg-stone-50 text-sm" value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)}>
                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             )}
@@ -373,25 +375,24 @@ const Inventory = () => {
                                     <button onClick={handleQuickCreateStore} className="bg-blue-600 text-white px-3 rounded"><FaCheck/></button>
                                 </>
                             ) : (
-                                <select className="w-full p-2 border rounded bg-stone-50" value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
+                                <select className="w-full p-2 border rounded bg-stone-50 text-sm" value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
                                     {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             )}
                             <button onClick={() => setIsCreatingStore(!isCreatingStore)} className="text-blue-600 text-xs hover:underline whitespace-nowrap px-1">
-                                {isCreatingStore ? <FaUndo/> : <FaPlus/>}
-                            </button>
+                                {isCreatingStore ? <FaUndo/> : <FaPlus/>}</button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Form chọn Sản phẩm */}
-            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+            <div className="bg-white p-4 md:p-6 rounded-xl border border-stone-200 shadow-sm">
               <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><FaPlus/> Thêm sản phẩm</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-stone-600 mb-1">Sản phẩm</label>
-                  <select className="w-full p-2 border rounded" value={tempProduct} onChange={e => { setTempProduct(e.target.value); setTempVariant(''); }}>
+                  <select className="w-full p-2 border rounded text-sm" value={tempProduct} onChange={e => { setTempProduct(e.target.value); setTempVariant(''); }}>
                     <option value="">-- Chọn sản phẩm --</option>
                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -400,7 +401,7 @@ const Inventory = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-3">
                         <label className="block text-sm font-medium text-stone-600 mb-1">Phiên bản</label>
-                        <select className="w-full p-2 border rounded" value={tempVariant} onChange={e => setTempVariant(e.target.value)}>
+                        <select className="w-full p-2 border rounded text-sm" value={tempVariant} onChange={e => setTempVariant(e.target.value)}>
                           <option value="">-- Chọn Size/Màu --</option>
                           {products.find(p => p.id == tempProduct)?.variants.map(v => (
                             <option key={v.id} value={v.id}>{v.sku} - {v.color} / {v.size}</option>
@@ -428,14 +429,16 @@ const Inventory = () => {
                         />
                     </div>
                 </div>
-                <button onClick={handleAddItem} className="w-full bg-stone-800 text-white py-2 rounded hover:bg-stone-700 font-medium">Thêm vào phiếu</button>
+                <button onClick={handleAddItem} className="w-full bg-stone-800 text-white py-3 rounded hover:bg-stone-700 font-medium">Thêm vào phiếu</button>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
+          <div className="bg-white p-4 md:p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
             <h3 className="font-bold text-stone-800 mb-4">Phiếu nhập ({importItems.length})</h3>
-            <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto">
+            
+            {/* [RESPONSIVE] GIỚI HẠN CHIỀU CAO */}
+            <div className="space-y-3 mb-6 max-h-[300px] md:max-h-[400px] overflow-y-auto">
               {importItems.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-start border-b border-stone-100 pb-2">
                   <div>
@@ -470,8 +473,7 @@ const Inventory = () => {
       {activeTab === 'stock' && (
         <div className="space-y-6">
             
-            {/* [MỚI] CARD HIỂN THỊ TỔNG GIÁ TRỊ TỒN KHO */}
-            {/* Đây là phần quan trọng để giải quyết yêu cầu đồng bộ giá trị */}
+            {/* [MỚI] CARD HIỂN THỊ TỔNG GIÁ TRỊ TỒN KHO - Responsive Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm flex items-center justify-between">
                     <div>
@@ -493,7 +495,7 @@ const Inventory = () => {
                     <input 
                         type="text" 
                         placeholder="Tìm theo tên sản phẩm hoặc mã SKU..." 
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-stone-800" 
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:border-stone-800 text-sm" 
                         value={stockSearch} 
                         onChange={e => setStockSearch(e.target.value)} 
                     />
@@ -501,78 +503,82 @@ const Inventory = () => {
             </div>
 
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-stone-100 text-stone-600 uppercase text-xs">
-                        <tr>
-                            <th className="p-4">Sản phẩm</th>
-                            <th className="p-4">SKU</th>
-                            <th className="p-4">Phân loại</th>
-                            <th className="p-4 text-center">Tồn kho</th>
-                            <th className="p-4 text-right">Giá trị lô (Vốn)</th>
-                            <th className="p-4 text-center">Trạng thái</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100 text-sm">
-                        {inventorySummary.length > 0 ? inventorySummary.map((item) => (
-                            <tr key={item.id} className="hover:bg-stone-50 transition-colors">
-                                <td className="p-4 flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-stone-200 rounded overflow-hidden flex-shrink-0 border border-stone-100">
-                                        {item.image ? (
-                                            <img src={item.image} className="w-full h-full object-cover"/>
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-xs text-stone-400">No Img</div>
-                                        )}
-                                    </div>
-                                    <span className="font-medium text-stone-800 line-clamp-2">{item.product_name}</span>
-                                </td>
-                                <td className="p-4 font-mono text-stone-500 text-xs">{item.sku}</td>
-                                <td className="p-4 text-stone-600 whitespace-nowrap">{item.color} / {item.size}</td>
-                                
-                                {/* CỘT ĐIỀU CHỈNH TRỰC TIẾP */}
-                                <td className="p-4 text-center">
-                                    <div className="relative inline-block group">
-                                        {isKeyLoading(item.id) ? (
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" disabled
-                                                    className="w-20 h-9 text-center border bg-stone-100 rounded text-stone-400"
-                                                    value={item.stock}
-                                                />
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <FaSpinner className="animate-spin text-stone-600" size={14}/>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <input 
-                                                type="number" 
-                                                className="w-20 h-9 text-center border border-stone-200 rounded font-bold text-stone-800 focus:border-stone-800 focus:ring-1 focus:ring-stone-800 outline-none transition-all"
-                                                value={editingStock[item.id] !== undefined ? editingStock[item.id] : item.stock}
-                                                onChange={(e) => handleStockInputChange(item.id, e.target.value)}
-                                                onBlur={() => commitStockChange(item.id, item.stock)}
-                                                onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-                                            />
-                                        )}
-                                    </div>
-                                </td>
-                                
-                                <td className="p-4 text-right text-stone-600 font-mono">
-                                    {new Intl.NumberFormat('vi-VN').format(item.value)} ₫
-                                </td>
-                                <td className="p-4 text-center">
-                                    {item.stock > 5 ? (
-                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sẵn hàng</span>
-                                    ) : item.stock > 0 ? (
-                                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sắp hết</span>
-                                    ) : (
-                                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Hết hàng</span>
-                                    )}
-                                </td>
+                
+                {/* [RESPONSIVE] WRAPPER BẢNG: OVERFLOW-X-AUTO */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[900px]">
+                        <thead className="bg-stone-100 text-stone-600 uppercase text-xs">
+                            <tr>
+                                <th className="p-4">Sản phẩm</th>
+                                <th className="p-4">SKU</th>
+                                <th className="p-4">Phân loại</th>
+                                <th className="p-4 text-center">Tồn kho</th>
+                                <th className="p-4 text-right">Giá trị lô (Vốn)</th>
+                                <th className="p-4 text-center">Trạng thái</th>
                             </tr>
-                        )) : (
-                            <tr><td colSpan="6" className="p-12 text-center text-stone-400">Không tìm thấy dữ liệu tồn kho</td></tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100 text-sm">
+                            {inventorySummary.length > 0 ? inventorySummary.map((item) => (
+                                <tr key={item.id} className="hover:bg-stone-50 transition-colors">
+                                    <td className="p-4 flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-stone-200 rounded overflow-hidden flex-shrink-0 border border-stone-100">
+                                            {item.image ? (
+                                                <img src={item.image} className="w-full h-full object-cover"/>
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-xs text-stone-400">No Img</div>
+                                            )}
+                                        </div>
+                                        <span className="font-medium text-stone-800 line-clamp-2 max-w-[200px]">{item.product_name}</span>
+                                    </td>
+                                    <td className="p-4 font-mono text-stone-500 text-xs">{item.sku}</td>
+                                    <td className="p-4 text-stone-600 whitespace-nowrap">{item.color} / {item.size}</td>
+                                    
+                                    {/* CỘT ĐIỀU CHỈNH TRỰC TIẾP */}
+                                    <td className="p-4 text-center">
+                                        <div className="relative inline-block group">
+                                            {isKeyLoading(item.id) ? (
+                                                <div className="relative">
+                                                    <input 
+                                                        type="number" disabled
+                                                        className="w-20 h-9 text-center border bg-stone-100 rounded text-stone-400"
+                                                        value={item.stock}
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <FaSpinner className="animate-spin text-stone-600" size={14}/>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <input 
+                                                    type="number" 
+                                                    className="w-16 md:w-20 h-9 text-center border border-stone-200 rounded font-bold text-stone-800 focus:border-stone-800 focus:ring-1 focus:ring-stone-800 outline-none transition-all"
+                                                    value={editingStock[item.id] !== undefined ? editingStock[item.id] : item.stock}
+                                                    onChange={(e) => handleStockInputChange(item.id, e.target.value)}
+                                                    onBlur={() => commitStockChange(item.id, item.stock)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                                                />
+                                            )}
+                                        </div>
+                                    </td>
+                                    
+                                    <td className="p-4 text-right text-stone-600 font-mono">
+                                        {new Intl.NumberFormat('vi-VN').format(item.value)} ₫
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        {item.stock > 5 ? (
+                                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sẵn hàng</span>
+                                        ) : item.stock > 0 ? (
+                                            <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Sắp hết</span>
+                                        ) : (
+                                            <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Hết hàng</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr><td colSpan="6" className="p-12 text-center text-stone-400">Không tìm thấy dữ liệu tồn kho</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
       )}
@@ -580,49 +586,64 @@ const Inventory = () => {
       {/* --- TAB 3: LỊCH SỬ NHẬP (ĐÃ SỬA: Hiển thị Tổng tồn sau GD) --- */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse">
-              <thead className="bg-stone-100 text-stone-600 uppercase text-xs">
-                <tr>
-                  <th className="p-4">Ngày nhập</th>
-                  <th className="p-4">Mã Lô</th>
-                  <th className="p-4">Sản phẩm</th>
-                  <th className="p-4">Kho / Ghi chú</th>
-                  <th className="p-4">Thay đổi</th>
-                  {/* [SỬA TÊN CỘT] */}
-                  <th className="p-4">Tổng tồn sau GD</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100 text-sm">
-                {/* [SỬA DỮ LIỆU] Dùng processedBatches để hiển thị tồn lũy kế */}
-                {processedBatches.map((batch) => (
-                  <tr key={batch.id} className={`hover:bg-stone-50 ${batch.is_adjustment ? 'bg-yellow-50' : ''}`}>
-                    <td className="p-4 text-stone-500">{new Date(batch.created_at).toLocaleDateString('vi-VN')}</td>
-                    <td className="p-4 font-mono text-xs text-blue-600">
-                        {batch.id}
-                        {batch.is_adjustment && <span className="ml-2 bg-yellow-200 text-yellow-800 text-[10px] px-1 rounded font-bold">ĐIỀU CHỈNH</span>}
-                    </td>
-                    <td className="p-4">
-                      <div className="font-medium">{batch.variants?.products?.name}</div>
-                      <div className="text-xs text-stone-500">{batch.variants?.size} / {batch.variants?.color}</div>
-                    </td>
-                    <td className="p-4 text-stone-600">
-                        {batch.stores?.name}
-                        {batch.notes && <div className="text-[10px] italic text-stone-400">{batch.notes}</div>}
-                    </td>
-                    
-                    {/* Hiển thị số lượng thay đổi (+/-) */}
-                    <td className="p-4 font-bold">
-                        <span className={batch.original_quantity > 0 ? "text-green-600" : "text-red-600"}>
-                            {batch.original_quantity > 0 ? '+' : ''}{batch.original_quantity}
-                        </span>
-                    </td>
+          
+          {/* [RESPONSIVE] WRAPPER BẢNG: OVERFLOW-X-AUTO */}
+          <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead className="bg-stone-100 text-stone-600 uppercase text-xs">
+                    <tr>
+                      <th className="p-4">Ngày nhập</th>
+                      <th className="p-4">Mã Lô</th>
+                      <th className="p-4">Sản phẩm</th>
+                      <th className="p-4">Kho / Ghi chú</th>
+                      <th className="p-4">Thay đổi</th>
+                      {/* [SỬA TÊN CỘT] */}
+                      <th className="p-4">Tổng tồn sau GD</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 text-sm">
+                    {/* [SỬA DỮ LIỆU] Dùng processedBatches để hiển thị tồn lũy kế */}
+                    {processedBatches.map((batch) => (
+                      <tr key={batch.id} className={`hover:bg-stone-50 ${batch.is_adjustment ? 'bg-yellow-50' : ''}`}>
+                        <td className="p-4 text-stone-500 whitespace-nowrap">{new Date(batch.created_at).toLocaleDateString('vi-VN')}</td>
+                        <td className="p-4 font-mono text-xs text-blue-600">
+                            {batch.id}
+                            {batch.is_adjustment && <span className="ml-2 bg-yellow-200 text-yellow-800 text-[10px] px-1 rounded font-bold">ĐIỀU CHỈNH</span>}
+                        </td>
+                        
+                        <td className="p-4 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-stone-100 rounded overflow-hidden border border-stone-200 flex-shrink-0">
+                                <img 
+                                    src={batch.variants?.image_url || batch.variants?.products?.images?.[0]} 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => e.target.style.display = 'none'}
+                                />
+                            </div>
+                            <div>
+                                <div className="font-medium line-clamp-1 max-w-[200px]">{batch.variants?.products?.name}</div>
+                                <div className="text-xs text-stone-500">{batch.variants?.size} / {batch.variants?.color}</div>
+                            </div>
+                        </td>
 
-                    {/* [SỬA] Hiển thị runningTotal thay vì quantity_remaining */}
-                    <td className="p-4 font-bold text-stone-800">{batch.runningTotal}</td>
-                  </tr>
-                ))}
-              </tbody>
-          </table>
+                        <td className="p-4 text-stone-600">
+                            {batch.stores?.name}
+                            {batch.notes && <div className="text-[10px] italic text-stone-400 max-w-[150px] truncate">{batch.notes}</div>}
+                        </td>
+                        
+                        {/* Hiển thị số lượng thay đổi (+/-) */}
+                        <td className="p-4 font-bold">
+                            <span className={batch.original_quantity > 0 ? "text-green-600" : "text-red-600"}>
+                                {batch.original_quantity > 0 ? '+' : ''}{batch.original_quantity}
+                            </span>
+                        </td>
+
+                        {/* [SỬA] Hiển thị runningTotal thay vì quantity_remaining */}
+                        <td className="p-4 font-bold text-stone-800">{batch.runningTotal}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+              </table>
+          </div>
         </div>
       )}
     </div>

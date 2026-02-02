@@ -127,9 +127,12 @@ const CreateOrder = () => {
     }, [products, search]);
 
     return (
-        <div className="flex flex-col lg:flex-row h-screen bg-stone-100 overflow-hidden">
+        // [RESPONSIVE] Thay đổi h-screen thành min-h-screen trên mobile, lg:h-screen trên desktop
+        <div className="flex flex-col lg:flex-row lg:h-screen min-h-screen bg-stone-100 lg:overflow-hidden">
+            
             {/* CỘT 1: DANH SÁCH SẢN PHẨM */}
-            <div className="lg:w-2/5 flex flex-col p-4 border-r border-stone-200 bg-white">
+            {/* [RESPONSIVE] Thêm h-[60vh] trên mobile để cuộn danh sách sản phẩm riêng biệt */}
+            <div className="lg:w-2/5 w-full flex flex-col p-4 border-r border-stone-200 bg-white h-[60vh] lg:h-full">
                 <div className="mb-4">
                     <h2 className="font-bold text-lg mb-2 flex items-center gap-2"><FaBoxOpen/> Chọn sản phẩm</h2>
                     <div className="relative">
@@ -171,7 +174,8 @@ const CreateOrder = () => {
             </div>
 
             {/* CỘT 2: THÔNG TIN KHÁCH HÀNG */}
-            <div className="lg:w-1/4 p-6 overflow-y-auto bg-stone-50 border-r border-stone-200">
+            {/* [RESPONSIVE] Cho phép chiều cao tự động trên mobile */}
+            <div className="lg:w-1/4 w-full p-4 lg:p-6 lg:overflow-y-auto bg-stone-50 border-r border-stone-200 lg:h-full">
                 <h2 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUser/> Khách hàng</h2>
                 <div className="space-y-4">
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Tên khách (*)</label><input className="w-full p-2 border rounded bg-white" value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} /></div>
@@ -182,9 +186,11 @@ const CreateOrder = () => {
             </div>
 
             {/* CỘT 3: CHI TIẾT & THANH TOÁN */}
-            <div className="flex-1 flex flex-col bg-white shadow-xl">
+            {/* [RESPONSIVE] Chiều cao tự động trên mobile, full trên desktop */}
+            <div className="flex-1 w-full flex flex-col bg-white shadow-xl lg:h-full">
                 <div className="p-4 bg-stone-900 text-white font-bold flex justify-between"><span>Đơn hàng</span><span>{cart.length} món</span></div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* [RESPONSIVE] Giới hạn chiều cao danh sách cart trên mobile */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[50vh] lg:max-h-full">
                     {cart.map(item => (
                         <div key={item.variant_id} className="flex justify-between items-start border-b pb-2">
                             <div><div className="font-bold text-sm">{item.name}</div><div className="text-xs text-stone-500">{item.size} / {item.color}</div><div className="text-red-600 font-bold text-sm mt-1">{new Intl.NumberFormat('vi-VN').format(item.price)}</div></div>

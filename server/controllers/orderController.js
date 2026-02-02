@@ -265,13 +265,14 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, restock } = req.body; 
+        const { status, restock, skip_ghn } = req.body; 
 
         // --- LOG DEBUG (Giữ lại để theo dõi) ---
         console.log("-------------------------------------------------");
         console.log(`🛠 Đang update đơn #${id} sang trạng thái: ${status}`);
 
         // 1. Lấy thông tin đơn hàng hiện tại (SỬA LỖI Ở ĐÂY: Thêm error: fetchError)
+        
         const { data: currentOrder, error: fetchError } = await supabase
             .from('orders')
             .select(`
@@ -308,23 +309,22 @@ exports.updateOrderStatus = async (req, res) => {
         // 2. LOGIC TỰ ĐỘNG GHN KHI CHUYỂN SANG SHIPPING
         // ==========================================================
         // Chỉ chạy khi: Trạng thái mới là shipping VÀ Chưa có mã vận đơn
-        if (status === 'shipping' && !trackingCode) {
-            console.log(`🚀 Admin xác nhận giao hàng. Đang gọi GHN...`);
+        // [THAY ĐỔI 2] Thêm điều kiện !skip_ghn
+        if (status === 'shipping' && !trackingCode && !skip_ghn) {
             try {
-                // TỰ ĐỘNG GỌI GHN TẠO VẬN ĐƠN
+                console.log("🚀 Đang tạo đơn qua GHN...");
                 trackingCode = await createGHNOrder(currentOrder);
-                
-                // Cập nhật mã vận đơn vào biến để lưu xuống DB
                 updateData.shipping_tracking_code = trackingCode;
-                console.log(`✅ Đã tạo mã vận đơn: ${trackingCode}`);
             } catch (ghnError) {
-                // Nếu lỗi GHN, dừng lại báo lỗi ngay cho Admin biết
-                console.error("❌ Lỗi tạo đơn GHN:", ghnError.message);
+                // Nếu lỗi GHN -> Trả về lỗi 400 để Frontend hiển thị thông báo
+                console.error("❌ Lỗi GHN:", ghnError.message);
                 return res.status(400).json({ 
                     success: false, 
-                    message: `Lỗi GHN: ${ghnError.message}. Kiểm tra lại địa chỉ khách!` 
+                    message: `Lỗi tạo đơn GHN: ${ghnError.message}. Hãy thử chọn 'Tự giao hàng'.` 
                 });
             }
+        } else if (status === 'shipping' && skip_ghn) {
+            console.log("🛵 Admin chọn Tự giao hàng -> Bỏ qua tạo đơn GHN.");
         }
 
         // ==========================================================

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowUp, FaArrowDown, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import { supabase } from '../supabaseClient';
-import { useAsync } from '../hooks/useAsync';
+// XÓA import supabase vì không dùng nữa
+// import { supabase } from '../supabaseClient'; 
+import imageCompression from 'browser-image-compression';
 
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   // State Form
@@ -25,10 +26,10 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
-  const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '' });
+  const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '', image_url: '' });
   const fileInputRef = useRef(null);
 
-  // --- [MỚI] HELPER FORMAT TIỀN TỆ ---
+  // --- HELPER FORMAT TIỀN TỆ ---
   const formatCurrencyInput = (value) => {
       if (!value) return '';
       const number = Number(value.toString().replace(/\D/g, ''));
@@ -48,19 +49,14 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       fetchCategories();
 
       if (productToEdit) {
-        console.log("========================================");
-        console.log("1️⃣ [INIT] Backend Data:", productToEdit);
-
-        // [LOGIC MỚI] Đọc cấu trúc phẳng { category_id: ... }
+        // Load collection_ids từ cấu trúc phẳng
         let loadedCollectionIds = [];
         if (productToEdit.product_collections && Array.isArray(productToEdit.product_collections)) {
             loadedCollectionIds = productToEdit.product_collections
-                .map(item => item.category_id) // Lấy trực tiếp field category_id
+                .map(item => item.category_id)
                 .filter(id => id !== null && id !== undefined)
-                .map(Number); // Ép kiểu số
+                .map(Number);
         }
-
-        console.log("3️⃣ [RESULT] IDs đã tick:", loadedCollectionIds);
 
         setFormData({
             name: productToEdit.name || '',
@@ -68,7 +64,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             base_price: productToEdit.base_price || 0,
             description: productToEdit.description || '',
             category_id: productToEdit.category_id || '',
-            collection_ids: loadedCollectionIds // <--- Gán vào đây
+            collection_ids: loadedCollectionIds
         });
 
         setImages(productToEdit.images || []);
@@ -84,13 +80,12 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
       } else {
         // Reset form
-        console.log("🆕 Chế độ tạo mới - Reset Form");
         setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [] });
         setImages([]);
         setVariants([]);
         setSizeChart('');
       }
-      setCurrentVariant({ size: '', color: '', sku: '' });
+      setCurrentVariant({ size: '', color: '', sku: '', image_url: '' });
     }
   }, [isOpen, productToEdit]);
 
@@ -98,70 +93,92 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
       if(res.data.success) {
-          console.log("📚 Danh sách Category tải về:", res.data.data);
           setCategories(res.data.data);
       }
     } catch (err) { console.error(err); }
   };
 
-  // --- 2. XỬ LÝ CLICK CHECKBOX (DEBUG KỸ) ---
+  // --- 2. XỬ LÝ CLICK CHECKBOX COLLECTION ---
   const handleToggleCollection = (catId) => {
       const targetId = Number(catId);
-      const currentIds = formData.collection_ids.map(Number); // Đảm bảo tất cả là số
+      const currentIds = formData.collection_ids.map(Number);
       
-      console.log(`🖱️ [CLICK] Bạn click vào ID: ${targetId} (Kiểu: ${typeof targetId})`);
-      console.log(`   [STATE] Danh sách hiện tại:`, currentIds);
-
       let newIds;
       if (currentIds.includes(targetId)) {
-          console.log("   -> ID đã tồn tại => XÓA");
           newIds = currentIds.filter(id => id !== targetId);
       } else {
-          console.log("   -> ID chưa có => THÊM");
           newIds = [...currentIds, targetId];
       }
-
-      console.log("   [NEW STATE] Danh sách mới:", newIds);
       setFormData({ ...formData, collection_ids: newIds });
   };
 
-  // --- 3. UPLOAD ẢNH ---
+  // --- 3. UPLOAD ẢNH (GỌI API SERVER CLOUDINARY) ---
     const handleImageUpload = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
         setUploading(true);
         const newImages = [];
 
-        // Cấu hình nén
         const options = {
-            maxSizeMB: 0.5,          // Giới hạn 500KB
-            maxWidthOrHeight: 1200,  // Giới hạn kích thước 1200px
-            useWebWorker: true,
-            fileType: 'image/webp'   // Chuyển sang WebP cho nhẹ
+            maxSizeMB: 1,          
+            maxWidthOrHeight: 1500,  
+            useWebWorker: true
         };
 
         try {
             for (const file of files) {
-                // [MỚI] Nén file trước khi upload
-                const compressedFile = await imageCompression(file, options);
+                // 1. Nén ảnh ở Client
+                let fileToUpload = file;
+                try {
+                    fileToUpload = await imageCompression(file, options);
+                } catch (compError) {
+                    console.warn("Lỗi nén ảnh, dùng ảnh gốc:", compError);
+                }
                 
-                const fileExt = 'webp'; // Luôn là webp sau khi nén
-                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                // 2. Chuẩn bị FormData gửi sang Backend
+                const uploadData = new FormData();
+                uploadData.append('image', fileToUpload);
+
+                // 3. Gọi API Backend (Nơi chứa logic Cloudinary)
+                const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, uploadData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
                 
-                // Upload file đã nén (compressedFile) thay vì file gốc
-                const { error } = await supabase.storage.from('products').upload(fileName, compressedFile);
-                
-                if (error) throw error;
-                const { data } = supabase.storage.from('products').getPublicUrl(fileName);
-                newImages.push(data.publicUrl);
+                if (res.data.success) {
+                    newImages.push(res.data.url);
+                }
             }
             setImages(prev => [...prev, ...newImages]);
-            toast.success(`Đã tải lên ${newImages.length} ảnh (Đã tối ưu)`);
+            toast.success(`Đã tải lên ${newImages.length} ảnh`);
         } catch (error) { 
             console.error(error);
-            toast.error('Lỗi upload ảnh: ' + error.message); 
+            toast.error('Lỗi upload: ' + (error.response?.data?.message || error.message)); 
         } finally { 
             setUploading(false); 
+            if(fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    // --- XỬ LÝ UPLOAD SIZE CHART ---
+    const handleUploadSizeChart = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const toastId = toast.loading("Đang tải ảnh...");
+        
+        try {
+            const uploadData = new FormData();
+            uploadData.append('image', file);
+
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (res.data.success) {
+                setSizeChart(res.data.url);
+                toast.update(toastId, { render: "Đã tải xong!", type: "success", isLoading: false, autoClose: 2000 });
+            }
+        } catch (err) {
+            toast.update(toastId, { render: "Lỗi upload", type: "error", isLoading: false, autoClose: 2000 });
         }
     };
 
@@ -170,8 +187,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       if(!currentVariant.size || !currentVariant.color || !currentVariant.sku) {
           return toast.warn("Vui lòng nhập đủ Size, Màu, SKU");
       }
-      setVariants([...variants, { ...currentVariant, image_url: '' }]);
-      setCurrentVariant({ size: '', color: '', sku: '' });
+      setVariants([...variants, { ...currentVariant, image_url: currentVariant.image_url || '' }]);
+      setCurrentVariant({ size: '', color: '', sku: '', image_url: '' });
   };
 
   const handleRemoveVariant = (index) => {
@@ -196,22 +213,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
               toast.success("Tạo danh mục thành công!");
           }
       } catch (err) { toast.error("Lỗi tạo danh mục"); }
-  };
-
-  const handleUploadSizeChart = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const toastId = toast.loading("Đang tải ảnh...");
-      try {
-          const fileName = `size-chart-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-          const { error } = await supabase.storage.from('products').upload(fileName, file);
-          if (error) throw error;
-          const { data } = supabase.storage.from('products').getPublicUrl(fileName);
-          setSizeChart(data.publicUrl);
-          toast.update(toastId, { render: "Đã tải xong!", type: "success", isLoading: false, autoClose: 2000 });
-      } catch (err) {
-          toast.update(toastId, { render: "Lỗi upload", type: "error", isLoading: false, autoClose: 2000 });
-      }
   };
 
   const moveImage = (index, direction) => {
@@ -277,7 +278,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="label">Tên sản phẩm</label>
-                    <input className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="VD: Áo Thun Basic" />
+                    <input className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value, slug: toSlug(e.target.value)})} placeholder="VD: Áo Thun Basic" />
                 </div>
                 
                 {/* DANH MỤC */}
@@ -303,7 +304,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         </div>
                     </div>
 
-                    {/* [SỬA] CHECKBOX COLLECTION: Ép kiểu Number để so sánh chuẩn */}
+                    {/* CHECKBOX COLLECTION */}
                     <div>
                         <label className="label">Bộ sưu tập (Phụ)</label>
                         <div className="border border-stone-200 p-2 rounded max-h-[100px] overflow-y-auto bg-stone-50 grid grid-cols-2 gap-2">
@@ -312,9 +313,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                     <input 
                                         type="checkbox"
                                         className="accent-stone-900 w-4 h-4"
-                                        // Kiểm tra kiểu Số === Số
                                         checked={formData.collection_ids?.some(id => Number(id) === Number(c.id))}
-                                        // Hàm toggle
                                         onChange={() => handleToggleCollection(c.id)}
                                     />
                                     <span className="text-sm text-stone-700">{c.name}</span>
@@ -348,7 +347,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             <div>
                 <label className="label mb-2 flex justify-between">
                     <span>Hình ảnh sản phẩm</span>
-                    {uploading && <span className="text-blue-600 text-xs animate-pulse">Đang tải ảnh lên...</span>}
+                    {uploading && <span className="text-blue-600 text-xs animate-pulse">Đang tải ảnh lên Cloudinary...</span>}
                 </label>
                 <div className="grid grid-cols-5 gap-3">
                     {images.map((img, idx) => (
@@ -363,7 +362,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                     ))}
                     
                     <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
-                        <FaUpload size={20} className="mb-2"/>
+                        {uploading ? <FaSpinner className="animate-spin"/> : <FaUpload size={20} className="mb-2"/>}
                         <span className="text-xs font-bold">{uploading ? '...' : 'Thêm ảnh'}</span>
                     </button>
                     <input type="file" hidden ref={fileInputRef} onChange={handleImageUpload} accept="image/*" multiple />
@@ -419,13 +418,10 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                 <span className="text-stone-600 min-w-[60px]">{v.color}</span>
                                 <span className="font-mono text-stone-400 text-xs py-0.5">{v.sku}</span>
                                 
-                                {/* --- [MỚI] HIỂN THỊ ẢNH THUMBNAIL --- */}
-                                {/* Nếu đã chọn ảnh thì hiện ảnh, chưa thì hiện ô trống */}
+                                {/* HIỂN THỊ ẢNH THUMBNAIL */}
                                 {v.image_url ? (
                                     <div className="w-10 h-10 rounded border border-stone-200 overflow-hidden relative group cursor-pointer">
                                         <img src={v.image_url} alt="Variant" className="w-full h-full object-cover" />
-                                        
-                                        {/* Tooltip: Rê chuột vào hiện ảnh to để soi chi tiết */}
                                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 hidden group-hover:block z-50 bg-white border border-stone-300 shadow-xl rounded p-1">
                                             <img src={v.image_url} className="w-full h-auto object-cover" />
                                         </div>
@@ -436,7 +432,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                     </div>
                                 )}
 
-                                {/* MENU CHỌN ẢNH (GIỮ NGUYÊN LOGIC CŨ CỦA BẠN) */}
+                                {/* MENU CHỌN ẢNH */}
                                 <select 
                                     className="border border-stone-300 rounded text-xs p-1 max-w-[120px] ml-auto focus:border-stone-800 outline-none"
                                     value={v.image_url || ""}
@@ -465,7 +461,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         {/* FOOTER */}
         <div className="p-6 border-t border-stone-100 flex justify-end gap-3 bg-stone-50 rounded-b-xl sticky bottom-0">
             <button onClick={onClose} className="px-6 py-2 rounded font-bold text-stone-500 hover:bg-stone-200 transition-colors">Hủy bỏ</button>
-            <button onClick={handleSubmit} disabled={uploading} className="px-6 py-2 rounded font-bold text-white bg-stone-900 hover:bg-black transition-colors shadow-lg disabled:opacity-50">
+            <button onClick={handleSubmit} disabled={uploading} className="px-6 py-2 rounded font-bold text-white bg-stone-900 hover:bg-black transition-colors shadow-lg disabled:opacity-50 flex items-center gap-2">
+                {uploading && <FaSpinner className="animate-spin"/>}
                 {uploading ? 'Đang tải...' : (productToEdit ? 'Lưu thay đổi' : 'Tạo sản phẩm')}
             </button>
         </div>

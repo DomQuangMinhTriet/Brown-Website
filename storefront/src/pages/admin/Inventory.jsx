@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'; // <--- Quan trọng nhất là dòng này
 import axios from 'axios';
-import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 // Import các hook của bạn (nếu file nằm ở thư mục hooks ngang cấp pages thì sửa đường dẫn)
 import { useAsync, useKeyedAsync } from '../../hooks/useAsync';

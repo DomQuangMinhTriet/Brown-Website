@@ -1,7 +1,6 @@
 const supabase = require('../config/supabase');
 
 // 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
-// 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
 exports.getProducts = async (req, res) => {
     try {
         const { search, category } = req.query; 
@@ -46,17 +45,15 @@ exports.getProducts = async (req, res) => {
         // [LOGIC MỚI]: Tính tổng tồn kho từ các lô hàng (batches)
         const productsWithStock = data.map(product => {
             const variantsWithStock = product.variants.map(v => {
-                // Cộng dồn quantity_remaining từ mảng inventory_batches
                 const totalStock = v.inventory_batches 
                     ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
                     : 0;
 
-                // Loại bỏ mảng batches thừa, chỉ giữ lại con số tổng
                 const { inventory_batches, ...variantProps } = v;
                 
                 return {
                     ...variantProps,
-                    quantity_remaining: totalStock // <-- Frontend cần trường này để biết còn hàng hay không
+                    quantity_remaining: totalStock 
                 };
             });
 
@@ -77,14 +74,26 @@ exports.getProductBySlug = async (req, res) => {
             .from('products')
             .select(`
                 *,
-                variants (id, size, color, sku, image_url),
+                variants (
+                    id, size, color, sku, image_url,
+                    inventory_batches ( quantity_remaining )
+                ),
                 categories (id, name, slug)
             `)
             .eq('slug', slug)
             .single();
 
         if (error) throw error;
-        res.json({ success: true, data });
+
+        const variantsWithStock = data.variants.map(v => {
+            const totalStock = v.inventory_batches 
+                ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
+                : 0;
+            const { inventory_batches, ...rest } = v;
+            return { ...rest, quantity_remaining: totalStock };
+        });
+
+        res.json({ success: true, data: { ...data, variants: variantsWithStock } });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -93,13 +102,15 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids } = req.body;
+        // [CẬP NHẬT] Lấy thêm size_chart_url từ body
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url } = req.body;
 
         // 1. Tạo Product
         const { data: newProduct, error: prodError } = await supabase
             .from('products')
             .insert([{
-                name, slug, base_price, description, category_id, images
+                name, slug, base_price, description, category_id, images, 
+                size_chart_url: size_chart_url || null // [QUAN TRỌNG] Lưu link Size Chart
             }])
             .select()
             .single();
@@ -113,7 +124,7 @@ exports.createProduct = async (req, res) => {
                 size: v.size,
                 color: v.color,
                 sku: v.sku,
-                image_url: v.image_url || null // <--- [THÊM MỚI] Lưu ảnh vào DB
+                image_url: v.image_url || null 
             }));
 
             const { error: varError } = await supabase.from('variants').insert(variantData);
@@ -140,12 +151,16 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids } = req.body;
+        // [CẬP NHẬT] Lấy thêm size_chart_url từ body
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url } = req.body;
 
         // 1. Update thông tin chung
         const { error: updateError } = await supabase
             .from('products')
-            .update({ name, slug, base_price, description, category_id, images })
+            .update({ 
+                name, slug, base_price, description, category_id, images, 
+                size_chart_url: size_chart_url || null // [QUAN TRỌNG] Cập nhật link Size Chart
+            })
             .eq('id', id);
 
         if (updateError) throw updateError;
@@ -157,7 +172,7 @@ exports.updateProduct = async (req, res) => {
             await supabase.from('product_collections').insert(collectionData);
         }
 
-        // 3. Xử lý Variants (Logic giữ nguyên, chỉ thêm update ảnh)
+        // 3. Xử lý Variants
         const { data: oldVariants } = await supabase.from('variants').select('id').eq('product_id', id);
         const oldVariantIds = oldVariants.map(v => v.id);
         
@@ -174,7 +189,7 @@ exports.updateProduct = async (req, res) => {
                 for (const v of variants) {
                     await supabase.from('variants')
                         .update({ 
-                            image_url: v.image_url || null, // <--- [THÊM MỚI] Cho phép sửa ảnh
+                            image_url: v.image_url || null, 
                             sku: v.sku 
                         })
                         .eq('product_id', id)
@@ -183,7 +198,6 @@ exports.updateProduct = async (req, res) => {
                 }
             }
             
-            // Trả về luôn (như logic cũ của bạn, nhưng giờ đã update được ảnh)
             return res.json({ 
                 success: true, 
                 message: 'Đã cập nhật thông tin chung và hình ảnh. (Không thể sửa Size/Màu vì có lịch sử kho)' 
@@ -200,7 +214,7 @@ exports.updateProduct = async (req, res) => {
                     size: v.size,
                     color: v.color,
                     sku: v.sku,
-                    image_url: v.image_url || null // <--- [THÊM MỚI] Lưu ảnh khi tạo lại
+                    image_url: v.image_url || null 
                 }));
                 await supabase.from('variants').insert(variantData);
             }
@@ -217,10 +231,43 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
+
+        // BƯỚC 1: Xóa liên kết bộ sưu tập
+        await supabase.from('product_collections').delete().eq('product_id', id);
+
+        // BƯỚC 2: Lấy danh sách biến thể để xóa tồn kho
+        const { data: variants } = await supabase.from('variants').select('id').eq('product_id', id);
+        
+        if (variants && variants.length > 0) {
+            const variantIds = variants.map(v => v.id);
+
+            // Xóa tồn kho (inventory_batches) của các biến thể này
+            // Lưu ý: Nếu có đơn hàng (order_items) dính tới biến thể, lệnh này có thể vẫn lỗi.
+            // Khi đó nên chuyển sang "Ẩn sản phẩm" thay vì Xóa vĩnh viễn.
+            await supabase.from('inventory_batches').delete().in('variant_id', variantIds);
+            
+            // Xóa biến thể
+            await supabase.from('variants').delete().eq('product_id', id);
+        }
+
+        // BƯỚC 3: Xóa sản phẩm chính
         const { error } = await supabase.from('products').delete().eq('id', id);
-        if (error) throw error;
-        res.json({ success: true, message: 'Đã xóa sản phẩm' });
+
+        if (error) {
+            // Nếu vẫn lỗi (thường do dính khóa ngoại Order), gợi ý người dùng ẩn đi
+            if (error.code === '23503') { // Mã lỗi Foreign Key Violation
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Không thể xóa vì sản phẩm này đã có Đơn hàng. Hãy chọn "Sửa" -> Bỏ tích "Kích hoạt" để ẩn sản phẩm.' 
+                });
+            }
+            throw error;
+        }
+
+        res.json({ success: true, message: 'Đã xóa sản phẩm và dữ liệu liên quan' });
+
     } catch (error) {
+        console.error("Delete Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

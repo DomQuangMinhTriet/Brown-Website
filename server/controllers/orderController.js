@@ -129,10 +129,23 @@ exports.createOrder = async (req, res) => {
             // Ưu tiên giá sale (current_price), nếu không có lấy giá gốc
             const realPrice = variant.current_price || variant.products.base_price;
             
+            // [LOGIC MỚI] Lấy giá vốn từ lô hàng nhập mới nhất
+            const { data: latestBatch } = await supabase
+                .from('inventory_batches')
+                .select('cost_price')
+                .eq('variant_id', item.variant_id)
+                .order('created_at', { ascending: false }) // Lấy lô mới nhất
+                .limit(1)
+                .single();
+
+            const unitCost = latestBatch ? Number(latestBatch.cost_price) : 0;
+            const totalCogs = unitCost * item.quantity;
+
             cleanItems.push({
                 variant_id: item.variant_id,
                 quantity: item.quantity,
-                unit_price: realPrice 
+                unit_price: realPrice,
+                cogs_total: totalCogs // <--- [MỚI] Gửi trường này xuống DB
             });
             
             subtotal_check += realPrice * item.quantity;
@@ -183,7 +196,7 @@ exports.createOrder = async (req, res) => {
             p_shipping_fee: shipping_fee, // Sử dụng phí ship frontend gửi lên (đã tính qua GHN)
             p_discount_amount: discount_amount,
             p_voucher_code: voucher_code || null,
-            p_items: cleanItems
+            p_items: cleanItems // Array này giờ đã có cogs_total
         });
 
         if (error) {
@@ -466,19 +479,37 @@ exports.createAdminOrder = async (req, res) => {
 
         if (orderError) throw orderError;
 
-        // --- BƯỚC 5: LƯU CHI TIẾT SẢN PHẨM (GIỮ NGUYÊN) ---
-        const orderItems = items.map(item => ({
-            order_id: order.id,
-            variant_id: item.variant_id,
-            quantity: item.quantity,
-            price_at_purchase: item.price || 0 
-        }));
+        // --- BƯỚC 5: LƯU CHI TIẾT SẢN PHẨM (CẬP NHẬT TÍNH GIÁ VỐN) ---
+        // Thay đổi cách duyệt để dùng await lấy giá vốn
+        const orderItemsData = [];
 
-        const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+        for (const item of items) {
+            // [LOGIC MỚI] Lấy giá vốn từ lô hàng nhập mới nhất
+            const { data: latestBatch } = await supabase
+                .from('inventory_batches')
+                .select('cost_price')
+                .eq('variant_id', item.variant_id)
+                .order('created_at', { ascending: false }) // Lấy lô mới nhất
+                .limit(1)
+                .single();
+
+            const unitCost = latestBatch ? Number(latestBatch.cost_price) : 0;
+            const totalCogs = unitCost * item.quantity;
+
+            orderItemsData.push({
+                order_id: order.id,
+                variant_id: item.variant_id,
+                quantity: item.quantity,
+                price_at_purchase: item.price || 0,
+                cogs_total: totalCogs // <--- [MỚI] Lưu giá vốn vào DB
+            });
+        }
+
+        const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
         if (itemsError) throw itemsError;
 
         // ============================================================
-        // --- BƯỚC 6: TRỪ TỒN KHO THEO LÔ (FIFO - MỚI) ---
+        // --- BƯỚC 6: TRỪ TỒN KHO THEO LÔ (FIFO - GIỮ NGUYÊN) ---
         // ============================================================
         console.log("--- BẮT ĐẦU TRỪ KHO FIFO ---");
 

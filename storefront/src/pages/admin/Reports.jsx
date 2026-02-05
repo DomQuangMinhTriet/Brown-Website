@@ -14,11 +14,21 @@ import { FaCalendarAlt, FaSearch } from 'react-icons/fa';
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 const Reports = () => {
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+  // Hàm helper format ngày YYYY-MM-DD
+  const formatDate = (date) => date.toISOString().split('T')[0];
 
-  const [dateRange, setDateRange] = useState({ start: firstDay, end: lastDay });
+  // [SỬA LẠI] Logic ngày tháng: Mặc định 7 ngày gần nhất tính đến hôm nay
+  const [dateRange, setDateRange] = useState(() => {
+      const end = new Date(); // Hôm nay
+      const start = new Date(); 
+      start.setDate(end.getDate() - 7); // Lùi lại 7 ngày
+
+      return {
+          start: formatDate(start),
+          end: formatDate(end)
+      };
+  });
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -148,7 +158,7 @@ const Reports = () => {
                 <div className="absolute right-0 top-0 w-20 h-20 bg-blue-50 rounded-bl-full -mr-4 -mt-4"></div>
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider z-10 relative">Tổng Doanh thu (100%)</p>
                 <h3 className="text-3xl font-bold text-stone-800 mt-2 z-10 relative">{formatMoney(data.revenue)}</h3>
-                <p className="text-xs text-stone-400 mt-2 z-10 relative">{data.orderCount} đơn hàng</p>
+                <p className="text-xs text-stone-400 mt-2 z-10 relative">{data.orderCount} đơn hàng (Hoàn thành và Đang vận chuyển)</p>
             </div>
 
             {/* 2. Giá vốn */}

@@ -2,31 +2,28 @@ const supabase = require('../config/supabase');
 
 exports.getDashboardStats = async (req, res) => {
     try {
-        // 1. TÍNH TỔNG DOANH THU (Chỉ tính đơn đã hoàn thành hoặc đang xử lý, trừ đơn hủy)
+        // [CẬP NHẬT] DASHBOARD: Tính doanh thu đơn HOÀN THÀNH + ĐANG GIAO
         const { data: revenueData, error: revError } = await supabase
             .from('orders')
             .select('total_amount')
-            .neq('status', 'cancelled'); // Không tính đơn hủy
+            .in('status', ['completed', 'shipping']); // <--- SỬA: Lấy cả 2 trạng thái
         
         if (revError) throw revError;
         const totalRevenue = revenueData.reduce((sum, order) => sum + order.total_amount, 0);
 
-        // 2. ĐẾM TỔNG ĐƠN HÀNG
+        // Đếm tổng đơn (vẫn đếm hết để biết traffic)
         const { count: totalOrders, error: orderError } = await supabase
             .from('orders')
             .select('*', { count: 'exact', head: true });
         
         if (orderError) throw orderError;
 
-        // 3. ĐẾM TỔNG KHÁCH HÀNG (Dựa trên số điện thoại duy nhất trong bảng orders hoặc bảng customers)
-        // Ở đây ta đếm trong bảng customers cho chuẩn
         const { count: totalCustomers, error: cusError } = await supabase
             .from('customers')
             .select('*', { count: 'exact', head: true });
 
         if (cusError) throw cusError;
 
-        // 4. LẤY 5 ĐƠN HÀNG GẦN NHẤT
         const { data: recentOrders, error: recentError } = await supabase
             .from('orders')
             .select('id, code, customer_name, total_amount, status, created_at')
@@ -35,7 +32,6 @@ exports.getDashboardStats = async (req, res) => {
 
         if (recentError) throw recentError;
 
-        // Trả về kết quả tổng hợp
         res.json({
             success: true,
             data: {
@@ -52,33 +48,43 @@ exports.getDashboardStats = async (req, res) => {
     }
 };
 
-// 2. BÁO CÁO TÀI CHÍNH CHI TIẾT (Hàm mới)
+// 2. BÁO CÁO TÀI CHÍNH CHI TIẾT
 exports.getFinancialReport = async (req, res) => {
     try {
-        const { startDate, endDate } = req.query; // Nhận tham số lọc ngày (VD: ?startDate=2025-01-01&endDate=2025-01-31)
+        const { startDate, endDate } = req.query;
+
+        // [SỬA 1] CHUẨN HÓA NGÀY THÁNG SANG ISO STRING
+        const startISO = new Date(startDate).toISOString();
+        
+        const endObj = new Date(endDate);
+        endObj.setHours(23, 59, 59, 999);
+        const endISO = endObj.toISOString();
+
+        console.log(`📊 Báo cáo từ ${startISO} đến ${endISO}`);
 
         let queryOrders = supabase
             .from('orders')
             .select(`
                 total_amount,
                 created_at,
+                status,
                 order_items (
+                    price_at_purchase,
+                    quantity,
                     cogs_total
                 )
             `)
-            .neq('status', 'cancelled'); // Không tính đơn hủy
+            // [SỬA 2] LẤY ĐƠN HOÀN THÀNH VÀ ĐANG GIAO
+            .in('status', ['completed', 'shipping']) // <--- SỬA Ở ĐÂY
+            .gte('created_at', startISO)
+            .lte('created_at', endISO);
 
         let queryExpenses = supabase
             .from('expenses')
-            .select('amount, created_at');
+            .select('amount, created_at')
+            .gte('expense_date', startISO)
+            .lte('expense_date', endISO);
 
-        // Áp dụng bộ lọc ngày nếu có
-        if (startDate && endDate) {
-            queryOrders = queryOrders.gte('created_at', startDate).lte('created_at', endDate);
-            queryExpenses = queryExpenses.gte('expense_date', startDate).lte('expense_date', endDate);
-        }
-
-        // Chạy song song 2 câu lệnh
         const [ordersRes, expensesRes] = await Promise.all([queryOrders, queryExpenses]);
 
         if (ordersRes.error) throw ordersRes.error;
@@ -89,26 +95,26 @@ exports.getFinancialReport = async (req, res) => {
 
         // --- TÍNH TOÁN ---
 
-        // 1. Doanh thu (Revenue)
+        // 1. Doanh thu
         const revenue = orders.reduce((sum, o) => sum + o.total_amount, 0);
 
-        // 2. Giá vốn hàng bán (COGS)
-        // Lưu ý: order_items là mảng, cần tính tổng lồng nhau
+        // 2. Giá vốn (CÓ FALLBACK CHO DỮ LIỆU CŨ)
         const cogs = orders.reduce((sum, o) => {
-            const orderCogs = o.order_items.reduce((itemSum, item) => itemSum + (item.cogs_total || 0), 0);
+            const orderCogs = o.order_items.reduce((itemSum, item) => {
+                let cost = item.cogs_total || 0;
+                
+                // Nếu dữ liệu cũ chưa có giá vốn, tạm tính = 70% giá bán
+                if (cost === 0 && item.price_at_purchase > 0) {
+                    cost = (item.price_at_purchase * item.quantity) * 0.7; 
+                }
+                return itemSum + cost;
+            }, 0);
             return sum + orderCogs;
         }, 0);
 
-        // 3. Lợi nhuận gộp (Gross Profit)
         const grossProfit = revenue - cogs;
-
-        // 4. Tổng Chi phí vận hành (Operating Expenses)
         const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-        // 5. Lợi nhuận ròng (Net Profit)
         const netProfit = grossProfit - totalExpenses;
-
-        // 6. Tỷ suất lợi nhuận (Profit Margin)
         const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(2) : 0;
 
         res.json({

@@ -46,6 +46,9 @@ const Checkout = () => {
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
 
+  // [MỚI] State xác nhận chuyển khoản
+  const [isTransferConfirmed, setIsTransferConfirmed] = useState(false);
+
   // --- [THAY ĐỔI 2] LOAD TỈNH THÀNH TỪ GHN (Thay vì esgoo) ---
   useEffect(() => {
     const fetchProvinces = async () => {
@@ -156,6 +159,12 @@ const Checkout = () => {
     
     if (!formData.fullName || !formData.phone || !formData.street || !formData.ward_code) {
         toast.warning("Vui lòng điền đầy đủ thông tin giao hàng!");
+        return;
+    }
+
+    // [MỚI] Chặn submit nếu chưa tích xác nhận
+    if (!isTransferConfirmed) {
+        toast.warning("Vui lòng xác nhận đã chuyển khoản trước khi đặt hàng!");
         return;
     }
 
@@ -320,6 +329,21 @@ const Checkout = () => {
                                     <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
                                 </div>
                             </div>
+
+                            {/* [MỚI] CHECKBOX XÁC NHẬN */}
+                            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
+                                <label className="flex items-start gap-3 cursor-pointer select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                                        checked={isTransferConfirmed}
+                                        onChange={(e) => setIsTransferConfirmed(e.target.checked)}
+                                    />
+                                    <span className="text-sm font-bold text-stone-800">
+                                        Tôi xác nhận đã chuyển khoản thành công {new Intl.NumberFormat('vi-VN').format(finalTotal)}đ
+                                    </span>
+                                </label>
+                            </div>
                         </>
                     ) : (
                         <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6">
@@ -327,7 +351,18 @@ const Checkout = () => {
                             <span>Nhập thông tin giao hàng để hiện mã QR</span>
                         </div>
                     )}
-                    <button type="submit" form="checkout-form" disabled={loading} className="w-full bg-stone-900 text-white py-4 font-bold rounded uppercase hover:bg-stone-800 disabled:opacity-70 transition-all flex items-center justify-center gap-2">
+                    
+                    {/* [SỬA] NÚT SUBMIT DISABLED NẾU CHƯA TÍCH */}
+                    <button 
+                        type="submit" 
+                        form="checkout-form" 
+                        disabled={loading || !isTransferConfirmed} 
+                        className={`w-full py-4 font-bold rounded uppercase transition-all flex items-center justify-center gap-2
+                            ${loading || !isTransferConfirmed 
+                                ? 'bg-stone-300 text-stone-500 cursor-not-allowed' 
+                                : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
+                        `}
+                    >
                         {loading ? 'Đang xử lý...' : <><FaCheckCircle/> Tôi đã chuyển khoản & Đặt hàng</>}
                     </button>
                     <p className="text-xs text-stone-400 mt-4 italic">*Lưu ý: Đơn hàng sẽ được xử lý sau khi hệ thống nhận được thanh toán.</p>

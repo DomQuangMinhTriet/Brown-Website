@@ -77,7 +77,7 @@ const Dashboard = () => {
           value={formatMoney(stats.revenue)} 
           icon={<FaMoneyBillWave className="text-green-600 text-xl" />} 
           color="bg-green-50"
-          subtext="Doanh thu thực tế (trừ đơn hủy)"
+          subtext="Hoàn thành và Đang vận chuyển"
         />
         <DashboardCard 
           title="Tổng Đơn Hàng" 

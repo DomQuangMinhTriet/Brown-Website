@@ -26,15 +26,21 @@ exports.getProducts = async (req, res) => {
 
         if (category) {
              const { data: catData } = await supabase.from('categories').select('id').eq('slug', category).single();
+             
              if (catData) {
                 const targetCatId = catData.id;
-                const { data: collectionItems } = await supabase.from('product_collections').select('product_id').eq('category_id', targetCatId);
-                const productIds = collectionItems.map(item => item.product_id);
                 
-                if (productIds.length > 0) {
-                    query = query.in('id', productIds);
+                // 1. Tìm các ID sản phẩm nằm trong Bộ sưu tập (Phụ)
+                const { data: collectionItems } = await supabase.from('product_collections').select('product_id').eq('category_id', targetCatId);
+                const subCollectionIds = collectionItems.map(item => item.product_id);
+                
+                // 2. Logic Lọc: Hoặc là Danh mục chính (category_id) HOẶC nằm trong Bộ sưu tập phụ (id in list)
+                if (subCollectionIds.length > 0) {
+                    // Cú pháp .or() của Supabase: category_id.eq.X,id.in.(Y,Z)
+                    query = query.or(`category_id.eq.${targetCatId},id.in.(${subCollectionIds.join(',')})`);
                 } else {
-                    return res.json({ success: true, data: [] });
+                    // Nếu không có trong bộ sưu tập phụ, chỉ cần tìm theo danh mục chính
+                    query = query.eq('category_id', targetCatId);
                 }
              }
         }

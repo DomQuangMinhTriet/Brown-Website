@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag } from 'react-icons/fa';
+// [THAY ĐỔI 1] Thêm FaCalendarAlt vào import
+import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag, FaCalendarAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 // --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
@@ -48,6 +49,32 @@ const Checkout = () => {
 
   // [MỚI] State xác nhận chuyển khoản
   const [isTransferConfirmed, setIsTransferConfirmed] = useState(false);
+
+  // =================================================================================
+  // [TẾT] LOGIC KIỂM TRA LỊCH NGHỈ TẾT
+  // =================================================================================
+  const getTetStatus = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      // Lưu ý: Tháng trong JS bắt đầu từ 0 (Tháng 2 là 1)
+      const t8Feb = new Date(year, 1, 5, 23, 59, 59);   // Hết ngày 8/2
+      const t11Feb = new Date(year, 1, 11, 23, 59, 59); // Hết ngày 11/2
+      const t17Feb = new Date(year, 1, 17, 0, 0, 0);    // Bắt đầu 17/2 (Mùng 1)
+      const t25Feb = new Date(year, 1, 25, 0, 0, 0);    // Bắt đầu 25/2 (Mùng 9)
+
+      // 1. Sau 11/2 -> Trước 17/2: ĐÓNG CỬA HOÀN TOÀN
+      if (now > t11Feb && now < t17Feb) return { code: 'CLOSED', msg: '🧧 Shop đang nghỉ Tết. Hẹn gặp lại quý khách vào Mùng 1 Tết (17/2)!' };
+      
+      // 2. Sau 8/2 -> Hết 11/2: CHỈ NHẬN HCM
+      if (now > t8Feb && now <= t11Feb) return { code: 'HCM_ONLY', msg: '⚠️ SẮP TẾT: Shop chỉ nhận đơn giao tại TP.HCM để kịp giao trước Tết.' };
+      
+      // 3. Từ 17/2 -> Trước 25/2: NHẬN ĐƠN NHƯNG GIAO MUỘN
+      if (now >= t17Feb && now < t25Feb) return { code: 'DELAYED', msg: '⚠️ LƯU Ý: Đơn hàng đặt bây giờ sẽ bắt đầu được xử lý và đi đơn từ ngày 25/2 (Mùng 9 Tết).' };
+
+      return { code: 'NORMAL', msg: '' };
+  };
+  const tetStatus = getTetStatus();
+  // =================================================================================
 
   // --- [THAY ĐỔI 2] LOAD TỈNH THÀNH TỪ GHN (Thay vì esgoo) ---
   useEffect(() => {
@@ -157,9 +184,25 @@ const Checkout = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // [TẾT] CHẶN NẾU SHOP ĐANG NGHỈ
+    if (tetStatus.code === 'CLOSED') {
+        toast.error("Shop đang nghỉ Tết, tạm thời chưa nhận đơn mới!");
+        return;
+    }
+
     if (!formData.fullName || !formData.phone || !formData.street || !formData.ward_code) {
         toast.warning("Vui lòng điền đầy đủ thông tin giao hàng!");
         return;
+    }
+
+    // [TẾT] LOGIC CHẶN TỈNH KHÁC HCM (Sau 8/2 - 11/2)
+    if (tetStatus.code === 'HCM_ONLY') {
+        // ID 202 là Hồ Chí Minh trong GHN (hoặc check tên)
+        const isHCM = formData.province_id == 202 || formData.province_name?.toLowerCase().includes('hồ chí minh');
+        if (!isHCM) {
+            toast.error("Xin lỗi, sau 8/2 Shop chỉ nhận đơn giao tại TP.HCM để kịp trước Tết!");
+            return;
+        }
     }
 
     // [MỚI] Chặn submit nếu chưa tích xác nhận
@@ -217,158 +260,182 @@ const Checkout = () => {
             <FaArrowLeft className="mr-2" /> Quay lại giỏ hàng
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            
-            {/* CỘT TRÁI: THÔNG TIN GIAO HÀNG */}
-            <div>
-                <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">1. Thông tin giao hàng</h2>
-                <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
-                    <input 
-                        type="text" placeholder="Họ và tên" required
-                        className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                        value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                        <input 
-                            type="text" placeholder="Số điện thoại" required
-                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                            value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
-                        />
-                         <input 
-                            type="email" placeholder="Email (để nhận thông báo, MVĐ,...)"
-                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                            value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-                        />
-                    </div>
-
-                    {/* --- [THAY ĐỔI 4] KHU VỰC CHỌN ĐỊA CHỈ (DÙNG KEY CỦA GHN) --- */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <select className="p-3 border rounded outline-none bg-white" value={formData.province_id} onChange={handleProvinceChange} required>
-                            <option value="">-- Tỉnh/Thành --</option>
-                            {/* GHN dùng ProvinceID và ProvinceName */}
-                            {provinces.map(p => <option key={p.ProvinceID} value={p.ProvinceID}>{p.ProvinceName}</option>)}
-                        </select>
-                        <select className="p-3 border rounded outline-none bg-white" value={formData.district_id} onChange={handleDistrictChange} required disabled={!formData.province_id}>
-                            <option value="">-- Quận/Huyện --</option>
-                            {/* GHN dùng DistrictID và DistrictName */}
-                            {districts.map(d => <option key={d.DistrictID} value={d.DistrictID}>{d.DistrictName}</option>)}
-                        </select>
-                        <select className="p-3 border rounded outline-none bg-white" value={formData.ward_code} onChange={handleWardChange} required disabled={!formData.district_id}>
-                            <option value="">-- Phường/Xã --</option>
-                            {/* GHN dùng WardCode và WardName */}
-                            {wards.map(w => <option key={w.WardCode} value={w.WardCode}>{w.WardName}</option>)}
-                        </select>
-                    </div>
-
-                    <input 
-                        type="text" placeholder="Số nhà, Tên đường..." required
-                        className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                        value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})}
-                    />
-
-                    <textarea 
-                        placeholder="Ghi chú đơn hàng (Tùy chọn)"
-                        className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none h-24 resize-none"
-                        value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})}
-                    ></textarea>
-                </form>
+        {/* [TẾT] HIỂN THỊ BANNER THÔNG BÁO TẾT NẾU KHÔNG PHẢI NORMAL */}
+        {tetStatus.code !== 'NORMAL' && tetStatus.code !== 'CLOSED' && (
+            <div className="bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-lg mb-8 flex items-start gap-3">
+                <FaCalendarAlt className="mt-1 text-xl" />
+                <div>
+                    <strong className="block font-bold">Thông báo Lịch nghỉ Tết</strong>
+                    <span className="text-sm">{tetStatus.msg}</span>
+                </div>
             </div>
+        )}
 
-            {/* CỘT PHẢI: QUÉT MÃ QR (GIỮ NGUYÊN) */}
-            <div className="h-fit">
-                 <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">2. Thanh toán QR Code</h2>
-                 
-                 <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-100 text-center">
+        {/* [TẾT] NẾU ĐÓNG CỬA (CLOSED) THÌ HIỂN THỊ THÔNG BÁO LỚN VÀ ẨN FORM */}
+        {tetStatus.code === 'CLOSED' ? (
+            <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200">
+                <div className="text-6xl mb-4">🧧</div>
+                <h2 className="text-2xl font-bold text-stone-800 mb-2">Chúc Mừng Năm Mới!</h2>
+                <p className="text-stone-600 max-w-md mx-auto mb-6">{tetStatus.msg}</p>
+                <Link to="/" className="bg-stone-900 text-white px-6 py-3 rounded font-bold hover:bg-stone-800">
+                    Về Trang Chủ
+                </Link>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                
+                {/* CỘT TRÁI: THÔNG TIN GIAO HÀNG */}
+                <div>
+                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">1. Thông tin giao hàng</h2>
+                    <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
+                        <input 
+                            type="text" placeholder="Họ và tên" required
+                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                            value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <input 
+                                type="text" placeholder="Số điện thoại" required
+                                className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                                value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                            />
+                            <input 
+                                type="email" placeholder="Email (để nhận thông báo, MVĐ,...)"
+                                className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                                value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                            />
+                        </div>
+
+                        {/* --- [THAY ĐỔI 4] KHU VỰC CHỌN ĐỊA CHỈ (DÙNG KEY CỦA GHN) --- */}
+                        <h3 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">2. Địa chỉ giao hàng (địa chỉ trước sáp nhập)</h3>
+                        <div className="grid grid-cols-3 gap-2">
+                            <select className="p-3 border rounded outline-none bg-white" value={formData.province_id} onChange={handleProvinceChange} required>
+                                <option value="">-- Tỉnh/Thành --</option>
+                                {/* GHN dùng ProvinceID và ProvinceName */}
+                                {provinces.map(p => <option key={p.ProvinceID} value={p.ProvinceID}>{p.ProvinceName}</option>)}
+                            </select>
+                            <select className="p-3 border rounded outline-none bg-white" value={formData.district_id} onChange={handleDistrictChange} required disabled={!formData.province_id}>
+                                <option value="">-- Quận/Huyện --</option>
+                                {/* GHN dùng DistrictID và DistrictName */}
+                                {districts.map(d => <option key={d.DistrictID} value={d.DistrictID}>{d.DistrictName}</option>)}
+                            </select>
+                            <select className="p-3 border rounded outline-none bg-white" value={formData.ward_code} onChange={handleWardChange} required disabled={!formData.district_id}>
+                                <option value="">-- Phường/Xã --</option>
+                                {/* GHN dùng WardCode và WardName */}
+                                {wards.map(w => <option key={w.WardCode} value={w.WardCode}>{w.WardName}</option>)}
+                            </select>
+                        </div>
+
+                        <input 
+                            type="text" placeholder="Số nhà, Tên đường..." required
+                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                            value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})}
+                        />
+
+                        <textarea 
+                            placeholder="Ghi chú đơn hàng (Tùy chọn)"
+                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none h-24 resize-none"
+                            value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})}
+                        ></textarea>
+                    </form>
+                </div>
+
+                {/* CỘT PHẢI: QUÉT MÃ QR (GIỮ NGUYÊN) */}
+                <div className="h-fit">
+                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">3. Thanh toán QR Code</h2>
                     
-                    {formData.phone ? (
-                        <>
-                            <p className="text-sm text-stone-500 mb-4">Vui lòng quét mã bên dưới để thanh toán</p>
-                            <div className="flex justify-center mb-4">
-                                <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
-                            </div>
-                            
-                            <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-3 mb-6">
-                                {/* VOUCHER INPUT */}
-                                <div className="flex gap-2 mb-2">
-                                    <div className="relative flex-1">
-                                        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none"><FaTag className="text-stone-400 text-xs" /></div>
-                                        <input type="text" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} placeholder="MÃ GIẢM GIÁ" disabled={!!appliedVoucher} className="w-full pl-7 p-2 text-xs border border-stone-200 rounded uppercase outline-none focus:border-stone-900" />
-                                    </div>
-                                    {appliedVoucher ? (
-                                        <button type="button" onClick={removeVoucher} className="bg-stone-200 text-stone-600 px-3 py-1 rounded hover:bg-stone-300"><FaTimes size={12} /></button>
-                                    ) : (
-                                        <button type="button" onClick={handleApplyVoucher} className="bg-stone-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-black">ÁP DỤNG</button>
-                                    )}
-                                </div>
-                                {appliedVoucher && <div className="text-green-600 text-xs flex items-center gap-1 mb-2"><FaCheckCircle size={10} /> Đã dùng mã: <strong>{appliedVoucher.code}</strong></div>}
-                                <hr className="border-stone-200"/>
-
-                                <div className="flex justify-between">
-                                    <span className="text-stone-500">Tạm tính:</span>
-                                    <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-stone-500">Phí vận chuyển (GHN):</span>
-                                    <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(shippingFee)} ₫</span>
-                                </div>
-
-                                {discountAmount > 0 && (
-                                    <div className="flex justify-between text-green-600 font-bold">
-                                        <span>Giảm giá:</span>
-                                        <span>- {new Intl.NumberFormat('vi-VN').format(discountAmount)} ₫</span>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-between border-t border-stone-200 pt-2">
-                                    <span className="text-stone-900 font-bold">Tổng thanh toán:</span>
-                                    <span className="font-bold text-xl text-red-600">{new Intl.NumberFormat('vi-VN').format(finalTotal)} ₫</span>
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-100 text-center">
+                        
+                        {formData.phone ? (
+                            <>
+                                <p className="text-sm text-stone-500 mb-4">Vui lòng quét mã bên dưới để thanh toán</p>
+                                <div className="flex justify-center mb-4">
+                                    <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
                                 </div>
                                 
-                                <div className="flex justify-between text-xs mt-2 pt-2 border-t border-stone-200 border-dashed">
-                                    <span className="text-stone-500">Nội dung CK:</span>
-                                    <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
-                                </div>
-                            </div>
+                                <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-3 mb-6">
+                                    {/* VOUCHER INPUT */}
+                                    <div className="flex gap-2 mb-2">
+                                        <div className="relative flex-1">
+                                            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none"><FaTag className="text-stone-400 text-xs" /></div>
+                                            <input type="text" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} placeholder="MÃ GIẢM GIÁ" disabled={!!appliedVoucher} className="w-full pl-7 p-2 text-xs border border-stone-200 rounded uppercase outline-none focus:border-stone-900" />
+                                        </div>
+                                        {appliedVoucher ? (
+                                            <button type="button" onClick={removeVoucher} className="bg-stone-200 text-stone-600 px-3 py-1 rounded hover:bg-stone-300"><FaTimes size={12} /></button>
+                                        ) : (
+                                            <button type="button" onClick={handleApplyVoucher} className="bg-stone-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-black">ÁP DỤNG</button>
+                                        )}
+                                    </div>
+                                    {appliedVoucher && <div className="text-green-600 text-xs flex items-center gap-1 mb-2"><FaCheckCircle size={10} /> Đã dùng mã: <strong>{appliedVoucher.code}</strong></div>}
+                                    <hr className="border-stone-200"/>
 
-                            {/* [MỚI] CHECKBOX XÁC NHẬN */}
-                            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
-                                <label className="flex items-start gap-3 cursor-pointer select-none">
-                                    <input 
-                                        type="checkbox" 
-                                        className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
-                                        checked={isTransferConfirmed}
-                                        onChange={(e) => setIsTransferConfirmed(e.target.checked)}
-                                    />
-                                    <span className="text-sm font-bold text-stone-800">
-                                        Tôi xác nhận đã chuyển khoản thành công {new Intl.NumberFormat('vi-VN').format(finalTotal)}đ
-                                    </span>
-                                </label>
+                                    <div className="flex justify-between">
+                                        <span className="text-stone-500">Tạm tính:</span>
+                                        <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-stone-500">Phí vận chuyển (GHN):</span>
+                                        <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(shippingFee)} ₫</span>
+                                    </div>
+
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between text-green-600 font-bold">
+                                            <span>Giảm giá:</span>
+                                            <span>- {new Intl.NumberFormat('vi-VN').format(discountAmount)} ₫</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between border-t border-stone-200 pt-2">
+                                        <span className="text-stone-900 font-bold">Tổng thanh toán:</span>
+                                        <span className="font-bold text-xl text-red-600">{new Intl.NumberFormat('vi-VN').format(finalTotal)} ₫</span>
+                                    </div>
+                                    
+                                    <div className="flex justify-between text-xs mt-2 pt-2 border-t border-stone-200 border-dashed">
+                                        <span className="text-stone-500">Nội dung CK:</span>
+                                        <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
+                                    </div>
+                                </div>
+
+                                {/* [MỚI] CHECKBOX XÁC NHẬN */}
+                                <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
+                                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                                            checked={isTransferConfirmed}
+                                            onChange={(e) => setIsTransferConfirmed(e.target.checked)}
+                                        />
+                                        <span className="text-sm font-bold text-stone-800">
+                                            Tôi xác nhận đã chuyển khoản thành công {new Intl.NumberFormat('vi-VN').format(finalTotal)}đ
+                                        </span>
+                                    </label>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6">
+                                <FaExclamationCircle className="text-2xl mb-2"/>
+                                <span>Nhập thông tin giao hàng để hiện mã QR</span>
                             </div>
-                        </>
-                    ) : (
-                        <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6">
-                            <FaExclamationCircle className="text-2xl mb-2"/>
-                            <span>Nhập thông tin giao hàng để hiện mã QR</span>
-                        </div>
-                    )}
-                    
-                    {/* [SỬA] NÚT SUBMIT DISABLED NẾU CHƯA TÍCH */}
-                    <button 
-                        type="submit" 
-                        form="checkout-form" 
-                        disabled={loading || !isTransferConfirmed} 
-                        className={`w-full py-4 font-bold rounded uppercase transition-all flex items-center justify-center gap-2
-                            ${loading || !isTransferConfirmed 
-                                ? 'bg-stone-300 text-stone-500 cursor-not-allowed' 
-                                : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
-                        `}
-                    >
-                        {loading ? 'Đang xử lý...' : <><FaCheckCircle/> Tôi đã chuyển khoản & Đặt hàng</>}
-                    </button>
-                    <p className="text-xs text-stone-400 mt-4 italic">*Lưu ý: Đơn hàng sẽ được xử lý sau khi hệ thống nhận được thanh toán.</p>
-                 </div>
+                        )}
+                        
+                        {/* [SỬA] NÚT SUBMIT DISABLED NẾU CHƯA TÍCH */}
+                        <button 
+                            type="submit" 
+                            form="checkout-form" 
+                            disabled={loading || !isTransferConfirmed} 
+                            className={`w-full py-4 font-bold rounded uppercase transition-all flex items-center justify-center gap-2
+                                ${loading || !isTransferConfirmed 
+                                    ? 'bg-stone-300 text-stone-500 cursor-not-allowed' 
+                                    : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
+                            `}
+                        >
+                            {loading ? 'Đang xử lý...' : <><FaCheckCircle/> Tôi đã chuyển khoản & Đặt hàng</>}
+                        </button>
+                        <p className="text-xs text-stone-400 mt-4 italic">*Lưu ý: Đơn hàng sẽ được xử lý sau khi hệ thống nhận được thanh toán.</p>
+                    </div>
+                </div>
             </div>
-        </div>
+        )}
     </div>
   );
 };

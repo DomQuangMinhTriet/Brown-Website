@@ -55,7 +55,6 @@ exports.getFinancialReport = async (req, res) => {
 
         // [SỬA 1] CHUẨN HÓA NGÀY THÁNG SANG ISO STRING
         const startISO = new Date(startDate).toISOString();
-        
         const endObj = new Date(endDate);
         endObj.setHours(23, 59, 59, 999);
         const endISO = endObj.toISOString();
@@ -68,6 +67,8 @@ exports.getFinancialReport = async (req, res) => {
                 total_amount,
                 created_at,
                 status,
+                code, 
+                note,
                 order_items (
                     price_at_purchase,
                     quantity,
@@ -75,7 +76,7 @@ exports.getFinancialReport = async (req, res) => {
                 )
             `)
             // [SỬA 2] LẤY ĐƠN HOÀN THÀNH VÀ ĐANG GIAO
-            .in('status', ['completed', 'shipping']) // <--- SỬA Ở ĐÂY
+            .in('status', ['completed', 'shipping']) 
             .gte('created_at', startISO)
             .lte('created_at', endISO);
 
@@ -102,7 +103,6 @@ exports.getFinancialReport = async (req, res) => {
         const cogs = orders.reduce((sum, o) => {
             const orderCogs = o.order_items.reduce((itemSum, item) => {
                 let cost = item.cogs_total || 0;
-                
                 // Nếu dữ liệu cũ chưa có giá vốn, tạm tính = 70% giá bán
                 if (cost === 0 && item.price_at_purchase > 0) {
                     cost = (item.price_at_purchase * item.quantity) * 0.7; 
@@ -111,6 +111,38 @@ exports.getFinancialReport = async (req, res) => {
             }, 0);
             return sum + orderCogs;
         }, 0);
+
+        // --- [MỚI] TÍNH TOÁN NGUỒN ĐƠN HÀNG (SOURCE BREAKDOWN) ---
+        const sourceStats = {};
+        
+        orders.forEach(o => {
+            let source = 'Khác';
+            const noteLower = o.note ? o.note.toLowerCase() : '';
+            const code = o.code || '';
+
+            // Logic xác định nguồn
+            if (code.startsWith('ORD-')) {
+                source = 'Website';
+            } else if (noteLower.includes('shopee')) {
+                source = 'Shopee';
+            } else if (noteLower.includes('tiktok')) {
+                source = 'TikTok';
+            } else if (noteLower.includes('ig') || noteLower.includes('instagram')) {
+                source = 'Instagram';
+            } else if (noteLower.includes('fb') || noteLower.includes('facebook')) {
+                source = 'Facebook';
+            } else if (noteLower.includes('zalo')) {
+                source = 'Zalo';
+            } else {
+                source = 'Khác';
+            }
+
+            // Cộng dồn doanh thu theo nguồn
+            if (!sourceStats[source]) {
+                sourceStats[source] = 0;
+            }
+            sourceStats[source] += o.total_amount;
+        });
 
         const grossProfit = revenue - cogs;
         const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -127,7 +159,8 @@ exports.getFinancialReport = async (req, res) => {
                 netProfit,
                 margin,
                 orderCount: orders.length,
-                expenseCount: expenses.length
+                expenseCount: expenses.length,
+                revenueBySource: sourceStats // [MỚI] Trả về dữ liệu nguồn
             }
         });
 

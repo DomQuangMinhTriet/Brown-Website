@@ -573,6 +573,82 @@ exports.createAdminOrder = async (req, res) => {
         }
     }
 };
+
+// [THÊM MỚI] API XỬ LÝ HÀNG LOẠT (BULK UPDATE)
+exports.bulkUpdateOrderStatus = async (req, res) => {
+    try {
+        const { orderIds, status, restock, skip_ghn } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+            return res.status(400).json({ success: false, message: "Chưa chọn đơn hàng nào" });
+        }
+
+        console.log(`📦 Bulk Update: ${orderIds.length} đơn -> ${status}`);
+        const results = { success: [], failed: [] };
+
+        // Xử lý tuần tự từng đơn để đảm bảo logic kho/GHN an toàn
+        for (const id of orderIds) {
+            try {
+                // 1. Lấy info đơn
+                const { data: currentOrder } = await supabase.from('orders').select('*, order_items(*)').eq('id', id).single();
+                if (!currentOrder) continue;
+
+                let trackingCode = currentOrder.shipping_tracking_code;
+                let updateData = { status };
+
+                // 2. Xử lý GHN (Nếu chuyển sang shipping và chưa có mã)
+                if (status === 'shipping' && !trackingCode && !skip_ghn) {
+                    try {
+                        trackingCode = await createGHNOrder(currentOrder);
+                        updateData.shipping_tracking_code = trackingCode;
+                    } catch (e) {
+                        console.error(`Lỗi GHN đơn ${id}:`, e.message);
+                        // Vẫn update trạng thái dù lỗi GHN để admin xử lý tay
+                    }
+                }
+
+                // 3. Xử lý Hoàn kho (Nếu trả hàng)
+                if (status === 'returned' && restock === true && currentOrder.status !== 'returned') {
+                    const orderItems = currentOrder.order_items;
+                    if (orderItems && orderItems.length > 0) {
+                        for (const item of orderItems) {
+                            const { data: batch } = await supabase.from('inventory_batches')
+                                .select('id, quantity_remaining')
+                                .eq('variant_id', item.variant_id)
+                                .order('created_at', { ascending: false }).limit(1).single();
+                            
+                            if (batch) {
+                                await supabase.from('inventory_batches').update({ quantity_remaining: batch.quantity_remaining + item.quantity }).eq('id', batch.id);
+                            } else {
+                                // Fallback tạo lô mới nếu không tìm thấy
+                                await supabase.from('inventory_batches').insert([{ variant_id: item.variant_id, original_quantity: item.quantity, quantity_remaining: item.quantity, cost_price: 0, is_adjustment: true }]);
+                            }
+                        }
+                    }
+                }
+
+                // 4. Update DB
+                await supabase.from('orders').update(updateData).eq('id', id);
+                
+                // 5. Gửi mail nếu shipping
+                if (status === 'shipping' && trackingCode) {
+                    sendShippingConfirmation(currentOrder, trackingCode).catch(console.error);
+                }
+
+                results.success.push(id);
+
+            } catch (err) {
+                results.failed.push({ id, reason: err.message });
+            }
+        }
+
+        res.json({ success: true, message: `Đã xử lý: ${results.success.length} thành công, ${results.failed.length} lỗi`, results });
+
+    } catch (error) {
+        console.error("Bulk Update Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
 // 2. Hàm phụ trợ: Trừ kho theo nguyên tắc nhập trước xuất trước (FIFO)
 async function decreaseStock(variantId, qtyNeeded) {
     // Lấy các lô hàng còn tồn của variant này, xếp theo cũ nhất trước

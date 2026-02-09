@@ -15,6 +15,10 @@ router.post('/', orderController.createOrder);
 
 // --- 3. CÁC ROUTE ADMIN ---
 router.get('/', orderController.getAllOrders);
+// [THÊM DÒNG NÀY ĐỂ FIX LỖI 404]
+router.put('/bulk-status', orderController.bulkUpdateOrderStatus); 
+
+// Route update trạng thái đơn lẻ (Dòng này phải nằm dưới bulk-status)
 router.put('/:id/status', orderController.updateOrderStatus);
 router.post('/create-admin', orderController.createAdminOrder);
 

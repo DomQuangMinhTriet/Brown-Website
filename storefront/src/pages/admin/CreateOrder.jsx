@@ -98,7 +98,8 @@ const CreateOrder = () => {
             // FIX: Gửi đúng key 'payment_method' (snake_case)
             payment_method: paymentMethod, 
             
-        
+            // [MỚI] Gửi thêm is_paid nếu thanh toán tại quầy
+            is_paid: isPaid,
             
             note: customerInfo.note
         };
@@ -107,6 +108,26 @@ const CreateOrder = () => {
             const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/orders/create-admin`, payload);
             if (res.data.success) {
                 toast.success("Tạo đơn hàng thành công!");
+                
+                // [MỚI] TRỪ TỒN KHO TRÊN GIAO DIỆN NGAY LẬP TỨC (OPTIMISTIC UPDATE)
+                // Duyệt qua giỏ hàng vừa mua và cập nhật lại state products
+                const updatedProducts = products.map(p => {
+                    if (!p.variants) return p;
+                    const newVariants = p.variants.map(v => {
+                        const cartItem = cart.find(c => c.variant_id === v.id);
+                        if (cartItem) {
+                            return { 
+                                ...v, 
+                                quantity_remaining: Math.max(0, v.quantity_remaining - cartItem.quantity) 
+                            };
+                        }
+                        return v;
+                    });
+                    return { ...p, variants: newVariants };
+                });
+                
+                setProducts(updatedProducts); // Update UI
+                
                 // Reset form
                 setCart([]);
                 setCustomerInfo({ name: '', phone: '', address: '', note: '' });

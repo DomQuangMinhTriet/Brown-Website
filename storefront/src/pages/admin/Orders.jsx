@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle } from 'react-icons/fa';
+// [THÊM] FaCheckSquare
+import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
 
@@ -14,6 +15,9 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  // [MỚI] State chọn hàng loạt
+  const [selectedIds, setSelectedIds] = useState([]);
 
   useEffect(() => {
     fetchOrders();
@@ -44,6 +48,59 @@ const Orders = () => {
     }
   };
 
+  // [MỚI] HÀM CHỌN TẤT CẢ
+  const handleSelectAll = (e) => {
+      if (e.target.checked) {
+          const allIds = filteredOrders.map(o => o.id);
+          setSelectedIds(allIds);
+      } else {
+          setSelectedIds([]);
+      }
+  };
+
+  // [MỚI] HÀM CHỌN 1 DÒNG
+  const handleSelectOne = (id) => {
+      if (selectedIds.includes(id)) {
+          setSelectedIds(selectedIds.filter(item => item !== id));
+      } else {
+          setSelectedIds([...selectedIds, id]);
+      }
+  };
+
+  // [MỚI] HÀM XỬ LÝ BULK UPDATE
+  const handleBulkAction = async (status, extraData = {}) => {
+      if (selectedIds.length === 0) return;
+      if (!confirm(`Xác nhận chuyển ${selectedIds.length} đơn sang "${ORDER_STATUS_MAP[status]?.label || status}"?`)) return;
+
+      setProcessing(true);
+      const toastId = toast.loading("Đang xử lý hàng loạt...");
+
+      try {
+          // Gọi API Bulk (Bạn cần khai báo route này ở backend: router.put('/bulk-status', ...))
+          const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/bulk-status`, {
+              orderIds: selectedIds,
+              status: status,
+              ...extraData
+          });
+
+          if (res.data.success) {
+              toast.update(toastId, { render: `Thành công: ${res.data.results.success.length} đơn`, type: "success", isLoading: false, autoClose: 2000 });
+              
+              // [OPTIMISTIC UI] Cập nhật giao diện ngay lập tức
+              const updatedList = orders.map(o => selectedIds.includes(o.id) ? { ...o, status: status } : o);
+              setOrders(updatedList);
+              setFilteredOrders(updatedList); // Update cả list đang filter
+              setSelectedIds([]); // Reset chọn
+          }
+      } catch (error) {
+          toast.update(toastId, { render: "Lỗi xử lý", type: "error", isLoading: false, autoClose: 3000 });
+          console.error(error);
+      } finally {
+          setProcessing(false);
+          fetchOrders(); // Fetch lại ngầm để đảm bảo data chuẩn
+      }
+  };
+
   // Hàm xử lý đổi trạng thái
   const handleUpdateStatus = async (newStatus, restock = false, extraData = {}) => {
     if (!selectedOrder) return;
@@ -56,12 +113,17 @@ const Orders = () => {
       });
       
       toast.success(`Đã chuyển trạng thái: ${newStatus}`);
-      fetchOrders(); 
+      
+      // [OPTIMISTIC UI] Cập nhật ngay lập tức
+      const updatedList = orders.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o);
+      setOrders(updatedList);
+      
       setShowModal(false); 
     } catch (error) {
       toast.error(error.response?.data?.message || "Lỗi cập nhật đơn hàng");
     } finally {
       setProcessing(false);
+      fetchOrders();
     }
   };
 
@@ -74,8 +136,27 @@ const Orders = () => {
     );
   };
 
+  // [MỚI] Helper xác định trạng thái chung của các đơn được chọn
+  // (Thêm đoạn này vào trước dòng return)
+  const getSelectedStatusGroup = () => {
+      const selected = orders.filter(o => selectedIds.includes(o.id));
+      if (selected.length === 0) return null;
+      
+      // Kiểm tra xem tất cả có phải là Pending/Processing không
+      const allPending = selected.every(o => ['pending', 'processing'].includes(o.status));
+      if (allPending) return 'pending_group';
+
+      // Kiểm tra xem tất cả có phải là Shipping không
+      const allShipping = selected.every(o => o.status === 'shipping');
+      if (allShipping) return 'shipping_group';
+
+      return 'mixed'; // Chọn lẫn lộn nhiều trạng thái
+  };
+
+  const statusGroup = getSelectedStatusGroup();
+
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 relative min-h-screen">
       {/* Header Responsive */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <h1 className="text-xl md:text-2xl font-bold text-stone-800 flex items-center gap-2">
@@ -98,11 +179,15 @@ const Orders = () => {
       </div>
 
       {/* Bảng Đơn hàng (Responsive Table) */}
-      <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden pb-24">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1100px]">
             <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 uppercase text-xs">
                 <tr>
+                    {/* [MỚI] CHECKBOX HEAD */}
+                    <th className="p-4 w-10">
+                        <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length > 0 && selectedIds.length === filteredOrders.length} className="w-4 h-4 accent-stone-900 cursor-pointer"/>
+                    </th>
                     <th className="p-4">Mã đơn</th>
                     <th className="p-4">Khách hàng</th>
                     <th className="p-4 w-48">Ghi chú</th>
@@ -113,9 +198,13 @@ const Orders = () => {
                 </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
-                {loading ? <tr><td colSpan="7" className="p-6 text-center text-stone-500">Đang tải...</td></tr> : 
+                {loading ? <tr><td colSpan="8" className="p-6 text-center text-stone-500">Đang tải...</td></tr> : 
                 filteredOrders.map(order => (
-                <tr key={order.id} className="hover:bg-stone-50 transition-colors">
+                <tr key={order.id} className={`transition-colors ${selectedIds.includes(order.id) ? 'bg-blue-50' : 'hover:bg-stone-50'}`}>
+                    {/* [MỚI] CHECKBOX ROW */}
+                    <td className="p-4">
+                        <input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => handleSelectOne(order.id)} className="w-4 h-4 accent-stone-900 cursor-pointer"/>
+                    </td>
                     <td className="p-4 font-mono font-bold text-stone-700">{order.code}</td>
                     <td className="p-4">
                         <p className="font-bold text-stone-800">{order.customer_name}</p>
@@ -155,7 +244,63 @@ const Orders = () => {
         </div>
       </div>
 
-      {/* MODAL CHI TIẾT ĐƠN HÀNG */}
+      {/* [MỚI] THANH CÔNG CỤ HÀNG LOẠT (BULK ACTIONS BAR) */}
+      {selectedIds.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 z-40 animate-bounce-in">
+              <span className="font-bold text-sm flex items-center gap-2">
+                  <FaCheckSquare/> Đã chọn: {selectedIds.length}
+              </span>
+              <div className="h-4 w-[1px] bg-stone-700"></div>
+              
+              <div className="flex gap-2">
+                  {/* TRƯỜNG HỢP 1: TẤT CẢ ĐỀU LÀ ĐƠN CHỜ XỬ LÝ (PENDING/PROCESSING) */}
+                  {statusGroup === 'pending_group' && (
+                      <>
+                          <button onClick={() => handleBulkAction('cancelled', { restock: true })} disabled={processing} className="hover:text-red-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3">
+                              <FaTimesCircle size={16}/> Hủy đơn
+                          </button>
+                          <button onClick={() => handleBulkAction('shipping')} disabled={processing} className="hover:text-blue-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3 border-l border-stone-700">
+                              <FaShippingFast size={16}/> Giao GHN
+                          </button>
+                          <button onClick={() => handleBulkAction('shipping', { skip_ghn: true })} disabled={processing} className="hover:text-yellow-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3">
+                              <FaMotorcycle size={16}/> Tự giao
+                          </button>
+                      </>
+                  )}
+
+                  {/* TRƯỜNG HỢP 2: TẤT CẢ ĐỀU LÀ ĐƠN ĐANG GIAO (SHIPPING) */}
+                  {statusGroup === 'shipping_group' && (
+                      <>
+                          <button onClick={() => handleBulkAction('returned', { restock: false })} disabled={processing} className="hover:text-red-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3">
+                              <FaExclamationTriangle size={16}/> Lỗi (Vứt bỏ)
+                          </button>
+                          <button onClick={() => handleBulkAction('returned', { restock: true })} disabled={processing} className="hover:text-orange-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3">
+                              <FaUndo size={16}/> Lỗi (Hoàn kho)
+                          </button>
+                          <button onClick={() => handleBulkAction('completed')} disabled={processing} className="hover:text-green-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3 border-l border-stone-700">
+                              <FaCheckCircle size={16}/> Thành công
+                          </button>
+                      </>
+                  )}
+
+                  {/* TRƯỜNG HỢP 3: CHỌN LỘN XỘN HOẶC TRẠNG THÁI KHÁC */}
+                  {statusGroup === 'mixed' && (
+                      <span className="text-yellow-400 text-xs italic font-medium px-2">
+                          ⚠️ Vui lòng chỉ chọn các đơn có cùng trạng thái (Cùng là Chờ xử lý HOẶC Cùng là Đang giao).
+                      </span>
+                  )}
+                  {!['pending_group', 'shipping_group', 'mixed'].includes(statusGroup) && statusGroup !== null && (
+                       <span className="text-stone-400 text-xs italic px-2">
+                          Không có hành động cho nhóm này.
+                      </span>
+                  )}
+              </div>
+
+              <button onClick={() => setSelectedIds([])} className="ml-2 text-stone-500 hover:text-white font-bold text-lg">&times;</button>
+          </div>
+      )}
+
+      {/* MODAL CHI TIẾT ĐƠN HÀNG (GIỮ NGUYÊN) */}
       {showModal && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">

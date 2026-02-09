@@ -57,7 +57,7 @@ const Checkout = () => {
       const now = new Date();
       const year = now.getFullYear();
       // Lưu ý: Tháng trong JS bắt đầu từ 0 (Tháng 2 là 1)
-      const t8Feb = new Date(year, 1, 5, 23, 59, 59);   // Hết ngày 8/2
+      const t8Feb = new Date(year, 1, 8, 23, 59, 59);   // Hết ngày 8/2
       const t11Feb = new Date(year, 1, 11, 23, 59, 59); // Hết ngày 11/2
       const t17Feb = new Date(year, 1, 17, 0, 0, 0);    // Bắt đầu 17/2 (Mùng 1)
       const t25Feb = new Date(year, 1, 25, 0, 0, 0);    // Bắt đầu 25/2 (Mùng 9)

@@ -58,18 +58,18 @@ const Checkout = () => {
       const year = now.getFullYear();
       // Lưu ý: Tháng trong JS bắt đầu từ 0 (Tháng 2 là 1)
       const t8Feb = new Date(year, 1, 8, 23, 59, 59);   // Hết ngày 8/2
-      const t11Feb = new Date(year, 1, 11, 23, 59, 59); // Hết ngày 11/2
-      const t17Feb = new Date(year, 1, 17, 0, 0, 0);    // Bắt đầu 17/2 (Mùng 1)
+      const t10Feb = new Date(year, 1, 10, 19, 59, 59); // Hết ngày 10/2
+      const t21Feb = new Date(year, 1, 21, 0, 0, 0);    // Bắt đầu 17/2 (Mùng 1)
       const t25Feb = new Date(year, 1, 25, 0, 0, 0);    // Bắt đầu 25/2 (Mùng 9)
 
-      // 1. Sau 11/2 -> Trước 17/2: ĐÓNG CỬA HOÀN TOÀN
-      if (now > t11Feb && now < t17Feb) return { code: 'CLOSED', msg: '🧧 Shop đang nghỉ Tết. Hẹn gặp lại quý khách vào Mùng 1 Tết (17/2)!' };
+      // 1. Sau 10/2 -> Trước 21/2: ĐÓNG CỬA HOÀN TOÀN
+      if (now > t10Feb && now < t21Feb) return { code: 'CLOSED', msg: '🧧 Shop đang nghỉ Tết. Hẹn gặp lại quý khách vào Mùng 5 Tết (21/2)!' };
       
-      // 2. Sau 8/2 -> Hết 11/2: CHỈ NHẬN HCM
-      if (now > t8Feb && now <= t11Feb) return { code: 'HCM_ONLY', msg: '⚠️ SẮP TẾT: Shop chỉ nhận đơn giao tại TP.HCM để kịp giao trước Tết.' };
+      // 2. Sau 8/2 -> Hết 10/2: CHỈ NHẬN HCM
+      if (now > t8Feb && now <= t10Feb) return { code: 'HCM_ONLY', msg: '⚠️ SẮP TẾT: Shop chỉ nhận đơn giao tại TP.HCM để kịp giao trước Tết.' };
       
-      // 3. Từ 17/2 -> Trước 25/2: NHẬN ĐƠN NHƯNG GIAO MUỘN
-      if (now >= t17Feb && now < t25Feb) return { code: 'DELAYED', msg: '⚠️ LƯU Ý: Đơn hàng đặt bây giờ sẽ bắt đầu được xử lý và đi đơn từ ngày 25/2 (Mùng 9 Tết).' };
+      // 3. Từ 21/2 -> Trước 25/2: NHẬN ĐƠN NHƯNG GIAO MUỘN
+      if (now >= t21Feb && now < t25Feb) return { code: 'DELAYED', msg: '⚠️ LƯU Ý: Đơn hàng đặt bây giờ sẽ bắt đầu được xử lý và đi đơn từ ngày 25/2 (Mùng 9 Tết).' };
 
       return { code: 'NORMAL', msg: '' };
   };
@@ -195,7 +195,7 @@ const Checkout = () => {
         return;
     }
 
-    // [TẾT] LOGIC CHẶN TỈNH KHÁC HCM (Sau 8/2 - 11/2)
+    // [TẾT] LOGIC CHẶN TỈNH KHÁC HCM (Sau 8/2 - 10/2)
     if (tetStatus.code === 'HCM_ONLY') {
         // ID 202 là Hồ Chí Minh trong GHN (hoặc check tên)
         const isHCM = formData.province_id == 202 || formData.province_name?.toLowerCase().includes('hồ chí minh');

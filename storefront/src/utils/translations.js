@@ -129,7 +129,25 @@ export const translations = {
       toast_invalid_voucher: "Mã không hợp lệ",
       toast_tet_closed: "Shop đang nghỉ Tết, tạm thời chưa nhận đơn mới!",
       toast_hcm_only: "Xin lỗi, sau 8/2 Shop chỉ nhận đơn giao tại TP.HCM để kịp trước Tết!",
-      toast_missing_info: "Vui lòng điền đầy đủ thông tin giao hàng!"
+      toast_missing_info: "Vui lòng điền đầy đủ thông tin giao hàng!",
+
+      shipping_type: "Khu vực giao hàng",
+      domestic: "Trong nước (Việt Nam)",
+      international: "Quốc tế (International)",
+      country: "Quốc gia",
+      city: "Thành phố",
+      zipcode: "Mã bưu chính (Zip/Postal Code)",
+      state_province: "Bang/Tỉnh",
+
+      credit_card: "Thẻ Tín Dụng / PayPal",
+      intl_payment_desc: "Thanh toán an toàn qua cổng quốc tế (Stripe/PayPal).",
+      calculating_fee: "Đang tính phí ship...",
+
+      
+      swift_transfer: "Chuyển khoản Quốc tế (SWIFT / Wise)",
+      swift_instructions: "Vui lòng chuyển khoản đúng số tiền vào tài khoản dưới đây. Hãy ghi Mã đơn hàng hoặc Số điện thoại của bạn vào nội dung chuyển khoản.",
+      swift_code: "Mã SWIFT",
+      address: "Địa chỉ",
     },
     auth: {
       login_title: "ĐĂNG NHẬP",
@@ -300,7 +318,25 @@ export const translations = {
       toast_invalid_voucher: "Invalid discount code",
       toast_tet_closed: "We are currently closed for the holiday and not accepting new orders!",
       toast_hcm_only: "Sorry, after Feb 8th we only accept orders within HCMC to ensure delivery before Tet!",
-      toast_missing_info: "Please fill in all required shipping information!"
+      toast_missing_info: "Please fill in all required shipping information!",
+
+      // ... các từ cũ
+      shipping_type: "Shipping Destination",
+      domestic: "Domestic (Vietnam)",
+      international: "International",
+      country: "Country",
+      city: "City",
+      zipcode: "Zip/Postal Code",
+      state_province: "State/Province",
+
+      credit_card: "Credit Card / PayPal",
+      intl_payment_desc: "Secure payment via international gateway (Stripe/PayPal).",
+      calculating_fee: "Calculating shipping fee...",
+      
+      swift_transfer: "International Wire Transfer (SWIFT / Wise)",
+      swift_instructions: "Please wire transfer the exact amount to our bank account below. Include your Phone Number or Name in the transfer remark so we can verify your payment.",
+      swift_code: "SWIFT Code",
+      address: "Address",
     },
     auth: {
       login_title: "LOGIN",

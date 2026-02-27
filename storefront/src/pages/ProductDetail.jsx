@@ -5,9 +5,11 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { FaStar, FaCheck, FaHistory, FaBoxOpen } from 'react-icons/fa';
 import SEO from '../components/SEO';
+import { useLanguage } from '../context/LanguageContext';
+import { formatPrice } from '../utils/currencyHelper'; // [MỚI] Import helper tiền tệ
 
 // --- COMPONENT CON: THẺ SẢN PHẨM ---
-const ProductCard = ({ product }) => (
+const ProductCard = ({ product, lang }) => (
     <Link to={`/product/${product.slug}`} className="group block">
         <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative bg-stone-100">
             <img 
@@ -20,10 +22,12 @@ const ProductCard = ({ product }) => (
             />
         </div>
         <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
-            {product.name}
+            {/* Hiển thị tên tiếng Anh nếu có, không thì fallback về tiếng Việt */}
+            {lang === 'en' && product.name_en ? product.name_en : product.name}
         </h3>
         <p className="text-stone-500 font-bold mt-1 text-sm">
-            {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+            {/* Đổi tiền tệ động theo ngôn ngữ */}
+            {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
         </p>
     </Link>
 );
@@ -33,11 +37,12 @@ const ProductDetail = () => {
     const [product, setProduct] = useState(null);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const { addToCart } = useCart();
+    const { t, lang } = useLanguage();
     
     // State cho 2 mục mới
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [viewedProducts, setViewedProducts] = useState([]);
-    const [mainImage, setMainImage] = useState(null); // [MỚI] State ảnh chính
+    const [mainImage, setMainImage] = useState(null); // State ảnh chính
 
     // 1. Fetch sản phẩm chính + Sản phẩm liên quan + Xử lý đã xem
     useEffect(() => {
@@ -88,7 +93,7 @@ const ProductDetail = () => {
         window.scrollTo(0, 0); 
     }, [slug]);
 
-    // [MỚI] Effect để set ảnh mặc định khi sản phẩm thay đổi
+    // Effect để set ảnh mặc định khi sản phẩm thay đổi
     useEffect(() => {
         if (product?.images?.length > 0) {
             setMainImage(product.images[0]);
@@ -121,14 +126,14 @@ const ProductDetail = () => {
     // Helper: Lấy tồn kho
     const getStock = (variant) => variant ? variant.quantity_remaining : 0;
 
-    if (!product) return <div className="min-h-screen flex justify-center items-center">Đang tải...</div>;
+    if (!product) return <div className="min-h-screen flex justify-center items-center">{t('product.loading')}</div>;
 
     return (
         <div className="min-h-screen pt-10 pb-20 px-4 bg-white">
              {/* SEO */}
              <SEO 
-                title={product.name} 
-                description={product.description?.substring(0, 150) + "..."} 
+                title={lang === 'en' && product.name_en ? product.name_en : product.name} 
+                description={(lang === 'en' && product.description_en ? product.description_en : product.description)?.substring(0, 150) + "..."} 
                 image={product.images?.[0]} 
                 url={`/product/${product.slug}`}
             />
@@ -139,7 +144,7 @@ const ProductDetail = () => {
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
                         <div className="rounded-xl overflow-hidden aspect-[3/4]">
-                            {/* [ĐÃ SỬA] Hiển thị mainImage thay vì fix cứng ảnh đầu tiên */}
+                            {/* Hiển thị mainImage thay vì fix cứng ảnh đầu tiên */}
                             <img 
                                 src={mainImage || product.images?.[0] || 'https://via.placeholder.com/500'} 
                                 alt={product.name} 
@@ -154,7 +159,7 @@ const ProductDetail = () => {
                                 {product.images.map((img, idx) => (
                                     <div 
                                         key={idx} 
-                                        onClick={() => setMainImage(img)} // [MỚI] Click đổi ảnh
+                                        onClick={() => setMainImage(img)} // Click đổi ảnh
                                         className={`
                                             aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-all
                                             ${mainImage === img ? 'ring-2 ring-stone-900' : 'border border-transparent'}
@@ -170,24 +175,27 @@ const ProductDetail = () => {
                     {/* Cột Phải: Thông tin */}
                     <div className="flex flex-col h-full">
                         <div className="mb-auto">
-                            <h1 className="text-3xl font-serif text-stone-900 mb-2">{product.name}</h1>
+                            <h1 className="text-3xl font-serif text-stone-900 mb-2">
+                                {lang === 'en' && product.name_en ? product.name_en : product.name}
+                            </h1>
                             <div className="flex items-center gap-2 mb-6">
                             </div>
 
                             <p className="text-2xl font-bold text-stone-800 mb-8">
-                                {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                                {/* Format tiền tệ tự động */}
+                                {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
                             </p>
 
                             {/* Chọn Biến thể */}
                             <div className="mb-8">
-                                <label className="text-xs font-bold uppercase text-stone-500 mb-3 block">Chọn Phân loại:</label>
+                                <label className="text-xs font-bold uppercase text-stone-500 mb-3 block">{t('product.select_variant')}</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.variants?.map(variant => (
                                         <button
                                             key={variant.id}
                                             onClick={() => {
                                                 setSelectedVariant(variant);
-                                                // [MỚI] Nếu biến thể có ảnh riêng -> đổi ảnh chính
+                                                // Nếu biến thể có ảnh riêng -> đổi ảnh chính
                                                 if (variant.image_url) {
                                                     setMainImage(variant.image_url);
                                                 }
@@ -201,7 +209,7 @@ const ProductDetail = () => {
                                             `}
                                             disabled={getStock(variant) <= 0}
                                         >
-                                            {variant.size} - {variant.color}
+                                            {variant.size} - {lang === 'en' && variant.color_en ? variant.color_en : variant.color}
                                             {/* Hiển thị tồn kho nhỏ */}
                                             {getStock(variant) > 0 && getStock(variant) < 5 && (
                                                 <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -212,8 +220,8 @@ const ProductDetail = () => {
                                 {selectedVariant && (
                                     <div className="mt-2 text-xs text-stone-500 font-medium">
                                         {getStock(selectedVariant) > 0 
-                                            ? `Còn lại ${getStock(selectedVariant)} sản phẩm` 
-                                            : <span className="text-red-500">Hết hàng</span>}
+                                            ? `${t('product.in_stock')} ${getStock(selectedVariant)}` 
+                                            : <span className="text-red-500">{t('product.out_of_stock')}</span>}
                                     </div>
                                 )}
                             </div>
@@ -229,19 +237,19 @@ const ProductDetail = () => {
                                         : 'bg-red-600 hover:bg-red-700'}
                                 `}
                             >
-                                {!selectedVariant ? "Chọn Size/Màu" : getStock(selectedVariant) <= 0 ? "Hết hàng" : "Thêm vào giỏ"}
+                                {!selectedVariant ? t('product.select_variant') : getStock(selectedVariant) <= 0 ? t('product.out_of_stock') : t('product.add_to_cart')}
                             </button>
 
                             {/* --- MÔ TẢ & SIZE CHART --- */}
                             <div className="border-t border-stone-100 pt-6">
-                                <h3 className="font-bold text-stone-700 mb-3 text-sm uppercase">Mô tả chi tiết</h3>
+                                <h3 className="font-bold text-stone-700 mb-3 text-sm uppercase">{t('product.details')}</h3>
                                 <p className="text-stone-600 leading-relaxed text-sm whitespace-pre-line mb-6">
-                                    {product.description || "Chưa có mô tả."}
+                                    {lang === 'en' && product.description_en ? product.description_en : (product.description || t('product.no_description'))}
                                 </p>
 
                                 {/* ẢNH SIZE CHART */}
                                 <div className="mt-4">
-                                    <h4 className="font-bold text-stone-700 text-xs uppercase mb-2">Bảng quy đổi kích cỡ</h4>
+                                    <h4 className="font-bold text-stone-700 text-xs uppercase mb-2">{t('product.size_chart')}</h4>
                                     
                                     {product.size_chart_url ? (
                                         <div className="rounded-lg overflow-hidden border border-stone-200">
@@ -258,7 +266,7 @@ const ProductDetail = () => {
                                                 alt="Size Chart Default"
                                                 className="w-full h-auto object-cover opacity-50"
                                             />
-                                            <p className="text-center text-xs text-stone-400 p-2">Sản phẩm này chưa cập nhật bảng size riêng.</p>
+                                            <p className="text-center text-xs text-stone-400 p-2">{t('product.no_size_chart')}</p>
                                         </div>
                                     )}
                                 </div>
@@ -271,11 +279,11 @@ const ProductDetail = () => {
                 {relatedProducts.length > 0 && (
                     <div className="mb-20">
                         <div className="flex items-center justify-between mb-6 border-b border-stone-200 pb-2">
-                            <h2 className="text-xl font-serif font-bold text-stone-900">Sản phẩm liên quan</h2>
-                            <Link to="/collection" className="text-xs font-bold text-stone-500 hover:text-stone-900">Xem tất cả</Link>
+                            <h2 className="text-xl font-serif font-bold text-stone-900">{t('product.related_products')}</h2>
+                            <Link to="/collection" className="text-xs font-bold text-stone-500 hover:text-stone-900">{t('product.view_all')}</Link>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-                            {relatedProducts.map(p => <ProductCard key={p.id} product={p} />)}
+                            {relatedProducts.map(p => <ProductCard key={p.id} product={p} lang={lang} />)}
                         </div>
                     </div>
                 )}
@@ -285,10 +293,10 @@ const ProductDetail = () => {
                     <div>
                          <div className="flex items-center gap-2 mb-6 border-b border-stone-200 pb-2">
                             <FaHistory className="text-stone-400"/>
-                            <h2 className="text-xl font-serif font-bold text-stone-900">Sản phẩm vừa xem</h2>
+                            <h2 className="text-xl font-serif font-bold text-stone-900">{t('product.viewed_products')}</h2>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-                            {viewedProducts.map(p => <ProductCard key={p.id} product={p} />)}
+                            {viewedProducts.map(p => <ProductCard key={p.id} product={p} lang={lang} />)}
                         </div>
                     </div>
                 )}

@@ -3,11 +3,13 @@ import axios from 'axios';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { FaStore, FaShoppingCart } from 'react-icons/fa';
 import { useCart } from '../context/CartContext'; 
-
+import { useLanguage } from '../context/LanguageContext';
+import { formatPrice } from '../utils/currencyHelper';
 const Collection = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { cartCount, cartTotal } = useCart(); 
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
   
   // Lấy tham số URL
@@ -17,13 +19,13 @@ const Collection = () => {
   const categorySlug = searchParams.get('category'); 
 
   // [MỚI] 1. State lưu tiêu đề trang (để không phụ thuộc vào sản phẩm)
-  const [pageTitle, setPageTitle] = useState('Tất cả sản phẩm');
+  const [pageTitle, setPageTitle] = useState(t('collection.all_products'));
 
   // [MỚI] 2. Effect riêng để lấy Tên Danh Mục đúng (Fix lỗi hiển thị sai tên)
   useEffect(() => {
     const fetchCategoryName = async () => {
         if (searchQuery) {
-            setPageTitle(`Kết quả tìm kiếm: "${searchQuery}"`);
+            setPageTitle(`${t('collection.search_result')}: "${searchQuery}"`);
         } else if (categorySlug) {
             try {
                 // Gọi API lấy danh sách danh mục để tìm tên đúng của Slug hiện tại
@@ -35,10 +37,10 @@ const Collection = () => {
                 }
             } catch (error) {
                 console.error("Lỗi lấy tên danh mục:", error);
-                setPageTitle('Sản phẩm');
+                setPageTitle(lang === 'en' && catData.name_en ? catData.name_en : catData.name);
             }
         } else {
-            setPageTitle('Tất cả sản phẩm');
+            setPageTitle(t('collection.all_products'));
         }
     };
 
@@ -79,10 +81,10 @@ const Collection = () => {
       {isPosMode && (
           <div className="bg-red-700 text-white p-4 shadow-md sticky top-20 z-40 flex justify-between items-center">
              <div className="font-bold text-lg flex items-center gap-2 uppercase">
-                <FaStore/> Chọn sản phẩm (POS)
+                <FaStore/> {t('collection.pos_mode')}
              </div>
              <button onClick={() => window.close()} className="text-xs underline opacity-80 hover:opacity-100">
-                Thoát
+                {t('collection.exit')}
              </button>
           </div>
       )}
@@ -97,7 +99,7 @@ const Collection = () => {
 
         {/* LIST SẢN PHẨM */}
         {loading ? (
-            <div className="text-center py-20">Đang tải...</div>
+            <div className="text-center py-20">{t('collection.loading')}</div>
         ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
             {products.map(product => (
@@ -118,16 +120,16 @@ const Collection = () => {
                         
                         {isPosMode && (
                             <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">CHỌN MUA</span>
+                                <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">{t('collection.select')}</span>
                             </div>
                         )}
                     </div>
 
                     <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
-                        {product.name}
+                        {lang === 'en' && product.name_en ? product.name_en : product.name}
                     </h3>
                     <p className="text-stone-500 font-bold mt-1 text-sm">
-                        {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                        {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
                     </p>
                 </Link>
             ))}
@@ -136,7 +138,7 @@ const Collection = () => {
         
         {!loading && products.length === 0 && (
             <div className="text-center py-10 text-stone-500 italic">
-                Không tìm thấy sản phẩm nào trong danh mục này.
+                {t('collection.no_products')}
             </div>
         )}
       </div>
@@ -150,8 +152,8 @@ const Collection = () => {
                     {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border border-white">{cartCount}</span>}
                 </div>
                 <div>
-                    <p className="text-xs text-stone-500 uppercase">Tổng tiền tạm tính</p>
-                    <p className="text-xl font-bold text-stone-900">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</p>
+                    <p className="text-xs text-stone-500 uppercase">{t('collection.subtotal')}</p>
+                    <p className="text-xl font-bold text-stone-900">{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')}</p>
                 </div>
             </div>
             
@@ -160,7 +162,7 @@ const Collection = () => {
                 disabled={cartCount === 0}
                 className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded font-bold uppercase tracking-widest disabled:bg-gray-300 transition-colors"
             >
-                Thanh Toán Ngay
+                {t('collection.checkout')}
             </button>
         </div>
       )}

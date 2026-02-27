@@ -6,7 +6,8 @@ import axios from 'axios';
 // [THAY ĐỔI 1] Thêm FaCalendarAlt vào import
 import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag, FaCalendarAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-
+import { useLanguage } from '../context/LanguageContext';
+import { formatPrice } from '../utils/currencyHelper';
 // --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
 const MY_BANK = {
   BANK_ID: 'SACOMBANK', 
@@ -22,6 +23,7 @@ const GHN_API_BASE = 'https://online-gateway.ghn.vn/shiip/public-api/master-data
 const Checkout = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   
   // --- STATE ĐỊA CHỈ (MỚI) ---
@@ -51,7 +53,7 @@ const Checkout = () => {
   const [isTransferConfirmed, setIsTransferConfirmed] = useState(false);
 
   // =================================================================================
-  // [TẾT] LOGIC KIỂM TRA LỊCH NGHỈ TẾT
+  // [TẾT] LOGIC KIỂM TRA LỊCH NGHỈ TẾT (Đã chuyển sang dùng msgKey cho đa ngôn ngữ)
   // =================================================================================
   const getTetStatus = () => {
       const now = new Date();
@@ -63,15 +65,15 @@ const Checkout = () => {
       const t25Feb = new Date(year, 1, 25, 0, 0, 0);    // Bắt đầu 25/2 (Mùng 9)
 
       // 1. Sau 10/2 -> Trước 21/2: ĐÓNG CỬA HOÀN TOÀN
-      if (now > t10Feb && now < t21Feb) return { code: 'CLOSED', msg: '🧧 Shop đang nghỉ Tết. Hẹn gặp lại quý khách vào Mùng 5 Tết (21/2)!' };
+      if (now > t10Feb && now < t21Feb) return { code: 'CLOSED', msgKey: 'checkout.tet_closed_msg' };
       
       // 2. Sau 8/2 -> Hết 10/2: CHỈ NHẬN HCM
-      if (now > t8Feb && now <= t10Feb) return { code: 'HCM_ONLY', msg: '⚠️ SẮP TẾT: Shop chỉ nhận đơn giao tại TP.HCM để kịp giao trước Tết.' };
+      if (now > t8Feb && now <= t10Feb) return { code: 'HCM_ONLY', msgKey: 'checkout.tet_hcm_msg' };
       
       // 3. Từ 21/2 -> Trước 25/2: NHẬN ĐƠN NHƯNG GIAO MUỘN
-      if (now >= t21Feb && now < t25Feb) return { code: 'DELAYED', msg: '⚠️ LƯU Ý: Đơn hàng đặt bây giờ sẽ bắt đầu được xử lý và đi đơn từ ngày 25/2 (Mùng 9 Tết).' };
+      if (now >= t21Feb && now < t25Feb) return { code: 'DELAYED', msgKey: 'checkout.tet_delayed_msg' };
 
-      return { code: 'NORMAL', msg: '' };
+      return { code: 'NORMAL', msgKey: '' };
   };
   const tetStatus = getTetStatus();
   // =================================================================================
@@ -149,7 +151,7 @@ const Checkout = () => {
 
   // --- XỬ LÝ VOUCHER (GIỮ NGUYÊN) ---
   const handleApplyVoucher = async () => {
-    if (!voucherCode) return toast.warn("Vui lòng nhập mã!");
+    if (!voucherCode) return toast.warn(t('checkout.toast_missing_voucher'));
     try {
         const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions/check`, {
             code: voucherCode,
@@ -159,12 +161,12 @@ const Checkout = () => {
             const { discountAmount, promo } = res.data.data;
             setDiscountAmount(discountAmount);
             setAppliedVoucher(promo);
-            toast.success(`Áp dụng mã ${promo.code} giảm ${new Intl.NumberFormat('vi-VN').format(discountAmount)}đ`);
+            toast.success(`${t('checkout.toast_discount_applied')} ${promo.code}`);
         }
     } catch (error) {
         setDiscountAmount(0);
         setAppliedVoucher(null);
-        toast.error(error.response?.data?.message || "Mã không hợp lệ");
+        toast.error(error.response?.data?.message || t('checkout.toast_invalid_voucher'));
     }
   };
 
@@ -186,12 +188,12 @@ const Checkout = () => {
     
     // [TẾT] CHẶN NẾU SHOP ĐANG NGHỈ
     if (tetStatus.code === 'CLOSED') {
-        toast.error("Shop đang nghỉ Tết, tạm thời chưa nhận đơn mới!");
+        toast.error(t('checkout.toast_tet_closed'));
         return;
     }
 
     if (!formData.fullName || !formData.phone || !formData.street || !formData.ward_code) {
-        toast.warning("Vui lòng điền đầy đủ thông tin giao hàng!");
+        toast.warning(t('checkout.toast_missing_info'));
         return;
     }
 
@@ -200,14 +202,14 @@ const Checkout = () => {
         // ID 202 là Hồ Chí Minh trong GHN (hoặc check tên)
         const isHCM = formData.province_id == 202 || formData.province_name?.toLowerCase().includes('hồ chí minh');
         if (!isHCM) {
-            toast.error("Xin lỗi, sau 8/2 Shop chỉ nhận đơn giao tại TP.HCM để kịp trước Tết!");
+            toast.error(t('checkout.toast_hcm_only'));
             return;
         }
     }
 
     // [MỚI] Chặn submit nếu chưa tích xác nhận
     if (!isTransferConfirmed) {
-        toast.warning("Vui lòng xác nhận đã chuyển khoản trước khi đặt hàng!");
+        toast.warning(t('checkout.toast_missing_transfer'));
         return;
     }
 
@@ -241,14 +243,14 @@ const Checkout = () => {
         const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, payload);
         
         if (res.data.success) {
-            toast.success("🎉 Đặt hàng thành công!");
+            toast.success(t('checkout.toast_order_success'));
             clearCart();
             navigate(user ? '/account' : '/');
         }
 
     } catch (error) {
         console.error(error);
-        toast.error(error.response?.data?.message || "Lỗi khi đặt hàng.");
+        toast.error(error.response?.data?.message || t('checkout.toast_order_error'));
     } finally {
         setLoading(false);
     }
@@ -257,7 +259,7 @@ const Checkout = () => {
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
         <Link to="/cart" className="flex items-center text-stone-500 hover:text-stone-900 mb-8 w-fit">
-            <FaArrowLeft className="mr-2" /> Quay lại giỏ hàng
+            <FaArrowLeft className="mr-2" /> {t('checkout.back_to_cart')}
         </Link>
 
         {/* [TẾT] HIỂN THỊ BANNER THÔNG BÁO TẾT NẾU KHÔNG PHẢI NORMAL */}
@@ -265,8 +267,8 @@ const Checkout = () => {
             <div className="bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-lg mb-8 flex items-start gap-3">
                 <FaCalendarAlt className="mt-1 text-xl" />
                 <div>
-                    <strong className="block font-bold">Thông báo Lịch nghỉ Tết</strong>
-                    <span className="text-sm">{tetStatus.msg}</span>
+                    <strong className="block font-bold">{t('checkout.tet_notice')}</strong>
+                    <span className="text-sm">{t(tetStatus.msgKey)}</span>
                 </div>
             </div>
         )}
@@ -275,10 +277,10 @@ const Checkout = () => {
         {tetStatus.code === 'CLOSED' ? (
             <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200">
                 <div className="text-6xl mb-4">🧧</div>
-                <h2 className="text-2xl font-bold text-stone-800 mb-2">Chúc Mừng Năm Mới!</h2>
-                <p className="text-stone-600 max-w-md mx-auto mb-6">{tetStatus.msg}</p>
+                <h2 className="text-2xl font-bold text-stone-800 mb-2">{t('checkout.tet_happy_new_year')}</h2>
+                <p className="text-stone-600 max-w-md mx-auto mb-6">{t(tetStatus.msgKey)}</p>
                 <Link to="/" className="bg-stone-900 text-white px-6 py-3 rounded font-bold hover:bg-stone-800">
-                    Về Trang Chủ
+                    {t('checkout.back_to_home')}
                 </Link>
             </div>
         ) : (
@@ -286,54 +288,54 @@ const Checkout = () => {
                 
                 {/* CỘT TRÁI: THÔNG TIN GIAO HÀNG */}
                 <div>
-                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">1. Thông tin giao hàng</h2>
+                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">1. {t('checkout.shipping_info')}</h2>
                     <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
                         <input 
-                            type="text" placeholder="Họ và tên" required
+                            type="text" placeholder={t('checkout.fullname')} required
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                             value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})}
                         />
                         <div className="grid grid-cols-2 gap-4">
                             <input 
-                                type="text" placeholder="Số điện thoại" required
+                                type="text" placeholder={t('checkout.phone')} required
                                 className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                                 value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
                             />
                             <input 
-                                type="email" placeholder="Email (để nhận thông báo, MVĐ,...)"
+                                type="email" placeholder={t('checkout.email')}
                                 className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                             />
                         </div>
 
                         {/* --- [THAY ĐỔI 4] KHU VỰC CHỌN ĐỊA CHỈ (DÙNG KEY CỦA GHN) --- */}
-                        <h3 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">2. Địa chỉ giao hàng (địa chỉ trước sáp nhập)</h3>
+                        <h3 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">{t('checkout.address')}</h3>
                         <div className="grid grid-cols-3 gap-2">
                             <select className="p-3 border rounded outline-none bg-white" value={formData.province_id} onChange={handleProvinceChange} required>
-                                <option value="">-- Tỉnh/Thành --</option>
+                                <option value="">-- {t('checkout.province')} --</option>
                                 {/* GHN dùng ProvinceID và ProvinceName */}
                                 {provinces.map(p => <option key={p.ProvinceID} value={p.ProvinceID}>{p.ProvinceName}</option>)}
                             </select>
                             <select className="p-3 border rounded outline-none bg-white" value={formData.district_id} onChange={handleDistrictChange} required disabled={!formData.province_id}>
-                                <option value="">-- Quận/Huyện --</option>
+                                <option value="">-- {t('checkout.district')} --</option>
                                 {/* GHN dùng DistrictID và DistrictName */}
                                 {districts.map(d => <option key={d.DistrictID} value={d.DistrictID}>{d.DistrictName}</option>)}
                             </select>
                             <select className="p-3 border rounded outline-none bg-white" value={formData.ward_code} onChange={handleWardChange} required disabled={!formData.district_id}>
-                                <option value="">-- Phường/Xã --</option>
+                                <option value="">-- {t('checkout.ward')} --</option>
                                 {/* GHN dùng WardCode và WardName */}
                                 {wards.map(w => <option key={w.WardCode} value={w.WardCode}>{w.WardName}</option>)}
                             </select>
                         </div>
 
                         <input 
-                            type="text" placeholder="Số nhà, Tên đường..." required
+                            type="text" placeholder={t('checkout.street')} required
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                             value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})}
                         />
 
                         <textarea 
-                            placeholder="Ghi chú đơn hàng (Tùy chọn)"
+                            placeholder={t('checkout.note')}
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none h-24 resize-none"
                             value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})}
                         ></textarea>
@@ -342,13 +344,13 @@ const Checkout = () => {
 
                 {/* CỘT PHẢI: QUÉT MÃ QR (GIỮ NGUYÊN) */}
                 <div className="h-fit">
-                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">3. Thanh toán QR Code</h2>
+                    <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">2. {t('checkout.payment_method')}</h2>
                     
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-100 text-center">
                         
                         {formData.phone ? (
                             <>
-                                <p className="text-sm text-stone-500 mb-4">Vui lòng quét mã bên dưới để thanh toán</p>
+                                <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr')}</p>
                                 <div className="flex justify-center mb-4">
                                     <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
                                 </div>
@@ -358,40 +360,40 @@ const Checkout = () => {
                                     <div className="flex gap-2 mb-2">
                                         <div className="relative flex-1">
                                             <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none"><FaTag className="text-stone-400 text-xs" /></div>
-                                            <input type="text" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} placeholder="MÃ GIẢM GIÁ" disabled={!!appliedVoucher} className="w-full pl-7 p-2 text-xs border border-stone-200 rounded uppercase outline-none focus:border-stone-900" />
+                                            <input type="text" value={voucherCode} onChange={(e) => setVoucherCode(e.target.value.toUpperCase())} placeholder={t('checkout.discount_code')} disabled={!!appliedVoucher} className="w-full pl-7 p-2 text-xs border border-stone-200 rounded uppercase outline-none focus:border-stone-900" />
                                         </div>
                                         {appliedVoucher ? (
                                             <button type="button" onClick={removeVoucher} className="bg-stone-200 text-stone-600 px-3 py-1 rounded hover:bg-stone-300"><FaTimes size={12} /></button>
                                         ) : (
-                                            <button type="button" onClick={handleApplyVoucher} className="bg-stone-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-black">ÁP DỤNG</button>
+                                            <button type="button" onClick={handleApplyVoucher} className="bg-stone-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-black">{t('checkout.apply')}</button>
                                         )}
                                     </div>
-                                    {appliedVoucher && <div className="text-green-600 text-xs flex items-center gap-1 mb-2"><FaCheckCircle size={10} /> Đã dùng mã: <strong>{appliedVoucher.code}</strong></div>}
+                                    {appliedVoucher && <div className="text-green-600 text-xs flex items-center gap-1 mb-2"><FaCheckCircle size={10} /> {t('checkout.applied_code')}: <strong>{appliedVoucher.code}</strong></div>}
                                     <hr className="border-stone-200"/>
 
                                     <div className="flex justify-between">
-                                        <span className="text-stone-500">Tạm tính:</span>
-                                        <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(cartTotal)} ₫</span>
+                                        <span className="text-stone-500">{t('checkout.subtotal')}:</span>
+                                        <span className="font-medium">{formatPrice(cartTotal)} </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-stone-500">Phí vận chuyển (GHN):</span>
-                                        <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(shippingFee)} ₫</span>
+                                        <span className="text-stone-500">{t('checkout.shipping_fee')}:</span>
+                                        <span className="font-medium">{formatPrice(shippingFee)} </span>
                                     </div>
 
                                     {discountAmount > 0 && (
                                         <div className="flex justify-between text-green-600 font-bold">
-                                            <span>Giảm giá:</span>
-                                            <span>- {new Intl.NumberFormat('vi-VN').format(discountAmount)} ₫</span>
+                                            <span>{t('checkout.discount')}:</span>
+                                            <span>- {formatPrice(discountAmount)} </span>
                                         </div>
                                     )}
 
                                     <div className="flex justify-between border-t border-stone-200 pt-2">
-                                        <span className="text-stone-900 font-bold">Tổng thanh toán:</span>
-                                        <span className="font-bold text-xl text-red-600">{new Intl.NumberFormat('vi-VN').format(finalTotal)} ₫</span>
+                                        <span className="text-stone-900 font-bold">{t('checkout.total')}:</span>
+                                        <span className="font-bold text-xl text-red-600">{formatPrice(finalTotal)} </span>
                                     </div>
                                     
                                     <div className="flex justify-between text-xs mt-2 pt-2 border-t border-stone-200 border-dashed">
-                                        <span className="text-stone-500">Nội dung CK:</span>
+                                        <span className="text-stone-500">{t('checkout.bank_transfer_content')}:</span>
                                         <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
                                     </div>
                                 </div>
@@ -406,7 +408,7 @@ const Checkout = () => {
                                             onChange={(e) => setIsTransferConfirmed(e.target.checked)}
                                         />
                                         <span className="text-sm font-bold text-stone-800">
-                                            Tôi xác nhận đã chuyển khoản thành công {new Intl.NumberFormat('vi-VN').format(finalTotal)}đ
+                                            {t('checkout.confirm_transfer')} {formatPrice(finalTotal)}đ
                                         </span>
                                     </label>
                                 </div>
@@ -414,7 +416,7 @@ const Checkout = () => {
                         ) : (
                             <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6">
                                 <FaExclamationCircle className="text-2xl mb-2"/>
-                                <span>Nhập thông tin giao hàng để hiện mã QR</span>
+                                <span>{t('checkout.qr_notice')}</span>
                             </div>
                         )}
                         
@@ -429,9 +431,9 @@ const Checkout = () => {
                                     : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
                             `}
                         >
-                            {loading ? 'Đang xử lý...' : <><FaCheckCircle/> Tôi đã chuyển khoản & Đặt hàng</>}
+                            {loading ? t('checkout.processing') : <><FaCheckCircle/> {t('checkout.banking_confirm')}</>}
                         </button>
-                        <p className="text-xs text-stone-400 mt-4 italic">*Lưu ý: Đơn hàng sẽ được xử lý sau khi hệ thống nhận được thanh toán.</p>
+                        <p className="text-xs text-stone-400 mt-4 italic">{t('checkout.note_warning')}</p>
                     </div>
                 </div>
             </div>

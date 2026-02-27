@@ -1,4 +1,16 @@
 const supabase = require('../config/supabase');
+const translate = require('translate-google');
+
+const autoTranslate = async (text) => {
+    if (!text || text.trim() === '') return '';
+    try {
+        const res = await translate(text, { from: 'vi', to: 'en' });
+        return res;
+    } catch (err) {
+        console.error('Lỗi dịch tự động:', err);
+        return text; // Nếu lỗi mạng thì tạm thời lấy chữ tiếng Việt
+    }
+};
 
 // 1. LẤY DANH SÁCH SẢN PHẨM (Kèm tính toán tồn kho thực tế)
 exports.getProducts = async (req, res) => {
@@ -11,7 +23,7 @@ exports.getProducts = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, sku, image_url,
+                    id, size, color, color_en, sku, image_url,
                     inventory_batches ( quantity_remaining ) 
                 ),
                 categories!fk_products_main_category (id, name, slug),
@@ -81,7 +93,7 @@ exports.getProductBySlug = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, sku, image_url,
+                    id, size, color, color_en, sku, image_url,
                     inventory_batches ( quantity_remaining )
                 ),
                 categories (id, name, slug)
@@ -108,15 +120,26 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        // [CẬP NHẬT] Lấy thêm size_chart_url từ body
         const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url } = req.body;
-
+        
+        const name_en = await autoTranslate(name);
+        const description_en = await autoTranslate(description);
+        
+        if (variants && Array.isArray(variants)) {
+            for (let i = 0; i < variants.length; i++) {
+                if (variants[i].color) {
+                    variants[i].color_en = await autoTranslate(variants[i].color);
+                }
+            }
+        }
+        
         // 1. Tạo Product
         const { data: newProduct, error: prodError } = await supabase
             .from('products')
             .insert([{
                 name, slug, base_price, description, category_id, images, 
-                size_chart_url: size_chart_url || null // [QUAN TRỌNG] Lưu link Size Chart
+                size_chart_url: size_chart_url || null,  
+                name_en, description_en
             }])
             .select()
             .single();
@@ -129,6 +152,7 @@ exports.createProduct = async (req, res) => {
                 product_id: newProduct.id,
                 size: v.size,
                 color: v.color,
+                color_en: v.color_en || null, 
                 sku: v.sku,
                 image_url: v.image_url || null 
             }));
@@ -157,15 +181,26 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        // [CẬP NHẬT] Lấy thêm size_chart_url từ body
         const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url } = req.body;
+        
+        const name_en = await autoTranslate(name);
+        const description_en = await autoTranslate(description);
 
+        if (variants && Array.isArray(variants)) {
+            for (let i = 0; i < variants.length; i++) {
+                if (variants[i].color) {
+                    variants[i].color_en = await autoTranslate(variants[i].color);
+                }
+            }
+        }
+        
         // 1. Update thông tin chung
         const { error: updateError } = await supabase
             .from('products')
             .update({ 
                 name, slug, base_price, description, category_id, images, 
-                size_chart_url: size_chart_url || null // [QUAN TRỌNG] Cập nhật link Size Chart
+                size_chart_url: size_chart_url || null, 
+                name_en, description_en
             })
             .eq('id', id);
 
@@ -190,13 +225,14 @@ exports.updateProduct = async (req, res) => {
         const hasHistory = count > 0;
 
         if (hasHistory) {
-            // TRƯỜNG HỢP 1: CÓ LỊCH SỬ KHO -> KHÔNG XÓA, CHỈ UPDATE ẢNH & SKU
+            // TRƯỜNG HỢP 1: CÓ LỊCH SỬ KHO -> KHÔNG XÓA, CHỈ UPDATE ẢNH, SKU, VÀ COLOR_EN
             if (variants && variants.length > 0) {
                 for (const v of variants) {
                     await supabase.from('variants')
                         .update({ 
                             image_url: v.image_url || null, 
-                            sku: v.sku 
+                            sku: v.sku,
+                            color_en: v.color_en || null // [VÁ LỖI] Bổ sung cập nhật màu tiếng Anh
                         })
                         .eq('product_id', id)
                         .eq('size', v.size)
@@ -219,6 +255,7 @@ exports.updateProduct = async (req, res) => {
                     product_id: id,
                     size: v.size,
                     color: v.color,
+                    color_en: v.color_en || null, // [VÁ LỖI] Đưa màu tiếng Anh vào khi tạo mới
                     sku: v.sku,
                     image_url: v.image_url || null 
                 }));

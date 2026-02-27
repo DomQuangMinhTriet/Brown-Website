@@ -92,7 +92,7 @@ const Navbar = () => {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-48 bg-white shadow-xl rounded-b-lg overflow-hidden border-t-2 border-stone-900 transition-all duration-300 ${isProductMenuOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'}`}>
                     <div className="flex flex-col">
                         <Link to="/collection" className="px-4 py-3 hover:bg-stone-50 text-stone-600 hover:text-stone-900 text-left border-b border-stone-100 last:border-0">
-                            Tất cả sản phẩm
+                            {t('collection.all_products')}
                         </Link>
                         {categories.map(cat => (
                             <Link 
@@ -108,11 +108,11 @@ const Navbar = () => {
             </div>
 
             <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
-                CHÍNH SÁCH ĐỔI HÀNG
+                {t('nav.return_policy')}
             </Link>
 
             <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
-                CHÍNH SÁCH VẬN CHUYỂN
+                {t('nav.shipping_policy')}
             </Link>
 
             {/* <Link to="/about" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
@@ -192,7 +192,7 @@ const Navbar = () => {
                     <div className="py-2 border-b border-stone-200">
                         <p className="text-lg font-bold text-stone-800 mb-2">{t('nav.products')}</p>
                         <div className="pl-4 flex flex-col gap-2 border-l-2 border-stone-300">
-                             <Link to="/collection" onClick={() => setIsMobileMenuOpen(false)} className="text-stone-600 py-1">Tất cả sản phẩm</Link>
+                             <Link to="/collection" onClick={() => setIsMobileMenuOpen(false)} className="text-stone-600 py-1">{t('collection.all_products')}</Link>
                              {categories.map(cat => (
                                 <Link 
                                     key={cat.id} 
@@ -207,11 +207,11 @@ const Navbar = () => {
                     </div>
                     
                     <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
-                        CHÍNH SÁCH ĐỔI HÀNG
+                        {t('nav.return_policy')}
                     </Link>
 
                     <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
-                        CHÍNH SÁCH VẬN CHUYỂN
+                        {t('nav.shipping_policy')}
                     </Link>
                     {/* <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200">
                         {t('nav.about')}

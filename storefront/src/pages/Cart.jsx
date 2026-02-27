@@ -1,17 +1,20 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { FaTrash, FaArrowRight } from 'react-icons/fa';
+import { useLanguage } from '../context/LanguageContext';
+import { formatPrice } from '../utils/currencyHelper';
 
 const Cart = () => {
   const { cartItems, removeFromCart, updateQuantity, cartTotal } = useCart();
+  const { t, lang } = useLanguage();
 
   if (cartItems.length === 0) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <h2 className="text-2xl font-serif text-stone-800 mb-4">Giỏ hàng của bạn đang trống</h2>
-        <p className="text-stone-500 mb-8">Hãy khám phá bộ sưu tập mới nhất của chúng tôi.</p>
+        <h2 className="text-2xl font-serif text-stone-800 mb-4">{t('cart.empty_title')}</h2>
+        <p className="text-stone-500 mb-8">{t('cart.empty_desc')}</p>
         <Link to="/" className="bg-stone-900 text-white px-8 py-3 uppercase tracking-wider text-sm hover:bg-stone-700">
-          Mua sắm ngay
+          {t('cart.shop_now')}
         </Link>
       </div>
     );
@@ -19,70 +22,80 @@ const Cart = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 md:py-16">
-      <h1 className="text-3xl font-serif text-stone-900 mb-10 text-center">Giỏ Hàng</h1>
+      <h1 className="text-3xl font-serif text-stone-900 mb-10 text-center">{t('cart.title')}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* DANH SÁCH SẢN PHẨM */}
-        <div className="lg:col-span-2 space-y-6">
-          {cartItems.map((item) => (
-            <div key={item.variant_id} className="flex gap-6 py-6 border-b border-stone-100">
-              {/* Ảnh */}
-              <Link to={`/product/${item.slug}`} className="w-24 h-32 bg-stone-100 flex-shrink-0">
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-              </Link>
+        <div className="lg:col-span-2">
+          <div className="grid grid-cols-12 gap-4 border-b border-stone-200 pb-4 text-xs font-bold text-stone-500 uppercase tracking-wider mb-6">
+            <div className="col-span-8 md:col-span-6"><p className="text-left">{t('cart.product')}</p></div>
+            <div className="col-span-4 md:col-span-3 hidden md:block"><p className="text-center">{t('cart.quantity')}</p></div>
+            <div className="col-span-4 md:col-span-3 hidden md:block"><p className="text-right">{t('cart.price')}</p></div>
+          </div>
 
-              {/* Thông tin */}
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start">
-                    <Link to={`/product/${item.slug}`} className="font-medium text-stone-800 hover:text-stone-600">
+          <div className="space-y-8">
+            {cartItems.map((item) => (
+              <div key={item.variant_id} className="grid grid-cols-12 gap-4 items-center">
+                <div className="col-span-12 md:col-span-6 flex items-center gap-4">
+                  <button onClick={() => removeFromCart(item.variant_id)} className="text-stone-300 hover:text-red-500 transition-colors">
+                    <FaTrash />
+                  </button>
+                  <img src={item.image} alt={item.name} className="w-20 h-24 object-cover rounded bg-stone-100" />
+                  <div>
+                    <Link to={`/product/${item.slug}`} className="font-bold text-stone-900 hover:text-stone-600 transition-colors line-clamp-1">
                       {item.name}
                     </Link>
-                    <button onClick={() => removeFromCart(item.variant_id)} className="text-stone-400 hover:text-red-500">
-                      <FaTrash size={14} />
-                    </button>
+                    <p className="text-stone-500 text-sm mb-2">Size: {item.size} | {t('product.select_color')}: {lang === 'en' && item.color_en ? item.color_en : item.color}</p>
+                    <div className="md:hidden font-bold text-stone-900 mb-2">
+                      {formatPrice(item.price, lang === 'en' ? 'USD' : 'VND')}
+                    </div>
+                    <div className="flex items-center border border-stone-200 rounded w-max md:hidden">
+                      <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">-</button>
+                      <span className="px-3 py-1 font-medium text-sm w-10 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">+</button>
+                    </div>
                   </div>
-                  <p className="text-sm text-stone-500 mt-1">{item.size} / {item.color}</p>
                 </div>
 
-                <div className="flex justify-between items-end">
-                  <div className="flex items-center border border-stone-200">
-                    <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="w-8 h-8 flex items-center justify-center hover:bg-stone-50">-</button>
-                    <span className="w-10 text-center text-sm">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="w-8 h-8 flex items-center justify-center hover:bg-stone-50">+</button>
-                  </div>
-                  <span className="font-medium text-stone-900">
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price * item.quantity)}
-                  </span>
+                <div className="col-span-4 md:col-span-3 hidden md:flex justify-center">
+                   <div className="flex items-center border border-stone-200 rounded">
+                      <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">-</button>
+                      <span className="px-3 py-1 font-medium text-sm w-12 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">+</button>
+                    </div>
+                </div>
+
+                <div className="col-span-4 md:col-span-3 hidden md:block text-right font-bold text-stone-900">
+                  {formatPrice(item.price * item.quantity, lang === 'en' ? 'USD' : 'VND')}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* TỔNG TIỀN & THANH TOÁN */}
         <div className="lg:col-span-1">
           <div className="bg-stone-50 p-6 rounded-lg sticky top-24">
-            <h3 className="font-bold text-stone-900 uppercase tracking-wider mb-6">Tóm tắt đơn hàng</h3>
+            <h3 className="font-bold text-stone-900 uppercase tracking-wider mb-6">{t('cart.summary')}</h3>
             
             <div className="flex justify-between mb-4 text-stone-600">
-              <span>Tạm tính</span>
-              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cartTotal)}</span>
+              <span>{t('cart.subtotal')}</span>
+              <span>{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
             <div className="flex justify-between mb-4 text-stone-600">
-              <span>Vận chuyển</span>
-              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(20000)}</span>
+              <span>{t('cart.shipping')}</span>
+              <span>---</span>
             </div>
             
             <hr className="border-stone-200 my-4" />
             
             <div className="flex justify-between mb-8 text-lg font-bold text-stone-900">
-              <span>Tổng cộng</span>
-              <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(cartTotal + 20000)}</span>
+              <span>{t('cart.total')}</span>
+              <span>{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
 
-            <Link to="/checkout" className="block w-full bg-stone-900 text-white text-center py-4 uppercase tracking-widest text-sm font-bold hover:bg-stone-800 transition-colors flex items-center justify-center gap-2">
-              Thanh toán <FaArrowRight />
+            <Link to="/checkout" className="block w-full bg-stone-900 text-white text-center py-4 uppercase tracking-widest text-sm font-bold hover:bg-stone-800 transition-colors">
+              {t('cart.checkout')}
             </Link>
           </div>
         </div>

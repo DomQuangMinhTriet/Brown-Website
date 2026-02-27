@@ -53,6 +53,7 @@ export const CartProvider = ({ children }) => {
                   slug: product.slug, 
                   image: product.images?.[0] || '', 
                   color: variant.color, 
+                  color_en: variant.color_en,
                   size: variant.size, 
                   price: Number(product.base_price),
                   quantity: Number(quantity), // FIX: Ép kiểu số

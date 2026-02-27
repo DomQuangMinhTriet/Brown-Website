@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { FaArrowRight } from 'react-icons/fa';
-
+import { formatPrice } from '../utils/currencyHelper';
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext'; // Đa ngôn ngữ
 
 const Home = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [products, setProducts] = useState([]);
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ const Home = () => {
 
   return (
     <>
-      <SEO title="Trang chủ" />
+      <SEO title={t('home.title')} />
       
       {/* 1. HERO BANNER - CLICKABLE & FIXED RATIO */}
         {/* aspect-[3/1]: Tỷ lệ chuẩn cho banner ngang (VD: 1920x640px) */}
@@ -139,18 +139,18 @@ const Home = () => {
                         />
                     {/* Nút xem nhanh (Desktop only) */}
                     <div className="absolute bottom-0 left-0 w-full bg-white/90 text-center py-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 hidden md:block">
-                        <span className="text-xs font-bold uppercase tracking-wider text-stone-900">Xem chi tiết</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-stone-900">{t('home.view_detail')}</span>
                     </div>
                   </div>
                   
                   {/* Tên sản phẩm */}
                     <h3 className="text-stone-900 font-medium text-sm group-hover:text-stone-600 transition-colors truncate px-1">
-                        {product.name}
+                        {lang === 'en' && product.name_en ? product.name_en : product.name}
                     </h3>
                     
                     {/* Giá tiền */}
                     <p className="text-stone-500 mt-1 font-bold text-sm px-1">
-                        {new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫
+                        {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
                     </p>
                 </Link>
             ))}

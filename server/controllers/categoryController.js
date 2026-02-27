@@ -1,4 +1,16 @@
 const supabase = require('../config/supabase');
+const translate = require('translate-google');
+
+// Hàm helper tự động dịch danh mục
+const autoTranslate = async (text) => {
+    if (!text || text.trim() === '') return '';
+    try {
+        return await translate(text, { from: 'vi', to: 'en' });
+    } catch (err) {
+        console.error('Lỗi dịch tự động danh mục:', err);
+        return text; // Fallback giữ nguyên tiếng Việt nếu lỗi mạng
+    }
+};
 
 // 1. Lấy danh sách danh mục
 exports.getCategories = async (req, res) => {
@@ -17,23 +29,40 @@ exports.getCategories = async (req, res) => {
 };
 
 // 2. Tạo danh mục mới
+// Hàm tạo danh mục
 exports.createCategory = async (req, res) => {
     try {
         const { name, slug } = req.body;
+
         if (!name || !slug) {
-            return res.status(400).json({ success: false, message: 'Thiếu tên hoặc slug!' });
+            return res.status(400).json({ success: false, message: 'Tên và slug là bắt buộc' });
         }
 
-        const { data, error } = await supabase
+        // --- 1. DỊCH TỰ ĐỘNG ---
+        let name_en = name; // Mặc định lấy tiếng Việt
+        try {
+            name_en = await translate(name, { from: 'vi', to: 'en' });
+        } catch (err) {
+            console.error("Lỗi dịch danh mục:", err);
+        }
+
+        // --- 2. LƯU VÀO DATABASE ---
+        const { data: newCategory, error } = await supabase
             .from('categories')
-            .insert([{ name, slug }])
-            .select();
+            .insert([{ 
+                name, 
+                slug,
+                name_en // <--- Lưu thêm tên tiếng Anh
+            }])
+            .select()
+            .single();
 
         if (error) throw error;
 
-        res.json({ success: true, data: data[0] });
+        res.status(201).json({ success: true, data: newCategory });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
     }
 };
 

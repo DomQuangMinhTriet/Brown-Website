@@ -105,36 +105,54 @@ exports.createOrder = async (req, res) => {
             }
         }
         // ==============================================================================
-        // C. CHUẨN BỊ DỮ LIỆU & BẢO MẬT GIÁ
-        // Hacker có thể sửa giá ở Frontend, nên ta phải lấy giá gốc từ Database
+        // C. CHUẨN BỊ DỮ LIỆU & BẢO MẬT GIÁ + KIỂM TRA TỒN KHO THỰC TẾ
+        // ==============================================================================
         const cleanItems = [];
         let subtotal_check = 0;
 
-        // Lấy danh sách ID sản phẩm để query 1 lần (tối ưu hiệu năng)
         const variantIds = items.map(i => i.variant_id);
+        
+        // [ĐÃ SỬA]: Truy vấn thêm inventory_batches để lấy số lượng tồn kho
         const { data: variantsDB, error: varError } = await supabase
             .from('variants')
-            .select('id, current_price, products(base_price)')
+            .select(`
+                id, 
+                current_price, 
+                products(base_price),
+                inventory_batches(quantity_remaining) 
+            `)
             .in('id', variantIds);
 
         if (varError || !variantsDB) throw new Error("Lỗi khi lấy thông tin sản phẩm");
 
-        // Map lại dữ liệu: Dùng giá từ DB, số lượng từ Khách
         for (const item of items) {
             const variant = variantsDB.find(v => v.id === item.variant_id);
             if (!variant) {
-                return res.status(400).json({ success: false, message: `Sản phẩm ID ${item.variant_id} không còn tồn tại` });
+                return res.status(400).json({ success: false, message: `Sản phẩm không còn tồn tại.` });
+            }
+
+            // [LOGIC MỚI BỔ SUNG]: Tính tổng tồn kho hiện tại của sản phẩm này
+            const totalStock = variant.inventory_batches
+                ? variant.inventory_batches.reduce((sum, batch) => sum + (Number(batch.quantity_remaining) || 0), 0)
+                : 0;
+
+            // [CHẶN LỖI]: Trả về lỗi ngay nếu khách đặt lố số lượng đang có
+            if (item.quantity > totalStock) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Rất tiếc! Một sản phẩm trong giỏ hàng của bạn hiện chỉ còn ${totalStock} chiếc. Vui lòng cập nhật lại số lượng.` 
+                });
             }
 
             // Ưu tiên giá sale (current_price), nếu không có lấy giá gốc
             const realPrice = variant.current_price || variant.products.base_price;
             
-            // [LOGIC MỚI] Lấy giá vốn từ lô hàng nhập mới nhất
+            // Lấy giá vốn từ lô hàng nhập mới nhất
             const { data: latestBatch } = await supabase
                 .from('inventory_batches')
                 .select('cost_price')
                 .eq('variant_id', item.variant_id)
-                .order('created_at', { ascending: false }) // Lấy lô mới nhất
+                .order('created_at', { ascending: false }) 
                 .limit(1)
                 .single();
 
@@ -145,7 +163,7 @@ exports.createOrder = async (req, res) => {
                 variant_id: item.variant_id,
                 quantity: item.quantity,
                 unit_price: realPrice,
-                cogs_total: totalCogs // <--- [MỚI] Gửi trường này xuống DB
+                cogs_total: totalCogs 
             });
             
             subtotal_check += realPrice * item.quantity;

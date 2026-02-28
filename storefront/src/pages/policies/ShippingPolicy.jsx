@@ -1,22 +1,29 @@
-import React from 'react';
+import { useEffect } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const ShippingPolicy = () => {
+  const { t } = useLanguage();
+
+  // FIX LỖI RESPONSIVE: Ép trình duyệt cuộn lên đầu trang khi vào
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 text-stone-700 leading-relaxed">
-      <h1 className="text-3xl font-serif font-bold text-stone-900 mb-8 text-center uppercase">Chính sách vận chuyển</h1>
+    <div className="max-w-4xl mx-auto px-6 pt-24 pb-16 text-stone-700 leading-relaxed min-h-[70vh]">
+      <h1 className="text-3xl font-serif font-bold text-stone-900 mb-8 text-center uppercase">
+        {t('policies.shipping_title')}
+      </h1>
       
       <div className="space-y-6">
-        <section>
-          <h2 className="font-bold text-lg text-stone-900 mb-2">1. Phí vận chuyển</h2>
-          <p>Brown áp dụng mức phí vận chuyển đồng giá: 20.000đ</p>
+        <section className="bg-stone-50 p-6 rounded-xl border border-stone-100">
+          <h2 className="font-bold text-lg text-stone-900 mb-4">{t('policies.shipping_fee_title')}</h2>
+          <p className="text-stone-600">{t('policies.shipping_fee_desc')}</p>
         </section>
 
-        <section>
-          <h2 className="font-bold text-lg text-stone-900 mb-2">2. Thời gian giao hàng</h2>
-          <p>
-            Thời gian giao hàng dự kiến từ <strong>2-5 ngày</strong> tùy thuộc vào địa chỉ nhận hàng của quý khách.
-            Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Instagram).
-          </p>
+        <section className="bg-stone-50 p-6 rounded-xl border border-stone-100">
+          <h2 className="font-bold text-lg text-stone-900 mb-4">{t('policies.shipping_time_title')}</h2>
+          <p className="text-stone-600">{t('policies.shipping_time_desc')}</p>
         </section>
       </div>
     </div>

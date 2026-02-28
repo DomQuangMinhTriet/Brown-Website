@@ -188,6 +188,20 @@ export const translations = {
       contact: "Liên hệ",
       follow: "Theo dõi chúng tôi",
       rights: "Bản quyền thuộc về BROWN.",
+    },
+    policies: {
+      return_title: "Chính sách đổi hàng",
+      return_cond_title: "1. Điều kiện đổi hàng",
+      return_cond_1: "Sản phẩm còn nguyên tem mác, chưa qua sử dụng, giặt ủi.",
+      return_cond_2: "Thời gian đổi trả trong vòng 03 ngày kể từ ngày nhận hàng.",
+      return_cond_3: "Sản phẩm bị lỗi do nhà sản xuất hoặc do BROWN tư vấn sai kích thước.",
+      return_process_title: "2. Quy trình đổi hàng",
+      return_process_desc: "Quý khách vui lòng liên hệ qua Instagram hoặc Zalo 090.695.4860 để được hướng dẫn. Sau khi xác nhận, quý khách gửi hàng về địa chỉ kho của BROWN. Tổng phí vận chuyển đổi hàng sẽ do BROWN chịu trách nhiệm.",
+      shipping_title: "Chính sách vận chuyển",
+      shipping_fee_title: "1. Phí vận chuyển",
+      shipping_fee_desc: "BROWN áp dụng mức phí vận chuyển đồng giá: 20.000đ cho đơn hàng nội địa. Đối với đơn hàng quốc tế, phí vận chuyển là $15.00 (381.000đ).",
+      shipping_time_title: "2. Thời gian giao hàng",
+      shipping_time_desc: "Thời gian giao hàng dự kiến từ 2-5 ngày tùy thuộc vào địa chỉ nhận hàng của quý khách. Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Instagram)."
     }
   },
   en: {
@@ -377,6 +391,20 @@ export const translations = {
       contact: "Contact Us",
       follow: "Follow Us",
       rights: "All rights reserved by BROWN.",
+    },
+    policies: {
+      return_title: "Return Policy",
+      return_cond_title: "1. Return Conditions",
+      return_cond_1: "Products must be unworn, unwashed, and have original tags attached.",
+      return_cond_2: "Returns must be made within 03 days of receiving your order.",
+      return_cond_3: "Products with manufacturing defects or incorrect sizing advice from BROWN.",
+      return_process_title: "2. Return Process",
+      return_process_desc: "Please contact us via Instagram or Zalo at (+84) 90 695 4860 for instructions. Once confirmed, please send the items back to our warehouse. Total shipping fee for return will be covered by BROWN.",
+      shipping_title: "Shipping Policy",
+      shipping_fee_title: "1. Shipping Fee",
+      shipping_fee_desc: "BROWN applies a flat shipping rate of 20,000 VND for domestic orders. International shipping is $15.00.",
+      shipping_time_title: "2. Delivery Time",
+      shipping_time_desc: "Estimated delivery time is 2-5 days depending on your location. Same-day delivery is available for inner-city orders via express shipping (please contact our Instagram)."
     }
   }
 };

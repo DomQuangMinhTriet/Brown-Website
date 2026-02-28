@@ -206,11 +206,19 @@ const Navbar = () => {
                         </div>
                     </div>
                     
-                    <Link to="/policy/return" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                    <Link 
+                        to="/policy/return" 
+                        onClick={() => setIsMobileMenuOpen(false)} 
+                        className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200"
+                    >
                         {t('nav.return_policy')}
                     </Link>
 
-                    <Link to="/policy/shipping" className="hover:text-stone-900 transition-colors py-2 border-b-2 border-transparent hover:border-stone-900">
+                    <Link 
+                        to="/policy/shipping" 
+                        onClick={() => setIsMobileMenuOpen(false)} 
+                        className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200 hover:border-stone-900"
+                    >
                         {t('nav.shipping_policy')}
                     </Link>
                     {/* <Link to="/about" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-bold text-stone-800 py-2 border-b border-stone-200">

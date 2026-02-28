@@ -56,7 +56,7 @@ exports.getShippingFee = async (req, res) => {
         const fee = await calculateShippingFee(district_id, ward_code);
         res.json({ success: true, fee });
     } catch (error) {
-        res.status(500).json({ success: false, fee: 30000 });
+        res.status(500).json({ success: false, fee: 20000 });
     }
 };
 

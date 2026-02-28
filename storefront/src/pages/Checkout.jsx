@@ -158,7 +158,7 @@ const Checkout = () => {
     setFormData({...formData, ward_code: wcode, ward_name: wname});
     
     // Giả lập tính xong phí ship nội địa
-    setShippingFee(30000); 
+    setShippingFee(20000); 
   };
 
   // XỬ LÝ ĐỔI QUỐC GIA QUỐC TẾ (Mock phí ship Easyship)

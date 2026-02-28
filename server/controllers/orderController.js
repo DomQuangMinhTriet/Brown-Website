@@ -4,43 +4,49 @@ const { calculateShippingFee, createGHNOrder } = require('../services/shippingSe
 const { z } = require('zod');
 
 // --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
-// --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
 const orderSchema = z.object({
     customer: z.object({
         fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
         
-        // [ĐÃ SỬA]: Chuyển thành min(8) để cho phép cả SĐT quốc tế thay vì dùng Regex VN
-        phone: z.string().min(8, "Số điện thoại không hợp lệ"), 
+        // Dùng min(8) để chấp nhận cả SĐT quốc tế và SĐT Việt Nam
+        phone: z.string().min(8, "Số điện thoại phải có ít nhất 8 ký tự"), 
         
-        email: z.string().email("Email không hợp lệ").optional().or(z.literal('')),
+        // Cho phép email trống, null hoặc đúng định dạng
+        email: z.string().email("Email không hợp lệ").nullable().optional().or(z.literal('')),
+        
         address: z.string().min(5, "Địa chỉ quá ngắn"),
-        province: z.string().optional(),
-        district: z.string().optional(),
-        ward: z.string().optional(),
-        province_id: z.any().optional(), 
-        district_id: z.any().optional(),
-        ward_code: z.any().optional(),
         
-        // [MỚI]: Thêm các trường quốc tế để Zod không lọc mất
-        country: z.string().optional(),
-        zipcode: z.string().optional(),
-        shipping_type: z.string().optional()
+        // Thêm nullable() cho tất cả các trường có thể bị truyền null từ Frontend
+        province: z.string().nullable().optional(),
+        district: z.string().nullable().optional(),
+        ward: z.string().nullable().optional(),
+        
+        province_id: z.any().nullable().optional(), 
+        district_id: z.any().nullable().optional(),
+        ward_code: z.any().nullable().optional(),
+        
+        country: z.string().nullable().optional(),
+        zipcode: z.string().nullable().optional(), // <--- Fix lỗi nội địa ở đây
+        shipping_type: z.string().nullable().optional()
     }),
     items: z.array(z.object({
         variant_id: z.number().int().positive(),
-        quantity: z.number().int().min(1)
-    })).min(1),
-    payment_method: z.enum(['done', 'banking', 'cod']).optional(),
+        quantity: z.number().int().min(1, "Số lượng phải lớn hơn 0")
+    })).min(1, "Giỏ hàng không được để trống"),
+    
+    // Giữ lại custom error của bạn và cho phép 'cod' nếu cần
+    payment_method: z.enum(['done', 'banking', 'cod'], { 
+        errorMap: () => ({ message: "Phương thức thanh toán không hợp lệ" }) 
+    }).nullable().optional(),
+    
     voucher_code: z.string().nullable().optional(),
     shipping_fee: z.number().min(0).default(0),
-    note: z.string().optional(),
+    note: z.string().nullable().optional(),
     
-    // [MỚI]: Thêm các trường tiền tệ từ Frontend
-    discount_amount: z.number().optional(),
-    final_total: z.number().optional(),
-    
-    // [QUAN TRỌNG NHẤT]: Thêm khai báo lang để Zod cho phép truyền biến ngôn ngữ xuống
-    lang: z.string().optional()
+    // Các trường tiền tệ & ngôn ngữ quốc tế
+    discount_amount: z.number().nullable().optional(),
+    final_total: z.number().nullable().optional(),
+    lang: z.string().nullable().optional()
 });
 
 // --- [MỚI] API TÍNH PHÍ SHIP (Frontend sẽ gọi cái này) ---

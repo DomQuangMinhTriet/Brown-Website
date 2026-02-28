@@ -4,31 +4,43 @@ const { calculateShippingFee, createGHNOrder } = require('../services/shippingSe
 const { z } = require('zod');
 
 // --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
+// --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
 const orderSchema = z.object({
     customer: z.object({
         fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
-        phone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, "Số điện thoại không hợp lệ"),
+        
+        // [ĐÃ SỬA]: Chuyển thành min(8) để cho phép cả SĐT quốc tế thay vì dùng Regex VN
+        phone: z.string().min(8, "Số điện thoại không hợp lệ"), 
+        
         email: z.string().email("Email không hợp lệ").optional().or(z.literal('')),
-        // Cho phép nhận cả tên địa chỉ và ID địa chỉ
         address: z.string().min(5, "Địa chỉ quá ngắn"),
         province: z.string().optional(),
         district: z.string().optional(),
         ward: z.string().optional(),
-        // [MỚI] Thêm ID để lưu vào DB phục vụ GHN sau này
         province_id: z.any().optional(), 
         district_id: z.any().optional(),
-        ward_code: z.any().optional()
+        ward_code: z.any().optional(),
+        
+        // [MỚI]: Thêm các trường quốc tế để Zod không lọc mất
+        country: z.string().optional(),
+        zipcode: z.string().optional(),
+        shipping_type: z.string().optional()
     }),
     items: z.array(z.object({
         variant_id: z.number().int().positive(),
-        quantity: z.number().int().min(1, "Số lượng phải lớn hơn 0")
-    })).min(1, "Giỏ hàng không được để trống"),
-    payment_method: z.enum(['done', 'banking'], { 
-        errorMap: () => ({ message: "Phương thức thanh toán không hợp lệ" }) 
-    }),
+        quantity: z.number().int().min(1)
+    })).min(1),
+    payment_method: z.enum(['done', 'banking', 'cod']).optional(),
     voucher_code: z.string().nullable().optional(),
     shipping_fee: z.number().min(0).default(0),
-    note: z.string().optional()
+    note: z.string().optional(),
+    
+    // [MỚI]: Thêm các trường tiền tệ từ Frontend
+    discount_amount: z.number().optional(),
+    final_total: z.number().optional(),
+    
+    // [QUAN TRỌNG NHẤT]: Thêm khai báo lang để Zod cho phép truyền biến ngôn ngữ xuống
+    lang: z.string().optional()
 });
 
 // --- [MỚI] API TÍNH PHÍ SHIP (Frontend sẽ gọi cái này) ---
@@ -56,7 +68,7 @@ exports.createOrder = async (req, res) => {
             });
         }
 
-        const { customer, items, payment_method, voucher_code, shipping_fee, note } = parseResult.data;
+        const { customer, items, payment_method, voucher_code, shipping_fee, note, lang } = parseResult.data;
         console.log("👉 Dữ liệu Customer sau khi Validate:", customer);
         // ==============================================================================
         // B. [ĐÃ CHỈNH SỬA] XÁC ĐỊNH KHÁCH HÀNG (Ưu tiên Login -> Tìm SĐT -> Tạo mới)
@@ -239,7 +251,7 @@ exports.createOrder = async (req, res) => {
                 total_amount: rawTotalAmount, 
                 shipping_tracking_code: 'Đang cập nhật' 
             };
-            sendOrderConfirmation(orderInfoForMail, emailAddress).catch(err => console.error("Mail Khách Error:", err));
+            sendOrderConfirmation(orderInfoForMail, emailAddress, lang || 'vi').catch(err => console.error("Mail Khách Error:", err));
         }
 
         // 2. [MỚI] Gửi mail thông báo cho Admin (brownvn25@gmail.com)

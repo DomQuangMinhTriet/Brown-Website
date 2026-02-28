@@ -9,12 +9,18 @@ const itemSchema = z.object({
 // Validate khách hàng
 const customerSchema = z.object({
     fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
-    phone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, "Số điện thoại không đúng định dạng VN"),
+    
+    // [ĐÃ SỬA]: Cho phép nhập số điện thoại quốc tế (chỉ yêu cầu tối thiểu 8 ký tự)
+    phone: z.string().min(8, "Số điện thoại không hợp lệ"), 
+    
     email: z.string().email("Email không hợp lệ").optional().or(z.literal('')),
     address: z.string().min(5, "Địa chỉ quá ngắn"),
     province: z.string().optional(),
     district: z.string().optional(),
     ward: z.string().optional(),
+    
+    // [MỚI]: Thêm trường quốc gia để lưu DB
+    country: z.string().optional(), 
 });
 
 // MAIN SCHEMA
@@ -29,7 +35,10 @@ const createOrderSchema = z.object({
     
     voucher_code: z.string().optional().nullable(),
     shipping_fee: z.number().min(0).default(0),
-    note: z.string().optional()
+    note: z.string().optional(),
+    lang: z.string().optional()
 });
+
+
 
 module.exports = { createOrderSchema };

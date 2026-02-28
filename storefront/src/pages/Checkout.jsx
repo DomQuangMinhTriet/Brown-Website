@@ -277,7 +277,9 @@ const Checkout = () => {
             note: formData.note,
             voucher_code: appliedVoucher ? appliedVoucher.code : null,
             discount_amount: discountAmount,
-            final_total: finalTotal 
+            final_total: finalTotal,
+            // [CẬP NHẬT QUAN TRỌNG]: Ép kiểu 'en' nếu là ship quốc tế để Email gửi về là tiếng Anh
+            lang: shippingType === 'international' ? 'en' : lang 
         };
 
         const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, payload);

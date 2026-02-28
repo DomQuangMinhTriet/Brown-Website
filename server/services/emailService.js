@@ -9,18 +9,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const SENDER_EMAIL = 'BROWN <donhang@brownvn.com>'; 
 const ADMIN_EMAIL = 'brownvn25@gmail.com'; 
 
-// --- [MỚI] HELPER: FORMAT TIỀN TỆ ---
-const formatMoney = (amount) => {
+// --- [ĐÃ NÂNG CẤP] HELPER: FORMAT TIỀN TỆ ĐA NGÔN NGỮ ---
+const formatMoney = (amount, lang = 'vi') => {
+    if (lang === 'en') {
+        const EXCHANGE_RATE = 25400; // Tỷ giá khớp với Frontend
+        const converted = amount / EXCHANGE_RATE;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(converted);
+    }
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
-// --- [MỚI] HELPER: TẠO HTML DANH SÁCH SẢN PHẨM ---
-const generateProductRows = (items) => {
+// --- [ĐÃ NÂNG CẤP] HELPER: TẠO HTML DANH SÁCH SẢN PHẨM ---
+const generateProductRows = (items, lang = 'vi') => {
     if (!items || items.length === 0) return '';
 
     return items.map(item => {
         // Xử lý lấy tên: Ưu tiên lấy từ cấu trúc lồng nhau (variants -> products -> name)
-        let productName = "Sản phẩm";
+        let productName = lang === 'en' ? "Product" : "Sản phẩm";
         if (item.variants?.products?.name) productName = item.variants.products.name;
         else if (item.product_name) productName = item.product_name; // Fallback
         else if (item.name) productName = item.name;
@@ -28,6 +33,7 @@ const generateProductRows = (items) => {
         // Xử lý lấy Size/Màu
         let variantInfo = "";
         if (item.variants) {
+            // Có thể nâng cấp dịch size/color ở đây nếu DB của bạn có lưu tiếng Anh
             variantInfo = `${item.variants.size || ''} / ${item.variants.color || ''}`;
         } else {
             variantInfo = `${item.size || ''} / ${item.color || ''}`;
@@ -40,7 +46,7 @@ const generateProductRows = (items) => {
                     <div style="font-size: 11px; color: #888;">${variantInfo}</div>
                 </td>
                 <td style="padding: 8px 0; text-align: center; font-size: 13px;">x${item.quantity}</td>
-                <td style="padding: 8px 0; text-align: right; font-weight: bold; font-size: 13px;">${formatMoney(item.price)}</td>
+                <td style="padding: 8px 0; text-align: right; font-weight: bold; font-size: 13px;">${formatMoney(item.price, lang)}</td>
             </tr>
         `;
     }).join('');
@@ -69,56 +75,88 @@ const sendViaResend = async (toEmail, subject, htmlContent) => {
     }
 };
 
-// 1. HÀM GỬI MAIL CƠ BẢN (Giữ nguyên tên để không lỗi Controller)
+// 1. HÀM GỬI MAIL CƠ BẢN
 const sendEmail = async (to, subject, text, html) => {
-    // Gọi hàm lõi ở trên
     return await sendViaResend(to, subject, html || text);
 };
 
-// 2. GỬI XÁC NHẬN ĐƠN HÀNG (Đã chèn thêm bảng sản phẩm)
-const sendOrderConfirmation = async (order, customerEmail) => {
+// 2. [ĐÃ NÂNG CẤP] GỬI XÁC NHẬN ĐƠN HÀNG
+// Nhận thêm biến lang, mặc định là 'vi'
+const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
     if (!customerEmail) return;
 
-    const formattedPrice = formatMoney(order.total_amount);
-    
-    // [MỚI] Tạo danh sách sản phẩm
+    // Lấy trước các thành phần động đã được format theo ngôn ngữ
+    const formattedPrice = formatMoney(order.total_amount, lang);
     const items = order.items || order.order_items || [];
-    const productRows = generateProductRows(items);
+    const productRows = generateProductRows(items, lang);
 
-    const subject = `[BROWN] Xác nhận đơn hàng #${order.code || order.id}`; // Fallback nếu code null
-    
-    // GIỮ NGUYÊN HTML CŨ CỦA BẠN & CHÈN THÊM BẢNG SẢN PHẨM
+    // TỪ ĐIỂN DỊCH THUẬT MINI CHO MAIL
+    const t = lang === 'en' ? {
+        subject: `[BROWN] Order Confirmation #${order.code || order.id}`,
+        header: "ORDER CONFIRMED",
+        greeting: `Hello <b>${order.customer_name}</b>,`,
+        thanks: `Thank you for shopping at BROWN. Your order <b>${order.code || order.id}</b> has been received.`,
+        detailsTitle: "Order Details:",
+        totalLabel: "Total Amount:",
+        methodLabel: "Payment Method:",
+        methodValue: "Bank Transfer (SWIFT)",
+        unpaidNote: "If you haven't completed your payment, please transfer to:",
+        bankDetails: `
+            <li>Bank: <b>Techcombank</b></li>
+            <li>SWIFT Code: <b>VTCBVNVX</b></li>
+            <li>Account Name: <b>Le Thi My Nhi</b></li>
+            <li>Account No: <b>19037727414020</b></li>
+            <li>Remark: Phone <b>${order.customer_name}</b></li>
+        `,
+        processingNote: "We will process and ship your order as soon as we receive your payment."
+    } : {
+        subject: `[BROWN] Xác nhận đơn hàng #${order.code || order.id}`,
+        header: "ĐƠN HÀNG ĐÃ ĐƯỢC GHI NHẬN",
+        greeting: `Xin chào <b>${order.customer_name}</b>,`,
+        thanks: `Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code || order.id}</b> của bạn đã được khởi tạo.`,
+        detailsTitle: "Chi tiết đơn hàng:",
+        totalLabel: "Tổng thanh toán:",
+        methodLabel: "Hình thức:",
+        methodValue: "Chuyển khoản ngân hàng (QR)",
+        unpaidNote: "Nếu bạn chưa hoàn tất thanh toán, vui lòng chuyển khoản đến:",
+        bankDetails: `
+            <li>Ngân hàng: <b>Sacombank</b></li>
+            <li>Số TK: <b>0902173763</b></li>
+            <li>Chủ TK: <b>LUU THI PHUONG QUYNH</b></li>
+            <li>Nội dung: SĐT <b> ${order.customer_name}</b></li>
+        `,
+        processingNote: "Chúng tôi sẽ xử lý và giao hàng ngay khi nhận được thanh toán."
+    };
+
+    // TEMPLATE HTML CHỈ SỬ DỤNG CÁC BIẾN TỪ TỪ ĐIỂN
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #1c1917; color: white; padding: 20px; text-align: center;">
-                <h2 style="margin: 0;">ĐƠN HÀNG ĐÃ ĐƯỢC GHI NHẬN</h2>
+                <h2 style="margin: 0;">${t.header}</h2>
             </div>
             <div style="padding: 20px;">
-                <p>Xin chào <b>${order.customer_name}</b>,</p>
-                <p>Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code || order.id}</b> của bạn đã được khởi tạo.</p>
+                <p>${t.greeting}</p>
+                <p>${t.thanks}</p>
                 
                 <div style="margin: 20px 0;">
-                    <p style="font-weight:bold; border-bottom: 2px solid #1c1917; padding-bottom: 5px;">Chi tiết đơn hàng:</p>
+                    <p style="font-weight:bold; border-bottom: 2px solid #1c1917; padding-bottom: 5px;">${t.detailsTitle}</p>
                     <table style="width: 100%; border-collapse: collapse;">
                         ${productRows}
                     </table>
                 </div>
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>Tổng thanh toán:</strong> ${formattedPrice}</p>
-                    <p style="margin: 5px 0;"><strong>Hình thức:</strong> Chuyển khoản ngân hàng (QR)</p>
+                    <p style="margin: 5px 0;"><strong>${t.totalLabel}</strong> ${formattedPrice}</p>
+                    <p style="margin: 5px 0;"><strong>${t.methodLabel}</strong> ${t.methodValue}</p>
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <p>Nếu bạn chưa hoàn tất thanh toán, vui lòng chuyển khoản đến:</p>
-                    <ul style="color: #444; background: #fff; border: 1px dashed #ccc; padding: 15px 30px; border-radius: 5px;">
-                        <li>Ngân hàng: <b>Sacombank</b></li>
-                        <li>Số TK: <b>0902173763</b></li>
-                        <li>Chủ TK: <b>LUU THI PHUONG QUYNH</b></li>
-                        <li>Nội dung: SĐT <b> ${order.customer_name}</b></li>
+                    <p>${t.unpaidNote}</p>
+                    <ul style="color: #444; background: #fff; border: 1px dashed #ccc; padding: 15px 30px; border-radius: 5px; line-height: 1.6;">
+                        ${t.bankDetails}
                     </ul>
                 </div>
 
-                <p>Chúng tôi sẽ xử lý và giao hàng ngay khi nhận được thanh toán.</p>
+                <p>${t.processingNote}</p>
             </div>
             <div style="background-color: #f5f5f4; color: #78716c; padding: 15px; text-align: center; font-size: 12px;">
                 © 2026 BROWN FASHION. All rights reserved.
@@ -126,9 +164,8 @@ const sendOrderConfirmation = async (order, customerEmail) => {
         </div>
     `;
 
-    return await sendViaResend(customerEmail, subject, htmlContent);
+    return await sendViaResend(customerEmail, t.subject, htmlContent);
 };
-
 // 3. GỬI THÔNG BÁO VẬN CHUYỂN (Giữ nguyên HTML cũ)
 const sendShippingConfirmation = async (order, trackingCode) => {
     const email = order.customer_info?.email || order.customer_email; 

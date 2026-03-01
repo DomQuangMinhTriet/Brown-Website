@@ -25,14 +25,14 @@ const GHN_API_BASE = 'https://online-gateway.ghn.vn/shiip/public-api/master-data
 
 // Danh sách Quốc gia cơ bản (Có gắn kèm phí ship giả lập)
 const COUNTRY_LIST = [
-  { code: 'US', name: 'United States', mockFee: 500000 },
-  { code: 'GB', name: 'United Kingdom', mockFee: 450000 },
-  { code: 'AU', name: 'Australia', mockFee: 400000 },
-  { code: 'CA', name: 'Canada', mockFee: 550000 },
-  { code: 'SG', name: 'Singapore', mockFee: 150000 },
-  { code: 'MY', name: 'Malaysia', mockFee: 150000 },
-  { code: 'KR', name: 'South Korea', mockFee: 200000 },
-  { code: 'JP', name: 'Japan', mockFee: 250000 },
+  { code: 'US', name: 'United States', mockFee: 'To be announced later' },
+  { code: 'GB', name: 'United Kingdom', mockFee:  'To be announced later' },
+  { code: 'AU', name: 'Australia', mockFee:  'To be announced later' },
+  { code: 'CA', name: 'Canada', mockFee:  'To be announced later' },
+  { code: 'SG', name: 'Singapore', mockFee:  'To be announced later' },
+  { code: 'MY', name: 'Malaysia', mockFee:  'To be announced later' },
+  { code: 'KR', name: 'South Korea', mockFee:  'To be announced later' },
+  { code: 'JP', name: 'Japan', mockFee:  'To be announced later' },
 ];
 
 const Checkout = () => {
@@ -155,23 +155,30 @@ const Checkout = () => {
   };
 
   // XỬ LÝ ĐỔI QUỐC GIA QUỐC TẾ 
-  const handleCountryChange = (e) => {
-    const selectedCountry = e.target.value;
-    setFormData({...formData, country: selectedCountry});
+//   const handleCountryChange = (e) => {
+//     const selectedCountry = e.target.value;
+//     setFormData({...formData, country: selectedCountry});
     
-    if (!selectedCountry) {
-        setShippingFee(0);
-        return;
-    }
+//     if (!selectedCountry) {
+//         setShippingFee(0);
+//         return;
+//     }
 
-    setIsCalculatingFee(true);
-    setTimeout(() => {
-        const countryInfo = COUNTRY_LIST.find(c => c.code === selectedCountry);
-        setShippingFee(countryInfo ? countryInfo.mockFee : 500000);
-        setIsCalculatingFee(false);
-    }, 800);
-  };
+//     setIsCalculatingFee(true);
+//     setTimeout(() => {
+//         const countryInfo = COUNTRY_LIST.find(c => c.code === selectedCountry);
+//         setShippingFee(countryInfo ? countryInfo.mockFee : 500000);
+//         setIsCalculatingFee(false);
+//     }, 800);
+//   };
 
+    const handleCountryChange = (e) => {
+        const selectedCountry = e.target.value;
+        setFormData({...formData, country: selectedCountry});
+        
+        // Nếu là đơn quốc tế, set phí ship = 0 để tính Total chỉ gồm tiền quần áo
+        setShippingFee(0); 
+    };
   // XỬ LÝ VOUCHER
   const handleApplyVoucher = async () => {
     if (!voucherCode) return toast.warn(t('checkout.toast_missing_voucher'));
@@ -447,7 +454,10 @@ const Checkout = () => {
                             <div className="flex justify-between">
                                 <span className="text-stone-500">{t('checkout.shipping_fee')}:</span>
                                 <span className="font-medium">
-                                    {isCalculatingFee ? <span className="text-stone-400 italic">{t('checkout.calculating_fee')}</span> : formatPrice(shippingFee, lang === 'en' ? 'USD' : 'VND')}
+                                    {shippingType === 'international' && formData.country
+                                        ? <span className="text-orange-600 font-bold">{lang === 'en' ? 'To be quoted' : 'Sẽ báo giá sau'}</span>
+                                        : (isCalculatingFee ? <span className="text-stone-400 italic">...</span> : formatPrice(shippingFee, lang === 'en' ? 'USD' : 'VND'))
+                                    }
                                 </span>
                             </div>
 
@@ -470,6 +480,15 @@ const Checkout = () => {
                             // GIAO DIỆN THANH TOÁN PAYPAL CHO ĐƠN QUỐC TẾ
                             // ==========================================
                             <div className="animate-fade-in relative z-0">
+                                
+                                {/* [MỚI THÊM] HỘP THOẠI CẢNH BÁO CHO KHÁCH */}
+                                <div className="mb-4 text-xs bg-orange-50 text-orange-800 p-3 rounded border border-orange-200 text-left leading-relaxed">
+                                    <strong>{lang === 'en' ? 'Important Note:' : 'Lưu ý quan trọng:'}</strong><br/>
+                                    {lang === 'en' 
+                                        ? 'The total amount below includes ONLY the cost of your items. Once your order is packed, we will calculate the exact shipping fee and email you a separate payment link for the shipping.' 
+                                        : 'Tổng tiền dưới đây CHỈ BAO GỒM tiền sản phẩm. Sau khi đóng gói, chúng tôi sẽ tính toán phí ship chính xác và gửi link thanh toán bổ sung qua email cho bạn.'}
+                                </div>
+
                                 <p className="text-sm text-stone-600 mb-4 italic">
                                     {lang === 'en' ? 'Pay securely with your PayPal account or Credit/Debit card.' : 'Thanh toán an toàn qua PayPal hoặc thẻ quốc tế.'}
                                 </p>

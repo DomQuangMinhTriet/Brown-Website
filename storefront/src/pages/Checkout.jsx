@@ -8,6 +8,9 @@ import { toast } from 'react-toastify';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
 
+// [MỚI] IMPORT THƯ VIỆN PAYPAL
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+
 // --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
 const MY_BANK = {
   BANK_ID: 'SACOMBANK', 
@@ -16,21 +19,11 @@ const MY_BANK = {
   TEMPLATE: 'compact' 
 };
 
-// --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN QUỐC TẾ (SWIFT) ---
-const INTL_BANK = {
-  BANK_NAME: 'Techcombank',
-  SWIFT_CODE: 'VTCBVNVX',
-  ACCOUNT_NAME: 'Le Thi My Nhi',
-  ACCOUNT_NO: '19037727414020',
-  ADDRESS: '15 Nguyen Xuan Khoat street, Tan Son Nhi ward, Tan Phu District, Ho Chi Minh City',
-  POST_CODE: '700000'
-};
-
 // CẤU HÌNH API GHN ĐỂ LẤY ĐỊA CHỈ CHUẨN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce'; 
 const GHN_API_BASE = 'https://online-gateway.ghn.vn/shiip/public-api/master-data';
 
-// Thêm danh sách Quốc gia cơ bản (Có gắn kèm phí ship giả lập)
+// Danh sách Quốc gia cơ bản (Có gắn kèm phí ship giả lập)
 const COUNTRY_LIST = [
   { code: 'US', name: 'United States', mockFee: 500000 },
   { code: 'GB', name: 'United Kingdom', mockFee: 450000 },
@@ -161,7 +154,7 @@ const Checkout = () => {
     setShippingFee(20000); 
   };
 
-  // XỬ LÝ ĐỔI QUỐC GIA QUỐC TẾ (Mock phí ship Easyship)
+  // XỬ LÝ ĐỔI QUỐC GIA QUỐC TẾ 
   const handleCountryChange = (e) => {
     const selectedCountry = e.target.value;
     setFormData({...formData, country: selectedCountry});
@@ -172,7 +165,6 @@ const Checkout = () => {
     }
 
     setIsCalculatingFee(true);
-    // Giả lập gọi API Easyship tốn 0.8s
     setTimeout(() => {
         const countryInfo = COUNTRY_LIST.find(c => c.code === selectedCountry);
         setShippingFee(countryInfo ? countryInfo.mockFee : 500000);
@@ -209,49 +201,22 @@ const Checkout = () => {
 
   const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
 
-  // QR Code (Vẫn sinh ra link VND gốc để lỡ cần dùng)
+  // QR Code Nội địa
   const transferContent = `${formData.phone} ${formData.fullName}`.trim().replace(/\s+/g, '%20').toUpperCase();
   const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
 
-  // --- SUBMIT ĐƠN HÀNG ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (tetStatus.code === 'CLOSED') {
-        toast.error(t('checkout.toast_tet_closed'));
-        return;
-    }
-
-    // VALIDATION
-    if (shippingType === 'domestic') {
-        if (!formData.fullName || !formData.phone || !formData.street || !formData.ward_code) {
-            toast.warning(t('checkout.toast_missing_info'));
-            return;
-        }
-    } else {
-        if (!formData.fullName || !formData.phone || !formData.street || !formData.country || !formData.state_province || !formData.city || !formData.zipcode) {
-            toast.warning(t('checkout.toast_missing_info'));
-            return;
-        }
-    }
-
-    if (tetStatus.code === 'HCM_ONLY' && shippingType === 'domestic') {
-        const isHCM = formData.province_id == 202 || formData.province_name?.toLowerCase().includes('hồ chí minh');
-        if (!isHCM) {
-            toast.error(t('checkout.toast_hcm_only'));
-            return;
-        }
-    }
-
-    // Phải tích xác nhận chuyển khoản mới cho đi tiếp
-    if (!isTransferConfirmed) {
-        toast.warning(t('checkout.toast_missing_transfer'));
-        return;
-    }
-
+  // =========================================================================
+  // [MỚI] HÀM LÕI ĐỂ GỬI ĐƠN HÀNG LÊN SERVER (Dùng chung cho Nội địa & PayPal)
+  // =========================================================================
+  const submitOrderToDatabase = async (paymentMethodType, paypalTransactionId = null) => {
     setLoading(true);
-
     try {
+        // Cập nhật note nếu có ID PayPal
+        let finalNote = formData.note;
+        if (paypalTransactionId) {
+            finalNote = (finalNote ? finalNote + ' | ' : '') + `[PayPal ID: ${paypalTransactionId}]`;
+        }
+
         const payload = {
             customer: {
                 fullName: formData.fullName,
@@ -271,14 +236,13 @@ const Checkout = () => {
                 country: shippingType === 'international' ? formData.country : 'VN',
                 zipcode: shippingType === 'international' ? formData.zipcode : null
             },
-            items: cartItems,
-            payment_method: 'banking', // Cả 2 loại ship đều dùng hình thức chuyển khoản thủ công
+            items: cartItems.map(item => ({ variant_id: item.variant_id, quantity: item.quantity })),
+            payment_method: paymentMethodType, // 'banking' hoặc 'done'
             shipping_fee: shippingFee, 
-            note: formData.note,
+            note: finalNote,
             voucher_code: appliedVoucher ? appliedVoucher.code : null,
             discount_amount: discountAmount,
             final_total: finalTotal,
-            // [CẬP NHẬT QUAN TRỌNG]: Ép kiểu 'en' nếu là ship quốc tế để Email gửi về là tiếng Anh
             lang: shippingType === 'international' ? 'en' : lang 
         };
 
@@ -296,6 +260,46 @@ const Checkout = () => {
     } finally {
         setLoading(false);
     }
+  };
+
+  // Hàm validate dùng chung để check xem đã điền đủ form chưa
+  const isFormValid = () => {
+    if (shippingType === 'domestic') {
+        return formData.fullName && formData.phone && formData.street && formData.ward_code;
+    } else {
+        return formData.fullName && formData.phone && formData.street && formData.country && formData.state_province && formData.city && formData.zipcode;
+    }
+  };
+
+  // Bắt sự kiện submit form (CHỈ DÀNH CHO NỘI ĐỊA)
+  const handleDomesticSubmit = async (e) => {
+    e.preventDefault();
+    if (shippingType === 'international') return; // Chặn enter key nếu đang ở tab quốc tế
+
+    if (tetStatus.code === 'CLOSED') {
+        toast.error(t('checkout.toast_tet_closed'));
+        return;
+    }
+
+    if (!isFormValid()) {
+        toast.warning(t('checkout.toast_missing_info'));
+        return;
+    }
+
+    if (tetStatus.code === 'HCM_ONLY' && shippingType === 'domestic') {
+        const isHCM = formData.province_id == 202 || formData.province_name?.toLowerCase().includes('hồ chí minh');
+        if (!isHCM) {
+            toast.error(t('checkout.toast_hcm_only'));
+            return;
+        }
+    }
+
+    if (!isTransferConfirmed) {
+        toast.warning(t('checkout.toast_missing_transfer'));
+        return;
+    }
+
+    await submitOrderToDatabase('banking');
   };
 
   return (
@@ -329,7 +333,7 @@ const Checkout = () => {
                 {/* CỘT TRÁI: THÔNG TIN GIAO HÀNG */}
                 <div>
                     <h2 className="text-xl font-serif font-bold text-stone-900 mb-6 uppercase tracking-wider">1. {t('checkout.shipping_info')}</h2>
-                    <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
+                    <form id="checkout-form" onSubmit={handleDomesticSubmit} className="space-y-4">
                         <input 
                             type="text" placeholder={t('checkout.fullname')} required
                             className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
@@ -389,11 +393,11 @@ const Checkout = () => {
                                             <option value="">-- {t('checkout.country')} --</option>
                                             {COUNTRY_LIST.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                                         </select>
-                                        <input type="text" placeholder={t('checkout.state_province')} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.state_province} onChange={e => setFormData({...formData, state_province: e.target.value})} />
+                                        <input type="text" placeholder={t('checkout.state_province') || "State/Province"} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.state_province} onChange={e => setFormData({...formData, state_province: e.target.value})} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <input type="text" placeholder={t('checkout.city')} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
-                                        <input type="text" placeholder={t('checkout.zipcode')} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.zipcode} onChange={e => setFormData({...formData, zipcode: e.target.value})} />
+                                        <input type="text" placeholder={t('checkout.city') || "City"} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                                        <input type="text" placeholder={t('checkout.zipcode') || "Zip/Postal Code"} required className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none" value={formData.zipcode} onChange={e => setFormData({...formData, zipcode: e.target.value})} />
                                     </div>
                                 </div>
                             )}
@@ -419,39 +423,7 @@ const Checkout = () => {
                     
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-100 text-center">
                         
-                        {/* HIỂN THỊ DỰA VÀO LỰA CHỌN VẬN CHUYỂN */}
-                        {shippingType === 'international' ? (
-                            // --- GIAO DIỆN CHUYỂN KHOẢN SWIFT CHO KHÁCH QUỐC TẾ ---
-                            <div className="bg-stone-50 p-6 rounded-lg mb-6 border border-stone-200 text-left animate-fade-in">
-                                <h4 className="font-bold text-stone-800 mb-2">{t('checkout.swift_transfer')}</h4>
-                                <p className="text-sm text-stone-600 mb-4">{t('checkout.swift_instructions')}</p>
-                                <div className="bg-white p-4 rounded border border-stone-200">
-                                    <ul className="text-sm space-y-3 text-stone-700">
-                                        <li className="flex flex-col"><span className="text-xs text-stone-400">{t('checkout.bank_name_intl') || 'Bank Name'}</span> <strong className="font-mono text-base">{INTL_BANK.BANK_NAME}</strong></li>
-                                        <li className="flex flex-col"><span className="text-xs text-stone-400">{t('checkout.swift_code')}</span> <strong className="font-mono">{INTL_BANK.SWIFT_CODE}</strong></li>
-                                        <li className="flex flex-col"><span className="text-xs text-stone-400">{t('checkout.bank_account_name')}</span> <strong>{INTL_BANK.ACCOUNT_NAME}</strong></li>
-                                        <li className="flex flex-col"><span className="text-xs text-stone-400">{t('checkout.bank_account_no')}</span> <strong className="font-mono text-lg text-blue-600">{INTL_BANK.ACCOUNT_NO}</strong></li>
-                                        <li className="flex flex-col"><span className="text-xs text-stone-400">{t('checkout.address')}</span> <span>{INTL_BANK.ADDRESS} - {INTL_BANK.POST_CODE}</span></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        ) : (
-                            // --- GIAO DIỆN VIETQR CHO TRONG NƯỚC ---
-                            formData.phone ? (
-                                <div className="animate-fade-in mb-6">
-                                    <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr')}</p>
-                                    <div className="flex justify-center mb-4">
-                                        <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6 animate-fade-in">
-                                    <FaExclamationCircle className="text-2xl mb-2"/>
-                                    <span>{t('checkout.qr_notice')}</span>
-                                </div>
-                            )
-                        )}
-
+                        {/* 1. MÃ GIẢM GIÁ & TÍNH TIỀN CHUNG */}
                         <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-3 mb-6">
                             {/* VOUCHER INPUT */}
                             <div className="flex gap-2 mb-2">
@@ -490,43 +462,113 @@ const Checkout = () => {
                                 <span className="text-stone-900 font-bold">{t('checkout.total')}:</span>
                                 <span className="font-bold text-xl text-red-600">{formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')} </span>
                             </div>
-                            
-                            <div className="flex justify-between text-xs mt-2 pt-2 border-t border-stone-200 border-dashed">
-                                <span className="text-stone-500">{t('checkout.bank_transfer_content')}:</span>
-                                <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
-                            </div>
                         </div>
 
-                        {/* CHECKBOX XÁC NHẬN CHUYỂN KHOẢN (Hiển thị cho cả VietQR và SWIFT) */}
-                        {(shippingType === 'international' || formData.phone) && (
-                            <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
-                                <label className="flex items-start gap-3 cursor-pointer select-none">
-                                    <input 
-                                        type="checkbox" 
-                                        className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
-                                        checked={isTransferConfirmed}
-                                        onChange={(e) => setIsTransferConfirmed(e.target.checked)}
+                        {/* 2. CHỌN KHU VỰC THANH TOÁN */}
+                        {shippingType === 'international' ? (
+                            // ==========================================
+                            // GIAO DIỆN THANH TOÁN PAYPAL CHO ĐƠN QUỐC TẾ
+                            // ==========================================
+                            <div className="animate-fade-in relative z-0">
+                                <p className="text-sm text-stone-600 mb-4 italic">
+                                    {lang === 'en' ? 'Pay securely with your PayPal account or Credit/Debit card.' : 'Thanh toán an toàn qua PayPal hoặc thẻ quốc tế.'}
+                                </p>
+                                
+                                <PayPalScriptProvider options={{ 
+                                    "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", 
+                                    currency: "USD",
+                                    intent: "capture"
+                                }}>
+                                    <PayPalButtons
+                                        // Vô hiệu hóa nút nếu đang tải, đang tính ship, hoặc điền thiếu form
+                                        disabled={loading || isCalculatingFee || !isFormValid()}
+                                        style={{ layout: "vertical", color: "gold", shape: "rect" }}
+                                        
+                                        onClick={(data, actions) => {
+                                            // Kiểm tra trước khi mở popup PayPal
+                                            if (!isFormValid()) {
+                                                toast.warning(t('checkout.toast_missing_info'));
+                                                return actions.reject();
+                                            }
+                                            return actions.resolve();
+                                        }}
+
+                                        createOrder={(data, actions) => {
+                                            // Đổi tổng tiền VND sang USD để đẩy sang PayPal
+                                            const usdAmount = (finalTotal / 25400).toFixed(2);
+                                            return actions.order.create({
+                                                purchase_units: [{ amount: { value: usdAmount, currency_code: "USD" } }]
+                                            });
+                                        }}
+
+                                        onApprove={(data, actions) => {
+                                            return actions.order.capture().then((details) => {
+                                                console.log("PayPal Success Detail:", details);
+                                                // Thành công -> Bắn vào DB với trạng thái 'done' và mã Transaction
+                                                submitOrderToDatabase('done', details.id);
+                                            });
+                                        }}
+
+                                        onError={(err) => {
+                                            console.error("PayPal Checkout Error", err);
+                                            toast.error(lang === 'en' ? "PayPal connection error. Please try again!" : "Lỗi kết nối PayPal. Vui lòng thử lại!");
+                                        }}
                                     />
-                                    <span className="text-sm font-bold text-stone-800">
-                                        {t('checkout.confirm_transfer')} {formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}
-                                    </span>
-                                </label>
+                                </PayPalScriptProvider>
                             </div>
+                        ) : (
+                            // ==========================================
+                            // GIAO DIỆN VIETQR CHO ĐƠN NỘI ĐỊA
+                            // ==========================================
+                            <>
+                                {formData.phone ? (
+                                    <div className="animate-fade-in mb-6">
+                                        <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr')}</p>
+                                        <div className="flex justify-center mb-4">
+                                            <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6 animate-fade-in">
+                                        <FaExclamationCircle className="text-2xl mb-2"/>
+                                        <span>{t('checkout.qr_notice')}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between text-xs mt-2 mb-4 pt-2 border-t border-stone-200 border-dashed">
+                                    <span className="text-stone-500">{t('checkout.bank_transfer_content')}:</span>
+                                    <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
+                                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                                            checked={isTransferConfirmed}
+                                            onChange={(e) => setIsTransferConfirmed(e.target.checked)}
+                                        />
+                                        <span className="text-sm font-bold text-stone-800">
+                                            {t('checkout.confirm_transfer')} {formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <button 
+                                    type="submit" 
+                                    form="checkout-form" 
+                                    disabled={loading || !isTransferConfirmed || isCalculatingFee} 
+                                    className={`w-full py-4 font-bold rounded uppercase transition-all flex items-center justify-center gap-2
+                                        ${loading || !isTransferConfirmed || isCalculatingFee
+                                            ? 'bg-stone-300 text-stone-500 cursor-not-allowed' 
+                                            : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
+                                    `}
+                                >
+                                    {loading ? t('checkout.processing') : <><FaCheckCircle/> {t('checkout.banking_confirm')}</>}
+                                </button>
+                                <p className="text-xs text-stone-400 mt-4 italic">{t('checkout.note_warning')}</p>
+                            </>
                         )}
-                        
-                        <button 
-                            type="submit" 
-                            form="checkout-form" 
-                            disabled={loading || !isTransferConfirmed || isCalculatingFee} 
-                            className={`w-full py-4 font-bold rounded uppercase transition-all flex items-center justify-center gap-2
-                                ${loading || !isTransferConfirmed || isCalculatingFee
-                                    ? 'bg-stone-300 text-stone-500 cursor-not-allowed' 
-                                    : 'bg-stone-900 text-white hover:bg-stone-800 shadow-lg'}
-                            `}
-                        >
-                            {loading ? t('checkout.processing') : <><FaCheckCircle/> {t('checkout.banking_confirm')}</>}
-                        </button>
-                        <p className="text-xs text-stone-400 mt-4 italic">{t('checkout.note_warning')}</p>
                     </div>
                 </div>
             </div>

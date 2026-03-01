@@ -90,7 +90,10 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
     const items = order.items || order.order_items || [];
     const productRows = generateProductRows(items, lang);
 
-    // TỪ ĐIỂN DỊCH THUẬT MINI CHO MAIL
+    // Kiểm tra xem đã thanh toán qua PayPal chưa
+    const isPaid = order.payment_method === 'done';
+
+    // TỪ ĐIỂN DỊCH THUẬT MINI CHO MAIL (Đã cập nhật PayPal)
     const t = lang === 'en' ? {
         subject: `[BROWN] Order Confirmation #${order.code || order.id}`,
         header: "ORDER CONFIRMED",
@@ -99,16 +102,22 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
         detailsTitle: "Order Details:",
         totalLabel: "Total Amount:",
         methodLabel: "Payment Method:",
-        methodValue: "Bank Transfer (SWIFT)",
-        unpaidNote: "If you haven't completed your payment, please transfer to:",
-        bankDetails: `
-            <li>Bank: <b>Techcombank</b></li>
-            <li>SWIFT Code: <b>VTCBVNVX</b></li>
-            <li>Account Name: <b>Le Thi My Nhi</b></li>
-            <li>Account No: <b>19037727414020</b></li>
-            <li>Remark: Phone <b>${order.customer_name}</b></li>
-        `,
-        processingNote: "We will process and ship your order as soon as we receive your payment."
+        methodValue: isPaid ? "PayPal / Credit Card" : "Bank Transfer",
+        
+        // Cập nhật phần hướng dẫn thanh toán
+        unpaidNote: isPaid ? "" : "If you haven't completed your payment, please transfer to:",
+        bankDetails: isPaid 
+            ? `<div style="color: #166534; font-weight: bold;">✅ Payment Successful. Thank you!</div>`
+            : `
+                <li>Bank: <b>Techcombank</b></li>
+                <li>SWIFT Code: <b>VTCBVNVX</b></li>
+                <li>Account Name: <b>Le Thi My Nhi</b></li>
+                <li>Account No: <b>19037727414020</b></li>
+                <li>Remark: Phone <b>${order.customer_name}</b></li>
+            `,
+        processingNote: isPaid 
+            ? "We are preparing your order for shipment." 
+            : "We will process and ship your order as soon as we receive your payment."
     } : {
         subject: `[BROWN] Xác nhận đơn hàng #${order.code || order.id}`,
         header: "ĐƠN HÀNG ĐÃ ĐƯỢC GHI NHẬN",
@@ -117,15 +126,21 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
         detailsTitle: "Chi tiết đơn hàng:",
         totalLabel: "Tổng thanh toán:",
         methodLabel: "Hình thức:",
-        methodValue: "Chuyển khoản ngân hàng (QR)",
-        unpaidNote: "Nếu bạn chưa hoàn tất thanh toán, vui lòng chuyển khoản đến:",
-        bankDetails: `
-            <li>Ngân hàng: <b>Sacombank</b></li>
-            <li>Số TK: <b>0902173763</b></li>
-            <li>Chủ TK: <b>LUU THI PHUONG QUYNH</b></li>
-            <li>Nội dung: SĐT <b> ${order.customer_name}</b></li>
-        `,
-        processingNote: "Chúng tôi sẽ xử lý và giao hàng ngay khi nhận được thanh toán."
+        methodValue: isPaid ? "PayPal / Thẻ quốc tế" : "Chuyển khoản ngân hàng (QR)",
+        
+        // Cập nhật phần hướng dẫn thanh toán
+        unpaidNote: isPaid ? "" : "Nếu bạn chưa hoàn tất thanh toán, vui lòng chuyển khoản đến:",
+        bankDetails: isPaid 
+            ? `<div style="color: #166534; font-weight: bold;">✅ Thanh toán thành công. Cảm ơn bạn!</div>`
+            : `
+                <li>Ngân hàng: <b>Sacombank</b></li>
+                <li>Số TK: <b>0902173763</b></li>
+                <li>Chủ TK: <b>LUU THI PHUONG QUYNH</b></li>
+                <li>Nội dung: SĐT <b> ${order.customer_name}</b></li>
+            `,
+        processingNote: isPaid 
+            ? "Chúng tôi đang chuẩn bị hàng và sẽ sớm giao cho đơn vị vận chuyển." 
+            : "Chúng tôi sẽ xử lý và giao hàng ngay khi nhận được thanh toán."
     };
 
     // TEMPLATE HTML CHỈ SỬ DỤNG CÁC BIẾN TỪ TỪ ĐIỂN
@@ -150,8 +165,8 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <p>${t.unpaidNote}</p>
-                    <ul style="color: #444; background: #fff; border: 1px dashed #ccc; padding: 15px 30px; border-radius: 5px; line-height: 1.6;">
+                    ${t.unpaidNote ? `<p>${t.unpaidNote}</p>` : ''}
+                    <ul style="${isPaid ? 'list-style-type: none; padding-left: 0; background: #f0fdf4;' : 'color: #444; background: #fff; border: 1px dashed #ccc; padding: 15px 30px; border-radius: 5px; line-height: 1.6;'}">
                         ${t.bankDetails}
                     </ul>
                 </div>

@@ -17,13 +17,14 @@ const CreateOrder = () => {
     // Cấu hình đơn
     const [paymentMethod, setPaymentMethod] = useState('cod');
     const [isPaid, setIsPaid] = useState(false);
-    const [orderStatus, setOrderStatus] = useState('pending');
+    
+    // [MỚI] Thêm state quản lý phí ship, mặc định là 20.000đ
+    const [shippingFee, setShippingFee] = useState(20000);
 
     // Load sản phẩm khi vào trang
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                // Gọi API lấy sản phẩm (đã bao gồm logic tính tồn kho ở backend)
                 const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
                 if (res.data.success) setProducts(res.data.data);
             } catch (err) { console.error(err); }
@@ -33,13 +34,11 @@ const CreateOrder = () => {
 
     // Logic Giỏ hàng
     const addToCart = (product, variant) => {
-        // SỬA: variant.stock -> variant.quantity_remaining
         if (variant.quantity_remaining <= 0) return toast.error("Hết hàng!");
         
         setCart(prev => {
             const existing = prev.find(item => item.variant_id === variant.id);
             if (existing) {
-                // SỬA: variant.stock -> variant.quantity_remaining
                 if (existing.quantity >= variant.quantity_remaining) {
                     toast.warn(`Kho chỉ còn ${variant.quantity_remaining} sản phẩm!`);
                     return prev;
@@ -54,7 +53,6 @@ const CreateOrder = () => {
                 color: variant.color,
                 price: product.base_price,
                 quantity: 1,
-                // SỬA: variant.stock -> variant.quantity_remaining
                 max_stock: variant.quantity_remaining, 
                 image: product.images?.[0]
             }];
@@ -74,7 +72,10 @@ const CreateOrder = () => {
     };
 
     const removeFromCart = (variantId) => setCart(prev => prev.filter(item => item.variant_id !== variantId));
-    const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // [MỚI] Tách riêng tiền hàng và tổng tiền
+    const itemsTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalAmount = itemsTotal + Number(shippingFee);
 
     // Xử lý Gửi đơn hàng
     const handleCreateOrder = async () => {
@@ -86,22 +87,19 @@ const CreateOrder = () => {
                 fullName: customerInfo.name || "Khách lẻ",
                 phone: customerInfo.phone,
                 address: customerInfo.address || "Tại quầy",
-                email: "" // Để trống nếu không có
+                email: "" 
             },
             items: cart.map(item => ({
-                product_id: item.product_id || item.id, // Gửi thêm product_id
+                product_id: item.product_id || item.id, 
                 variant_id: item.variant_id,
                 quantity: item.quantity,
                 price: item.price
             })),
-            
-            // FIX: Gửi đúng key 'payment_method' (snake_case)
             payment_method: paymentMethod, 
-            
-            // [MỚI] Gửi thêm is_paid nếu thanh toán tại quầy
             is_paid: isPaid,
-            
-            note: customerInfo.note
+            note: customerInfo.note,
+            // [MỚI] Gửi phí ship xuống Backend
+            shipping_fee: Number(shippingFee)
         };
 
         try {
@@ -109,8 +107,6 @@ const CreateOrder = () => {
             if (res.data.success) {
                 toast.success("Tạo đơn hàng thành công!");
                 
-                // [MỚI] TRỪ TỒN KHO TRÊN GIAO DIỆN NGAY LẬP TỨC (OPTIMISTIC UPDATE)
-                // Duyệt qua giỏ hàng vừa mua và cập nhật lại state products
                 const updatedProducts = products.map(p => {
                     if (!p.variants) return p;
                     const newVariants = p.variants.map(v => {
@@ -126,12 +122,13 @@ const CreateOrder = () => {
                     return { ...p, variants: newVariants };
                 });
                 
-                setProducts(updatedProducts); // Update UI
+                setProducts(updatedProducts); 
                 
-                // Reset form
                 setCart([]);
                 setCustomerInfo({ name: '', phone: '', address: '', note: '' });
                 setSearch('');
+                // Reset lại phí ship về 20k cho đơn tiếp theo
+                setShippingFee(20000);
             }
         } catch (error) {
             console.error(error);
@@ -139,7 +136,6 @@ const CreateOrder = () => {
         }
     };
 
-    // Filter tìm kiếm
     const filteredProducts = useMemo(() => {
         return products.filter(p => 
             p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -148,11 +144,9 @@ const CreateOrder = () => {
     }, [products, search]);
 
     return (
-        // [RESPONSIVE] Thay đổi h-screen thành min-h-screen trên mobile, lg:h-screen trên desktop
         <div className="flex flex-col lg:flex-row lg:h-screen min-h-screen bg-stone-100 lg:overflow-hidden">
             
             {/* CỘT 1: DANH SÁCH SẢN PHẨM */}
-            {/* [RESPONSIVE] Thêm h-[60vh] trên mobile để cuộn danh sách sản phẩm riêng biệt */}
             <div className="lg:w-2/5 w-full flex flex-col p-4 border-r border-stone-200 bg-white h-[60vh] lg:h-full">
                 <div className="mb-4">
                     <h2 className="font-bold text-lg mb-2 flex items-center gap-2"><FaBoxOpen/> Chọn sản phẩm</h2>
@@ -168,22 +162,18 @@ const CreateOrder = () => {
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-stone-800">{p.name}</div>
                                 <div className="text-red-600 font-bold text-sm">{new Intl.NumberFormat('vi-VN').format(p.base_price)}</div>
-                                {/* Tìm đoạn code hiển thị variants trong phần return */}
                                 <div className="flex flex-wrap gap-1 mt-2">
                                     {p.variants?.map(v => (
                                         <button 
                                             key={v.id} 
                                             onClick={() => addToCart(p, v)} 
-                                            // SỬA: v.stock -> v.quantity_remaining
                                             disabled={v.quantity_remaining <= 0} 
                                             className={`text-xs px-2 py-1 border rounded ${
-                                                // SỬA: v.stock -> v.quantity_remaining
                                                 v.quantity_remaining > 0 
                                                 ? 'hover:bg-stone-800 hover:text-white' 
                                                 : 'bg-stone-100 text-stone-300 line-through'
                                             }`}
                                         >
-                                            {/* SỬA: v.stock -> v.quantity_remaining */}
                                             {v.size}-{v.color} ({v.quantity_remaining})
                                         </button>
                                     ))}
@@ -195,7 +185,6 @@ const CreateOrder = () => {
             </div>
 
             {/* CỘT 2: THÔNG TIN KHÁCH HÀNG */}
-            {/* [RESPONSIVE] Cho phép chiều cao tự động trên mobile */}
             <div className="lg:w-1/4 w-full p-4 lg:p-6 lg:overflow-y-auto bg-stone-50 border-r border-stone-200 lg:h-full">
                 <h2 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUser/> Khách hàng</h2>
                 <div className="space-y-4">
@@ -207,10 +196,9 @@ const CreateOrder = () => {
             </div>
 
             {/* CỘT 3: CHI TIẾT & THANH TOÁN */}
-            {/* [RESPONSIVE] Chiều cao tự động trên mobile, full trên desktop */}
             <div className="flex-1 w-full flex flex-col bg-white shadow-xl lg:h-full">
                 <div className="p-4 bg-stone-900 text-white font-bold flex justify-between"><span>Đơn hàng</span><span>{cart.length} món</span></div>
-                {/* [RESPONSIVE] Giới hạn chiều cao danh sách cart trên mobile */}
+                
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[50vh] lg:max-h-full">
                     {cart.map(item => (
                         <div key={item.variant_id} className="flex justify-between items-start border-b pb-2">
@@ -222,8 +210,32 @@ const CreateOrder = () => {
                         </div>
                     ))}
                 </div>
+
                 <div className="p-6 bg-stone-50 border-t">
-                    <div className="flex justify-between mb-4 text-xl font-bold"><span>Tổng tiền:</span><span className="text-red-600">{new Intl.NumberFormat('vi-VN').format(totalAmount)} ₫</span></div>
+                    {/* [MỚI] Tách rõ Tạm tính và Phí vận chuyển trên Giao diện */}
+                    <div className="flex justify-between mb-2 text-sm text-stone-500">
+                        <span>Tạm tính:</span>
+                        <span className="font-bold text-stone-700">{new Intl.NumberFormat('vi-VN').format(itemsTotal)} ₫</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-stone-200 border-dashed text-sm text-stone-500">
+                        <span>Phí giao hàng:</span>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="number" 
+                                className="w-24 p-1 text-right border border-stone-300 rounded outline-none font-bold text-stone-700 focus:border-stone-900"
+                                value={shippingFee}
+                                onChange={(e) => setShippingFee(e.target.value)}
+                            />
+                            <span className="font-bold">₫</span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between mb-4 text-xl font-bold">
+                        <span>Tổng tiền:</span>
+                        <span className="text-red-600">{new Intl.NumberFormat('vi-VN').format(totalAmount)} ₫</span>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div><label className="text-xs font-bold block mb-1">Thanh toán</label><select className="w-full p-2 border rounded bg-white" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}><option value="cod">COD (Thu hộ)</option><option value="transfer">Chuyển khoản</option></select></div>
                         <div><label className="text-xs font-bold block mb-1">Trạng thái TT</label><select className="w-full p-2 border rounded bg-white" value={isPaid} onChange={e => setIsPaid(e.target.value === 'true')}><option value="false">Chưa thanh toán</option><option value="true">Đã thanh toán</option></select></div>

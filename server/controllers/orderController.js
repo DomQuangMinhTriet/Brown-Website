@@ -451,7 +451,7 @@ exports.updateOrderStatus = async (req, res) => {
 
 exports.createAdminOrder = async (req, res) => {
     try {
-        const { customer, items, payment_method, note, is_paid } = req.body;
+        const { customer, items, payment_method, note, shipping_fee, is_paid } = req.body;
 
         // --- BƯỚC 1: TÌM HOẶC TẠO KHÁCH HÀNG (GIỮ NGUYÊN) ---
         let customerId = null;
@@ -479,9 +479,12 @@ exports.createAdminOrder = async (req, res) => {
             customerId = newCus.id;
         }
 
-        // --- BƯỚC 2: TÍNH TOÁN TIỀN (GIỮ NGUYÊN) ---
+        // --- BƯỚC 2: TÍNH TOÁN TIỀN ---
         const itemTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const orderCode = `#ADM-${Date.now().toString().slice(-6)}`;
+        
+        // [MỚI] Xử lý số tiền phí ship (Đảm bảo là số, nếu không có mặc định là 20k)
+        const finalShippingFee = shipping_fee !== undefined ? Number(shipping_fee) : 20000;
 
         // --- BƯỚC 3: XỬ LÝ GHI CHÚ (GIỮ NGUYÊN) ---
         let finalNote = note || "";
@@ -489,7 +492,7 @@ exports.createAdminOrder = async (req, res) => {
             finalNote += " [ĐÃ THANH TOÁN]";
         }
 
-        // --- BƯỚC 4: TẠO ĐƠN HÀNG (GIỮ NGUYÊN) ---
+        // --- BƯỚC 4: TẠO ĐƠN HÀNG (ĐÃ SỬA PHÍ SHIP) ---
         const orderPayload = {
             code: orderCode,
             customer_id: customerId,
@@ -498,8 +501,13 @@ exports.createAdminOrder = async (req, res) => {
             customer_address: customer.address || "Tại quầy", 
             
             subtotal: itemTotal,      
-            total_amount: itemTotal,  
-            shipping_fee: 0,          
+            
+            // [SỬA Ở ĐÂY] Tổng tiền = Tiền hàng + Phí ship
+            total_amount: itemTotal + finalShippingFee,  
+            
+            // [SỬA Ở ĐÂY] Lưu phí ship thực tế thay vì số 0
+            shipping_fee: finalShippingFee,          
+            
             discount_amount: 0,       
 
             payment_method: payment_method || 'cod',

@@ -8,41 +8,112 @@ import {
   Title 
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2'; 
-import { FaCalendarAlt, FaSearch } from 'react-icons/fa';
+import { FaCalendarAlt, FaFileExcel, FaFilter } from 'react-icons/fa';
+import * as XLSX from 'xlsx';
 
 // Đăng ký các thành phần biểu đồ
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
+// Hàm Helper: Định dạng Date -> YYYY-MM-DD theo múi giờ local
+const toYMD = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const Reports = () => {
-  // Hàm helper format ngày YYYY-MM-DD
-  const formatDate = (date) => date.toISOString().split('T')[0];
-
-  // Logic ngày tháng: Mặc định 7 ngày gần nhất tính đến hôm nay
-  const [dateRange, setDateRange] = useState(() => {
-      const end = new Date(); // Hôm nay
-      const start = new Date(); 
-      start.setDate(end.getDate() - 7); // Lùi lại 7 ngày
-
-      return {
-          start: formatDate(start),
-          end: formatDate(end)
-      };
+  // State: Mặc định chế độ là 'month'
+  const [reportMode, setReportMode] = useState('month'); 
+  
+  // State: Lưu giá trị input ngày/tháng
+  const [dateValue, setDateValue] = useState(() => {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   });
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Cập nhật giá trị mặc định khi đổi chế độ (Từ tháng -> ngày hoặc ngược lại)
+  const handleModeChange = (e) => {
+      const newMode = e.target.value;
+      setReportMode(newMode);
+      const today = new Date();
+      if (newMode === 'month') {
+          setDateValue(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`);
+      } else {
+          setDateValue(toYMD(today));
+      }
+  };
+
+  // Hàm tính toán Khoảng thời gian Hiện tại & Kỳ trước
+  const getPeriods = (mode, val) => {
+      let startCurr, endCurr, startPrev, endPrev;
+      const d = new Date(val);
+
+      if (mode === 'day') {
+          startCurr = endCurr = toYMD(d);
+          const prev = new Date(d);
+          prev.setDate(prev.getDate() - 1);
+          startPrev = endPrev = toYMD(prev);
+      } 
+      else if (mode === 'week') {
+          // Tính Thứ 2 và Chủ nhật của tuần hiện tại
+          const day = d.getDay() || 7; 
+          const monday = new Date(d);
+          monday.setDate(monday.getDate() - day + 1);
+          const sunday = new Date(monday);
+          sunday.setDate(sunday.getDate() + 6);
+          
+          startCurr = toYMD(monday);
+          endCurr = toYMD(sunday);
+
+          // Lùi 7 ngày để lấy tuần trước
+          const prevMonday = new Date(monday);
+          prevMonday.setDate(prevMonday.getDate() - 7);
+          const prevSunday = new Date(sunday);
+          prevSunday.setDate(prevSunday.getDate() - 7);
+
+          startPrev = toYMD(prevMonday);
+          endPrev = toYMD(prevSunday);
+      } 
+      else if (mode === 'month') {
+          const [y, m] = val.split('-');
+          const year = parseInt(y);
+          const month = parseInt(m);
+
+          startCurr = toYMD(new Date(year, month - 1, 1));
+          endCurr = toYMD(new Date(year, month, 0));
+
+          startPrev = toYMD(new Date(year, month - 2, 1));
+          endPrev = toYMD(new Date(year, month - 1, 0));
+      }
+
+      return { startCurr, endCurr, startPrev, endPrev };
+  };
+
   useEffect(() => {
     fetchReport();
-  }, [dateRange]);
+  }, [reportMode, dateValue]);
 
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/reports/financial?startDate=${dateRange.start}&endDate=${dateRange.end}`);
-      if (res.data.success) {
-        setData(res.data.data);
-      }
+        const { startCurr, endCurr, startPrev, endPrev } = getPeriods(reportMode, dateValue);
+
+        const [resCurr, resPrev] = await Promise.all([
+            axios.get(`${import.meta.env.VITE_API_URL}/api/reports/financial?startDate=${startCurr}&endDate=${endCurr}`),
+            axios.get(`${import.meta.env.VITE_API_URL}/api/reports/financial?startDate=${startPrev}&endDate=${endPrev}`)
+        ]);
+
+        if (resCurr.data.success && resPrev.data.success) {
+            setData({
+                current: resCurr.data.data,
+                previous: resPrev.data.data,
+                periodInfo: { startCurr, endCurr }
+            });
+        }
     } catch (error) {
       console.error("Lỗi tải báo cáo:", error);
     } finally {
@@ -50,23 +121,51 @@ const Reports = () => {
     }
   };
 
-  const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 
-  // --- 1. BIỂU ĐỒ CƠ CẤU CHI PHÍ ---
+  // Tính % tăng trưởng
+  const calcGrowth = (curr, prev) => {
+      if (!prev || prev === 0) return curr > 0 ? '+100%' : '0%';
+      const percent = ((curr - prev) / prev) * 100;
+      return percent > 0 ? `+${percent.toFixed(1)}%` : `${percent.toFixed(1)}%`;
+  };
+
+  // Lấy nhãn so sánh hiển thị trên UI
+  const getComparisonLabel = () => {
+      if (reportMode === 'day') return 'vs Hôm qua';
+      if (reportMode === 'week') return 'vs Tuần trước';
+      return 'vs Tháng trước';
+  };
+
+  // Xuất Excel
+  const handleExportExcel = () => {
+      if (!data) return;
+      const exportData = [
+          { "Chỉ tiêu": "Doanh thu", "Kỳ này": data.current.revenue, "Kỳ trước": data.previous.revenue, "Tăng trưởng": calcGrowth(data.current.revenue, data.previous.revenue) },
+          { "Chỉ tiêu": "Giá vốn (COGS)", "Kỳ này": data.current.cogs, "Kỳ trước": data.previous.cogs, "Tăng trưởng": calcGrowth(data.current.cogs, data.previous.cogs) },
+          { "Chỉ tiêu": "Chi phí vận hành", "Kỳ này": data.current.totalExpenses, "Kỳ trước": data.previous.totalExpenses, "Tăng trưởng": calcGrowth(data.current.totalExpenses, data.previous.totalExpenses) },
+          { "Chỉ tiêu": "Lợi nhuận ròng", "Kỳ này": data.current.netProfit, "Kỳ trước": data.previous.netProfit, "Tăng trưởng": calcGrowth(data.current.netProfit, data.previous.netProfit) },
+          { "Chỉ tiêu": "Số lượng đơn hàng", "Kỳ này": data.current.orderCount, "Kỳ trước": data.previous.orderCount, "Tăng trưởng": calcGrowth(data.current.orderCount, data.previous.orderCount) }
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "BaoCao");
+      XLSX.writeFile(workbook, `BROWN_BaoCao_${reportMode}_${dateValue}.xlsx`);
+  };
+
+  // --- BIỂU ĐỒ CƠ CẤU CHI PHÍ ---
   const chartData = useMemo(() => {
     if (!data) return null;
-    const profitDisplay = data.netProfit > 0 ? data.netProfit : 0;
+    const current = data.current;
+    const profitDisplay = current.netProfit > 0 ? current.netProfit : 0;
     return {
       labels: ['Giá vốn (COGS)', 'Chi phí vận hành', 'Lợi nhuận ròng'],
       datasets: [
         {
           label: 'Số tiền',
-          data: [data.cogs, data.totalExpenses, profitDisplay],
-          backgroundColor: [
-            '#f59e0b', // Cam
-            '#ef4444', // Đỏ
-            '#10b981', // Xanh
-          ],
+          data: [current.cogs, current.totalExpenses, profitDisplay],
+          backgroundColor: ['#f59e0b', '#ef4444', '#10b981'],
           borderColor: ['#ffffff', '#ffffff', '#ffffff'],
           borderWidth: 2,
           hoverOffset: 4
@@ -75,22 +174,14 @@ const Reports = () => {
     };
   }, [data]);
 
-  // --- 2. [MỚI] BIỂU ĐỒ NGUỒN ĐƠN HÀNG ---
+  // --- BIỂU ĐỒ NGUỒN ĐƠN HÀNG ---
   const sourceChartData = useMemo(() => {
-      if (!data || !data.revenueBySource) return null;
+      if (!data || !data.current.revenueBySource) return null;
       
-      const labels = Object.keys(data.revenueBySource);
-      const values = Object.values(data.revenueBySource);
+      const labels = Object.keys(data.current.revenueBySource);
+      const values = Object.values(data.current.revenueBySource);
       
-      // Bảng màu cho các nguồn
-      const bgColors = [
-          '#3b82f6', // Web (Xanh dương)
-          '#ec4899', // Instagram/Tiktok (Hồng)
-          '#f97316', // Shopee (Cam)
-          '#6366f1', // Facebook (Tím)
-          '#64748b', // Tại quầy (Xám)
-          '#8b5cf6', '#14b8a6', '#f43f5e' // Các màu khác
-      ];
+      const bgColors = ['#3b82f6', '#ec4899', '#f97316', '#6366f1', '#64748b', '#8b5cf6', '#14b8a6', '#f43f5e'];
 
       return {
           labels: labels,
@@ -128,7 +219,6 @@ const Reports = () => {
     },
   };
 
-  // Option riêng cho biểu đồ nguồn (chỉ đổi title)
   const sourceChartOptions = {
       ...chartOptions,
       plugins: {
@@ -137,117 +227,153 @@ const Reports = () => {
       }
   };
 
-  if (!data) return <div className="p-10 text-center">Đang tải dữ liệu...</div>;
+  if (!data && loading) return <div className="p-10 text-center mt-20 text-stone-500">Đang tổng hợp dữ liệu...</div>;
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-stone-800">Báo cáo Tài chính</h1>
           <p className="text-stone-500">Phân tích hiệu quả kinh doanh</p>
         </div>
 
-        {/* Bộ lọc ngày */}
-        <div className="bg-white p-2 rounded-lg border border-stone-200 flex items-center gap-2 shadow-sm">
-            <FaCalendarAlt className="text-stone-400 ml-2"/>
-            <input 
-                type="date" 
-                value={dateRange.start}
-                onChange={e => setDateRange({...dateRange, start: e.target.value})}
-                className="p-1 outline-none text-sm font-medium text-stone-600 cursor-pointer"
-            />
-            <span className="text-stone-400">-</span>
-            <input 
-                type="date" 
-                value={dateRange.end}
-                onChange={e => setDateRange({...dateRange, end: e.target.value})}
-                className="p-1 outline-none text-sm font-medium text-stone-600 cursor-pointer"
-            />
-            <button onClick={fetchReport} className="bg-stone-800 text-white p-2 rounded hover:bg-stone-700">
-                <FaSearch/>
+        {/* CỤM CÔNG CỤ BỘ LỌC & EXCEL */}
+        <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-white p-2 rounded-lg border border-stone-200 flex items-center gap-2 shadow-sm">
+                <FaFilter className="text-stone-400 ml-2" size={14} />
+                <select 
+                    value={reportMode} 
+                    onChange={handleModeChange}
+                    className="p-1 outline-none text-sm font-bold text-stone-700 cursor-pointer bg-transparent border-r border-stone-200 pr-2"
+                >
+                    <option value="day">Theo Ngày</option>
+                    <option value="week">Theo Tuần</option>
+                    <option value="month">Theo Tháng</option>
+                </select>
+                
+                <FaCalendarAlt className="text-stone-400 ml-2" size={14} />
+                <input 
+                    type={reportMode === 'month' ? 'month' : 'date'} 
+                    value={dateValue}
+                    onChange={e => setDateValue(e.target.value)}
+                    className="p-1 outline-none text-sm font-medium text-stone-600 cursor-pointer"
+                />
+            </div>
+            
+            <button 
+                onClick={handleExportExcel} 
+                className="bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 transition-colors shadow-sm text-sm"
+            >
+                <FaFileExcel/> Xuất Excel
             </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        
-        {/* CỘT TRÁI: CÁC THẺ SỐ LIỆU (Chiếm 1 cột) */}
-        <div className="lg:col-span-1 space-y-4">
-            {/* 1. Tổng Doanh thu */}
-            <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden">
-                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Doanh thu</p>
-                <h3 className="text-2xl font-bold text-stone-800 mt-1">{formatMoney(data.revenue)}</h3>
-                <p className="text-xs text-stone-400 mt-1">{data.orderCount} đơn (Đã/Đang giao)</p>
-            </div>
+      {/* Hiển thị khoảng thời gian đang lọc */}
+      {data && (
+          <div className="mb-6 bg-stone-50 border border-stone-200 px-4 py-2 rounded-md inline-block text-sm text-stone-600">
+              Đang xem dữ liệu từ: <strong className="text-stone-800">{data.periodInfo.startCurr.split('-').reverse().join('/')}</strong> đến <strong className="text-stone-800">{data.periodInfo.endCurr.split('-').reverse().join('/')}</strong>
+          </div>
+      )}
 
-            {/* 2. Giá vốn */}
-            <div className="bg-white p-5 rounded-xl border border-orange-100 shadow-sm">
-                <p className="text-xs font-bold text-orange-500 uppercase">(-) Giá vốn hàng bán</p>
-                <h3 className="text-xl font-bold text-stone-800 mt-1">{formatMoney(data.cogs)}</h3>
-                <span className="text-xs font-bold text-orange-400">
-                    {data.revenue > 0 ? ((data.cogs / data.revenue) * 100).toFixed(0) : 0}% doanh thu
-                </span>
-            </div>
-
-            {/* 3. Chi phí */}
-            <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm">
-                <p className="text-xs font-bold text-red-500 uppercase">(-) Chi phí vận hành</p>
-                <h3 className="text-xl font-bold text-stone-800 mt-1">{formatMoney(data.totalExpenses)}</h3>
-            </div>
-
-            {/* 4. Lợi nhuận Ròng */}
-            <div className={`p-5 rounded-xl border shadow-sm ${data.netProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                <p className={`text-xs font-bold uppercase ${data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {data.netProfit >= 0 ? '(=) Lợi nhuận ròng' : '(=) Thua lỗ'}
-                </p>
-                <h3 className={`text-2xl font-bold mt-1 ${data.netProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {formatMoney(data.netProfit)}
-                </h3>
-                <p className={`text-xs font-bold mt-1 ${data.netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    Margin: {data.margin}%
-                </p>
-            </div>
-        </div>
-
-        {/* CỘT PHẢI: BIỂU ĐỒ (Chiếm 3 cột) */}
-        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* BIỂU ĐỒ 1: CƠ CẤU CHI PHÍ */}
-            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex flex-col h-[400px]">
-                {data.revenue === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-stone-400 flex-col">
-                        <span className="text-4xl mb-2">∅</span>
-                        <p>Chưa có dữ liệu</p>
+      {data && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* CỘT TRÁI: CÁC THẺ SỐ LIỆU */}
+            <div className="lg:col-span-1 space-y-4">
+                {/* 1. Tổng Doanh thu */}
+                <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden">
+                    <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Doanh thu</p>
+                    <h3 className="text-2xl font-bold text-stone-800 mt-1">{formatMoney(data.current.revenue)}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs font-bold ${data.current.revenue >= data.previous.revenue ? 'text-green-500' : 'text-red-500'}`}>
+                            {calcGrowth(data.current.revenue, data.previous.revenue)}
+                        </span>
+                        <span className="text-xs text-stone-400">{getComparisonLabel()}</span>
                     </div>
-                ) : (
-                    <Doughnut data={chartData} options={chartOptions} />
-                )}
-            </div>
+                </div>
 
-            {/* BIỂU ĐỒ 2: NGUỒN ĐƠN HÀNG [MỚI] */}
-            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex flex-col h-[400px]">
-                {data.revenue === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-stone-400 flex-col">
-                        <span className="text-4xl mb-2">∅</span>
-                        <p>Chưa có dữ liệu</p>
+                {/* 2. Giá vốn */}
+                <div className="bg-white p-5 rounded-xl border border-orange-100 shadow-sm">
+                    <p className="text-xs font-bold text-orange-500 uppercase">(-) Giá vốn hàng bán</p>
+                    <h3 className="text-xl font-bold text-stone-800 mt-1">{formatMoney(data.current.cogs)}</h3>
+                    <div className="flex items-center gap-2 mt-1 text-xs">
+                        <span className={`font-bold ${data.current.cogs <= data.previous.cogs ? 'text-green-500' : 'text-red-500'}`}>
+                            {calcGrowth(data.current.cogs, data.previous.cogs)}
+                        </span>
+                        <span className="text-stone-400">{getComparisonLabel()}</span>
                     </div>
-                ) : (
-                    <Doughnut data={sourceChartData} options={sourceChartOptions} />
-                )}
+                </div>
+
+                {/* 3. Chi phí */}
+                <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm">
+                    <p className="text-xs font-bold text-red-500 uppercase">(-) Chi phí vận hành</p>
+                    <h3 className="text-xl font-bold text-stone-800 mt-1">{formatMoney(data.current.totalExpenses)}</h3>
+                    <div className="flex items-center gap-2 mt-1 text-xs">
+                        <span className={`font-bold ${data.current.totalExpenses <= data.previous.totalExpenses ? 'text-green-500' : 'text-red-500'}`}>
+                            {calcGrowth(data.current.totalExpenses, data.previous.totalExpenses)}
+                        </span>
+                        <span className="text-stone-400">{getComparisonLabel()}</span>
+                    </div>
+                </div>
+
+                {/* 4. Lợi nhuận Ròng */}
+                <div className={`p-5 rounded-xl border shadow-sm ${data.current.netProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                    <p className={`text-xs font-bold uppercase ${data.current.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {data.current.netProfit >= 0 ? '(=) Lợi nhuận ròng' : '(=) Thua lỗ'}
+                    </p>
+                    <h3 className={`text-2xl font-bold mt-1 ${data.current.netProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                        {formatMoney(data.current.netProfit)}
+                    </h3>
+                    <div className="flex items-center justify-between mt-1">
+                        <span className={`text-xs font-bold ${data.current.netProfit >= data.previous.netProfit ? 'text-green-600' : 'text-red-500'}`}>
+                            {calcGrowth(data.current.netProfit, data.previous.netProfit)} {getComparisonLabel()}
+                        </span>
+                        <span className="text-xs font-bold text-stone-500">
+                            Biên LN: {data.current.margin}%
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            {/* Chú thích */}
-            <div className="md:col-span-2 mt-2 p-4 bg-stone-50 rounded-lg text-xs text-stone-500 leading-relaxed border border-stone-100">
-                <h4 className="font-bold text-stone-700 mb-1">Ghi chú báo cáo:</h4>
-                <ul className="list-disc pl-4 space-y-1">
-                    <li>Dữ liệu bao gồm các đơn hàng <strong>Đã hoàn thành</strong> và <strong>Đang giao hàng</strong>.</li>
-                    <li><strong>Nguồn Website:</strong> Các đơn có mã bắt đầu bằng "ORD-".</li>
-                    <li><strong>Các nguồn khác (Shopee, IG...):</strong> Được nhận diện tự động qua Ghi chú đơn hàng.</li>
-                </ul>
-            </div>
-        </div>
+            {/* CỘT PHẢI: BIỂU ĐỒ (Chiếm 3 cột) */}
+            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* BIỂU ĐỒ 1: CƠ CẤU CHI PHÍ */}
+                <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex flex-col h-[400px]">
+                    {data.current.revenue === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-stone-400 flex-col">
+                            <span className="text-4xl mb-2">∅</span>
+                            <p>Không có dữ liệu trong khoảng thời gian này</p>
+                        </div>
+                    ) : (
+                        <Doughnut data={chartData} options={chartOptions} />
+                    )}
+                </div>
 
-      </div>
+                {/* BIỂU ĐỒ 2: NGUỒN ĐƠN HÀNG */}
+                <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex flex-col h-[400px]">
+                    {data.current.revenue === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-stone-400 flex-col">
+                            <span className="text-4xl mb-2">∅</span>
+                            <p>Không có dữ liệu trong khoảng thời gian này</p>
+                        </div>
+                    ) : (
+                        <Doughnut data={sourceChartData} options={sourceChartOptions} />
+                    )}
+                </div>
+
+                {/* Chú thích */}
+                <div className="md:col-span-2 mt-2 p-4 bg-stone-50 rounded-lg text-xs text-stone-500 leading-relaxed border border-stone-100">
+                    <h4 className="font-bold text-stone-700 mb-1">Ghi chú báo cáo:</h4>
+                    <ul className="list-disc pl-4 space-y-1">
+                        <li><strong>Chế độ so sánh:</strong> Hệ thống tự động đối chiếu số liệu với thời gian tương đương của kỳ trước (Hôm qua / Tuần trước / Tháng trước).</li>
+                        <li><strong>Báo cáo tuần:</strong> Tuần được tính từ Thứ Hai đến Chủ Nhật. Chọn một ngày bất kỳ, hệ thống sẽ tự quét cả tuần chứa ngày đó.</li>
+                        <li>Màu <span className="text-green-500 font-bold">Xanh</span> báo hiệu hiệu suất tốt (Tăng doanh thu / Giảm chi phí). Màu <span className="text-red-500 font-bold">Đỏ</span> ngược lại.</li>
+                    </ul>
+                </div>
+            </div>
+          </div>
+      )}
     </div>
   );
 };

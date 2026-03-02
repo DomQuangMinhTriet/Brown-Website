@@ -474,66 +474,89 @@ const Checkout = () => {
                             </div>
                         </div>
 
-                        {/* 2. CHỌN KHU VỰC THANH TOÁN */}
+                        {/*2. CHỌN KHU VỰC THANH TOÁN*/}
                         {shippingType === 'international' ? (
-                            // ==========================================
-                            // GIAO DIỆN THANH TOÁN PAYPAL CHO ĐƠN QUỐC TẾ
-                            // ==========================================
-                            <div className="animate-fade-in relative z-0">
+//                             // ==========================================
+//                             // GIAO DIỆN THANH TOÁN PAYPAL CHO ĐƠN QUỐC TẾ
+//                             // ==========================================
+//                             <div className="animate-fade-in relative z-0">
                                 
-                                {/* [MỚI THÊM] HỘP THOẠI CẢNH BÁO CHO KHÁCH */}
-                                <div className="mb-4 text-xs bg-orange-50 text-orange-800 p-3 rounded border border-orange-200 text-left leading-relaxed">
-                                    <strong>{lang === 'en' ? 'Important Note:' : 'Lưu ý quan trọng:'}</strong><br/>
-                                    {lang === 'en' 
-                                        ? 'The total amount below includes ONLY the cost of your items. Once your order is packed, we will calculate the exact shipping fee and email you a separate payment link for the shipping.' 
-                                        : 'Tổng tiền dưới đây CHỈ BAO GỒM tiền sản phẩm. Sau khi đóng gói, chúng tôi sẽ tính toán phí ship chính xác và gửi link thanh toán bổ sung qua email cho bạn.'}
+//                                 {/* [MỚI THÊM] HỘP THOẠI CẢNH BÁO CHO KHÁCH */}
+//                                 <div className="mb-4 text-xs bg-orange-50 text-orange-800 p-3 rounded border border-orange-200 text-left leading-relaxed">
+//                                     <strong>{lang === 'en' ? 'Important Note:' : 'Lưu ý quan trọng:'}</strong><br/>
+//                                     {lang === 'en' 
+//                                         ? 'The total amount below includes ONLY the cost of your items. Once your order is packed, we will calculate the exact shipping fee and email you a separate payment link for the shipping.' 
+//                                         : 'Tổng tiền dưới đây CHỈ BAO GỒM tiền sản phẩm. Sau khi đóng gói, chúng tôi sẽ tính toán phí ship chính xác và gửi link thanh toán bổ sung qua email cho bạn.'}
+//                                 </div>
+
+//                                 <p className="text-sm text-stone-600 mb-4 italic">
+//                                     {lang === 'en' ? 'Pay securely with your PayPal account or Credit/Debit card.' : 'Thanh toán an toàn qua PayPal hoặc thẻ quốc tế.'}
+//                                 </p>
+                                
+//                                 <PayPalScriptProvider options={{ 
+//                                     "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", 
+//                                     currency: "USD",
+//                                     intent: "capture"
+//                                 }}>
+//                                     <PayPalButtons
+//                                         // Vô hiệu hóa nút nếu đang tải, đang tính ship, hoặc điền thiếu form
+//                                         disabled={loading || isCalculatingFee || !isFormValid()}
+//                                         style={{ layout: "vertical", color: "gold", shape: "rect" }}
+                                        
+//                                         onClick={(data, actions) => {
+//                                             // Kiểm tra trước khi mở popup PayPal
+//                                             if (!isFormValid()) {
+//                                                 toast.warning(t('checkout.toast_missing_info'));
+//                                                 return actions.reject();
+//                                             }
+//                                             return actions.resolve();
+//                                         }}
+
+//                                         createOrder={(data, actions) => {
+//                                             // Đổi tổng tiền VND sang USD để đẩy sang PayPal
+//                                             const usdAmount = (finalTotal / 25400).toFixed(2);
+//                                             return actions.order.create({
+//                                                 purchase_units: [{ amount: { value: usdAmount, currency_code: "USD" } }]
+//                                             });
+//                                         }}
+
+//                                         onApprove={(data, actions) => {
+//                                             return actions.order.capture().then((details) => {
+//                                                 console.log("PayPal Success Detail:", details);
+//                                                 // Thành công -> Bắn vào DB với trạng thái 'done' và mã Transaction
+//                                                 submitOrderToDatabase('done', details.id);
+//                                             });
+//                                         }}
+
+//                                         onError={(err) => {
+//                                             console.error("PayPal Checkout Error", err);
+//                                             toast.error(lang === 'en' ? "PayPal connection error. Please try again!" : "Lỗi kết nối PayPal. Vui lòng thử lại!");
+//                                         }}
+//                                     />
+//                                 </PayPalScriptProvider>
+//                             </div>
+//                         ) : (
+                            <div className="animate-fade-in">
+                                <div className="bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded text-sm leading-relaxed text-left">
+                                    <strong>
+                                        {lang === 'en' ? 'International Shipping Notice' : 'Thông báo vận chuyển quốc tế'}
+                                    </strong>
+                                    <br /><br />
+                                    {lang === 'en'
+                                        ? `International orders are temporarily not available for online payment.
+                                        Please place your order, and our team will contact you via email to confirm
+                                        shipping fee and payment method.`
+                                        : `Đơn hàng quốc tế hiện TẠM THỜI CHƯA hỗ trợ thanh toán online.
+                                        Bạn vui lòng gửi đơn hàng, chúng tôi sẽ liên hệ qua email để xác nhận
+                                        phí vận chuyển và hình thức thanh toán.`}
                                 </div>
 
-                                <p className="text-sm text-stone-600 mb-4 italic">
-                                    {lang === 'en' ? 'Pay securely with your PayPal account or Credit/Debit card.' : 'Thanh toán an toàn qua PayPal hoặc thẻ quốc tế.'}
-                                </p>
-                                
-                                <PayPalScriptProvider options={{ 
-                                    "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID || "test", 
-                                    currency: "USD",
-                                    intent: "capture"
-                                }}>
-                                    <PayPalButtons
-                                        // Vô hiệu hóa nút nếu đang tải, đang tính ship, hoặc điền thiếu form
-                                        disabled={loading || isCalculatingFee || !isFormValid()}
-                                        style={{ layout: "vertical", color: "gold", shape: "rect" }}
-                                        
-                                        onClick={(data, actions) => {
-                                            // Kiểm tra trước khi mở popup PayPal
-                                            if (!isFormValid()) {
-                                                toast.warning(t('checkout.toast_missing_info'));
-                                                return actions.reject();
-                                            }
-                                            return actions.resolve();
-                                        }}
-
-                                        createOrder={(data, actions) => {
-                                            // Đổi tổng tiền VND sang USD để đẩy sang PayPal
-                                            const usdAmount = (finalTotal / 25400).toFixed(2);
-                                            return actions.order.create({
-                                                purchase_units: [{ amount: { value: usdAmount, currency_code: "USD" } }]
-                                            });
-                                        }}
-
-                                        onApprove={(data, actions) => {
-                                            return actions.order.capture().then((details) => {
-                                                console.log("PayPal Success Detail:", details);
-                                                // Thành công -> Bắn vào DB với trạng thái 'done' và mã Transaction
-                                                submitOrderToDatabase('done', details.id);
-                                            });
-                                        }}
-
-                                        onError={(err) => {
-                                            console.error("PayPal Checkout Error", err);
-                                            toast.error(lang === 'en' ? "PayPal connection error. Please try again!" : "Lỗi kết nối PayPal. Vui lòng thử lại!");
-                                        }}
-                                    />
-                                </PayPalScriptProvider>
+                                <button
+                                    disabled
+                                    className="w-full mt-6 py-4 rounded font-bold uppercase bg-stone-300 text-stone-500 cursor-not-allowed"
+                                >
+                                    {lang === 'en' ? 'International payment temporarily disabled' : 'Tạm ngưng thanh toán quốc tế'}
+                                </button>
                             </div>
                         ) : (
                             // ==========================================

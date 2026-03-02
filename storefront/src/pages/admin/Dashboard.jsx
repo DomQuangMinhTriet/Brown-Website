@@ -70,28 +70,28 @@ const Dashboard = () => {
         <p className="text-stone-500">Cập nhật lúc: {new Date().toLocaleString('vi-VN')}</p>
       </div>
 
-      {/* 1. CÁC THẺ THỐNG KÊ (DỮ LIỆU THẬT) */}
+      {/* 1. CÁC THẺ THỐNG KÊ (DỮ LIỆU THÁNG HIỆN TẠI) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <DashboardCard 
-          title="Tổng Doanh Thu" 
+          title="Doanh thu tháng này" 
           value={formatMoney(stats.revenue)} 
           icon={<FaMoneyBillWave className="text-green-600 text-xl" />} 
-          color="bg-green-50"
-          subtext="Hoàn thành và Đang vận chuyển"
+          color="bg-green-50" 
+          subtext="Các đơn đã hoàn thành/đang giao" 
         />
         <DashboardCard 
-          title="Tổng Đơn Hàng" 
+          title="Đơn hàng tháng này" 
           value={stats.orders} 
           icon={<FaShoppingBag className="text-blue-600 text-xl" />} 
-          color="bg-blue-50"
-          subtext="Đơn hàng trên toàn hệ thống"
+          color="bg-blue-50" 
+          subtext="Số đơn phát sinh trong tháng" 
         />
         <DashboardCard 
-          title="Khách Hàng" 
+          title="Khách hàng mới" 
           value={stats.customers} 
           icon={<FaUsers className="text-purple-600 text-xl" />} 
-          color="bg-purple-50"
-          subtext="Khách hàng đã lưu hồ sơ"
+          color="bg-purple-50" 
+          subtext="Khách đăng ký trong tháng" 
         />
       </div>
 

@@ -4,5 +4,6 @@ const reportController = require('../controllers/reportController');
 
 router.get('/dashboard', reportController.getDashboardStats);
 router.get('/financial', reportController.getFinancialReport); // <--- Route mới
+router.get('/monthly', reportController.getMonthlyFinancialReport);
 
 module.exports = router;

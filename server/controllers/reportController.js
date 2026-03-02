@@ -2,48 +2,55 @@ const supabase = require('../config/supabase');
 
 exports.getDashboardStats = async (req, res) => {
     try {
-        // [CẬP NHẬT] DASHBOARD: Tính doanh thu đơn HOÀN THÀNH + ĐANG GIAO
+        // [MỚI] Lấy ngày đầu và ngày cuối của tháng hiện tại
+        const date = new Date();
+        const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+        const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+
+        // Tính doanh thu tháng này
         const { data: revenueData, error: revError } = await supabase
             .from('orders')
             .select('total_amount')
-            .in('status', ['completed', 'shipping']); // <--- SỬA: Lấy cả 2 trạng thái
+            .in('status', ['completed', 'shipping'])
+            .gte('created_at', startOfMonth)
+            .lte('created_at', endOfMonth);
         
         if (revError) throw revError;
         const totalRevenue = revenueData.reduce((sum, order) => sum + order.total_amount, 0);
 
-        // Đếm tổng đơn (vẫn đếm hết để biết traffic)
+        // Đếm số đơn hàng tháng này
         const { count: totalOrders, error: orderError } = await supabase
             .from('orders')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', startOfMonth)
+            .lte('created_at', endOfMonth);
         
-        if (orderError) throw orderError;
-
+        // Đếm số khách hàng mới tháng này
         const { count: totalCustomers, error: cusError } = await supabase
             .from('customers')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', startOfMonth)
+            .lte('created_at', endOfMonth);
 
-        if (cusError) throw cusError;
-
-        const { data: recentOrders, error: recentError } = await supabase
+        // Đơn hàng gần nhất thì vẫn lấy 5 đơn mới nhất
+        const { data: recentOrders } = await supabase
             .from('orders')
             .select('id, code, customer_name, total_amount, status, created_at')
             .order('created_at', { ascending: false })
             .limit(5);
 
-        if (recentError) throw recentError;
-
         res.json({
             success: true,
             data: {
                 revenue: totalRevenue,
-                orders: totalOrders,
+                orders: totalOrders || 0,
                 customers: totalCustomers || 0,
-                recentOrders: recentOrders
+                recentOrders: recentOrders || []
             }
         });
 
     } catch (error) {
-        console.error("Lỗi báo cáo:", error);
+        console.error("Lỗi báo cáo Dashboard:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -166,6 +173,57 @@ exports.getFinancialReport = async (req, res) => {
 
     } catch (error) {
         console.error("Lỗi báo cáo tài chính:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getMonthlyFinancialReport = async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        const targetMonth = parseInt(month);
+        const targetYear = parseInt(year);
+
+        // Tháng hiện tại được chọn
+        const startCurrent = new Date(targetYear, targetMonth - 1, 1).toISOString();
+        const endCurrent = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999).toISOString();
+
+        // Tháng liền trước đó để so sánh
+        const startPrev = new Date(targetYear, targetMonth - 2, 1).toISOString();
+        const endPrev = new Date(targetYear, targetMonth - 1, 0, 23, 59, 59, 999).toISOString();
+
+        // Hàm helper để truy xuất số liệu theo khoảng thời gian
+        const getStatsForPeriod = async (start, end) => {
+            const [ordersRes, expensesRes] = await Promise.all([
+                supabase.from('orders').select('total_amount, order_items(cogs_total)')
+                        .in('status', ['completed', 'shipping']).gte('created_at', start).lte('created_at', end),
+                supabase.from('expenses').select('amount').gte('expense_date', start).lte('expense_date', end)
+            ]);
+
+            const orders = ordersRes.data || [];
+            const expenses = expensesRes.data || [];
+
+            const revenue = orders.reduce((sum, o) => sum + o.total_amount, 0);
+            // Tính tổng giá vốn (cogs_total lưu trong bảng order_items)
+            const cogs = orders.reduce((sum, o) => {
+                const itemsCogs = o.order_items?.reduce((itemSum, item) => itemSum + (Number(item.cogs_total) || 0), 0) || 0;
+                return sum + itemsCogs;
+            }, 0);
+            
+            const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+            const netProfit = revenue - cogs - totalExpenses;
+
+            return { revenue, cogs, totalExpenses, netProfit, orderCount: orders.length };
+        };
+
+        const currentData = await getStatsForPeriod(startCurrent, endCurrent);
+        const prevData = await getStatsForPeriod(startPrev, endPrev);
+
+        res.json({
+            success: true,
+            data: { current: currentData, previous: prevData }
+        });
+    } catch (error) {
+        console.error("Lỗi báo cáo tháng:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

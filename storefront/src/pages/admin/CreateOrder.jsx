@@ -19,7 +19,7 @@ const CreateOrder = () => {
     const [isPaid, setIsPaid] = useState(false);
     
     // [MỚI] Thêm state quản lý phí ship, mặc định là 20.000đ
-    const [shippingFee, setShippingFee] = useState(20000);
+    const [shippingFee, setShippingFee] = useState(0);
 
     // Load sản phẩm khi vào trang
     useEffect(() => {
@@ -128,7 +128,7 @@ const CreateOrder = () => {
                 setCustomerInfo({ name: '', phone: '', address: '', note: '' });
                 setSearch('');
                 // Reset lại phí ship về 20k cho đơn tiếp theo
-                setShippingFee(20000);
+                setShippingFee(0);
             }
         } catch (error) {
             console.error(error);

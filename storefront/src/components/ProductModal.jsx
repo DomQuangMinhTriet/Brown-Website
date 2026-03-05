@@ -2,19 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowUp, FaArrowDown, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-// XÓA import supabase vì không dùng nữa
-// import { supabase } from '../supabaseClient'; 
 import imageCompression from 'browser-image-compression';
 
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
-  // State Form
+  // [CẬP NHẬT]: Thêm is_active vào State mặc định
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
     base_price: 0,
     description: '',
     category_id: '',
-    collection_ids: [] 
+    collection_ids: [],
+    is_active: true
   });
 
   const [images, setImages] = useState([]);
@@ -49,7 +48,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       fetchCategories();
 
       if (productToEdit) {
-        // Load collection_ids từ cấu trúc phẳng
         let loadedCollectionIds = [];
         if (productToEdit.product_collections && Array.isArray(productToEdit.product_collections)) {
             loadedCollectionIds = productToEdit.product_collections
@@ -64,7 +62,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             base_price: productToEdit.base_price || 0,
             description: productToEdit.description || '',
             category_id: productToEdit.category_id || '',
-            collection_ids: loadedCollectionIds
+            collection_ids: loadedCollectionIds,
+            // [CẬP NHẬT]: Lấy dữ liệu is_active từ DB (nếu có), nếu không mặc định = true
+            is_active: productToEdit.is_active !== undefined ? productToEdit.is_active : true 
         });
 
         setImages(productToEdit.images || []);
@@ -79,8 +79,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         })));
 
       } else {
-        // Reset form
-        setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [] });
+        setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [], is_active: true });
         setImages([]);
         setVariants([]);
         setSizeChart('');
@@ -127,7 +126,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
         try {
             for (const file of files) {
-                // 1. Nén ảnh ở Client
                 let fileToUpload = file;
                 try {
                     fileToUpload = await imageCompression(file, options);
@@ -135,11 +133,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                     console.warn("Lỗi nén ảnh, dùng ảnh gốc:", compError);
                 }
                 
-                // 2. Chuẩn bị FormData gửi sang Backend
                 const uploadData = new FormData();
                 uploadData.append('image', fileToUpload);
 
-                // 3. Gọi API Backend (Nơi chứa logic Cloudinary)
                 const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, uploadData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
@@ -228,8 +224,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const handleSubmit = async () => {
       if(!formData.name || !formData.base_price) return toast.warn("Tên và giá là bắt buộc");
 
+      // [CẬP NHẬT]: payload sẽ chứa is_active do nằm sẵn trong formData
       const payload = {
-          ...formData,
+          ...formData, 
           base_price: Number(formData.base_price),
           images,
           variants,
@@ -340,6 +337,25 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 <div className="md:col-span-2">
                     <label className="label">Mô tả sản phẩm</label>
                     <textarea className="input h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+
+                {/* [CẬP NHẬT] Khu vực Toggle bật/tắt hiển thị */}
+                <div className="md:col-span-2 border-t border-stone-200 pt-4 mt-2">
+                    <label className="label mb-2">Trạng thái sản phẩm</label>
+                    <label className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors w-fit ${formData.is_active ? 'bg-green-50 border-green-200' : 'bg-stone-100 border-stone-300'}`}>
+                        <input 
+                            type="checkbox" 
+                            className="w-5 h-5 accent-green-600 cursor-pointer"
+                            checked={formData.is_active} 
+                            onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                        />
+                        <div>
+                            <span className={`font-bold block ${formData.is_active ? 'text-green-700' : 'text-stone-500'}`}>
+                                {formData.is_active ? '✅ Đang hiển thị cho khách hàng' : '❌ Đang Ẩn (Ngừng kinh doanh)'}
+                            </span>
+                            <span className="text-xs text-stone-500 mt-1 block">Tắt tùy chọn này thay vì "Xóa" để bảo vệ dữ liệu các đơn hàng cũ.</span>
+                        </div>
+                    </label>
                 </div>
             </div>
 

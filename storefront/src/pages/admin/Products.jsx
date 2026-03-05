@@ -8,10 +8,8 @@ const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // [MỚI] State cho tìm kiếm
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null); 
 
@@ -21,7 +19,8 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+      // [CẬP NHẬT]: Gửi kèm admin=true để lấy toàn bộ dữ liệu (kể cả đang bị ẩn is_active = false)
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true`);
       if (response.data.success) {
         setProducts(response.data.data);
       }
@@ -48,7 +47,6 @@ const Products = () => {
 
   const handleEdit = (product) => {
       if (!product) return;
-      console.log("Đang sửa sản phẩm:", product); 
       setSelectedProduct(product); 
       setIsModalOpen(true);        
   };
@@ -58,13 +56,12 @@ const Products = () => {
       setIsModalOpen(true);
   };
 
-  // [MỚI] Logic lọc sản phẩm theo từ khóa tìm kiếm
   const filteredProducts = products.filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto"> {/* Đã điều chỉnh padding cho mobile */}
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-stone-800">Sản phẩm</h1>
@@ -79,7 +76,6 @@ const Products = () => {
         </button>
       </div>
 
-      {/* --- [MỚI] THANH TÌM KIẾM --- */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 mb-6">
         <div className="relative">
             <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -97,9 +93,7 @@ const Products = () => {
         {loading ? (
             <div className="p-10 text-center text-stone-500">Đang tải dữ liệu...</div>
         ) : (
-            // [QUAN TRỌNG] overflow-x-auto giúp cuộn ngang trên điện thoại
             <div className="overflow-x-auto">
-                {/* [QUAN TRỌNG] min-w-[1000px] ép bảng luôn rộng, không bị vỡ chữ */}
                 <table className="w-full text-left border-collapse min-w-[1000px]">
                     <thead className="bg-stone-50 text-stone-600 uppercase text-xs tracking-wider font-bold">
                       <tr>
@@ -113,7 +107,8 @@ const Products = () => {
                     <tbody className="divide-y divide-stone-100">
                       {filteredProducts.length > 0 ? (
                           filteredProducts.map((product) => (
-                            <tr key={product.id} className="hover:bg-stone-50 transition-colors group">
+                            // [CẬP NHẬT] Thêm opacity và bg xám nếu sản phẩm đang bị Ẩn
+                            <tr key={product.id} className={`transition-colors group ${!product.is_active ? 'bg-stone-50/70 opacity-60 hover:opacity-100' : 'hover:bg-stone-50'}`}>
                               <td className="p-4">
                                 <div className="w-12 h-16 bg-stone-200 rounded overflow-hidden border border-stone-100">
                                     {product.images && product.images.length > 0 ? (
@@ -125,15 +120,21 @@ const Products = () => {
                               </td>
                               <td className="p-4 font-medium text-stone-800">
                                   {product.name}
-                                  {/* Hiển thị slug nhỏ bên dưới cho dễ nhận biết */}
                                   <div className="text-xs text-stone-400 font-normal mt-0.5">{product.slug}</div>
                               </td>
                               <td className="p-4 font-bold text-stone-900">{new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫</td>
                               
                               <td className="p-4">
-                                <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-medium border border-green-100">
-                                  Sẵn hàng
-                                </span>
+                                {/* [CẬP NHẬT] Hiển thị Text trạng thái tương ứng */}
+                                {product.is_active !== false ? (
+                                    <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-medium border border-green-100">
+                                      Hiển thị
+                                    </span>
+                                ) : (
+                                    <span className="text-stone-500 bg-stone-100 px-2 py-1 rounded text-xs font-medium border border-stone-200">
+                                      Đã ẩn
+                                    </span>
+                                )}
                               </td>
 
                               <td className="p-4 text-right">

@@ -141,7 +141,7 @@ const Dashboard = () => {
             <p className="text-stone-400 text-sm mb-6">Hệ thống quản lý vận hành</p>
             <div className="w-full bg-stone-800 p-4 rounded-lg mb-2">
                 <p className="text-xs text-stone-400 uppercase tracking-widest mb-1">Target tháng này</p>
-                <p className="text-2xl font-bold">100.000.000 ₫</p>
+                <p className="text-2xl font-bold">200.000.000 ₫</p>
             </div>
             <p className="text-xs text-stone-500">Tiếp tục cố gắng nhé!</p>
         </div>

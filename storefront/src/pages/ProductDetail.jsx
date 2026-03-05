@@ -8,12 +8,22 @@ import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper'; // [MỚI] Import helper tiền tệ
 
+// --- [MỚI] HÀM NÉN ẢNH CLOUDINARY CHỐNG TRÀN RAM TRÊN MOBILE ---
+const getOptimizedImageUrl = (url, width = 800) => {
+    if (!url || !url.includes('cloudinary.com')) return url;
+    const uploadIndex = url.indexOf('upload/') + 7;
+    // Thêm tham số: f_auto (tự động format WebP), q_auto (nén thông minh), w_... (giới hạn chiều rộng)
+    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
+    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
+};
+
 // --- COMPONENT CON: THẺ SẢN PHẨM ---
 const ProductCard = ({ product, lang }) => (
     <Link to={`/product/${product.slug}`} className="group block">
         <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative bg-stone-100">
             <img 
-                src={product.images?.[0]} 
+                // [ĐÃ SỬA] Nén ảnh Thumbnail xuống width 400px
+                src={getOptimizedImageUrl(product.images?.[0], 400)} 
                 alt={product.name} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 // [THÊM] Lazy load
@@ -98,7 +108,7 @@ const ProductDetail = () => {
         if (product?.images?.length > 0) {
             setMainImage(product.images[0]);
         }
-    }, [product]);
+    }, [product?.id]); // [ĐÃ SỬA] Thay `[product]` thành `[product?.id]` để chống vòng lặp render vô tận
 
     // 2. Hàm lưu lịch sử xem
     const saveToViewedHistory = (currentProduct) => {
@@ -146,7 +156,8 @@ const ProductDetail = () => {
                         <div className="rounded-xl overflow-hidden aspect-[3/4]">
                             {/* Hiển thị mainImage thay vì fix cứng ảnh đầu tiên */}
                             <img 
-                                src={mainImage || product.images?.[0] || 'https://via.placeholder.com/500'} 
+                                // [ĐÃ SỬA] Nén ảnh chính
+                                src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)} 
                                 alt={product.name} 
                                 className="w-full h-full object-cover transition-all duration-300"
                                 // Ảnh chính nên tải ngay (priority), không dùng lazy ở đây để tránh nháy hình
@@ -165,7 +176,14 @@ const ProductDetail = () => {
                                             ${mainImage === img ? 'ring-2 ring-stone-900' : 'border border-transparent'}
                                         `}
                                     >
-                                        <img src={img} className="w-full h-full object-cover" alt="" loading="lazy" decoding="async" />
+                                        <img 
+                                            // [ĐÃ SỬA] Nén ảnh thumbnails siêu nhỏ để tiết kiệm RAM
+                                            src={getOptimizedImageUrl(img, 200)} 
+                                            className="w-full h-full object-cover" 
+                                            alt="" 
+                                            loading="lazy" 
+                                            decoding="async" 
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -254,9 +272,11 @@ const ProductDetail = () => {
                                     {product.size_chart_url ? (
                                         <div className="rounded-lg overflow-hidden border border-stone-200">
                                             <img 
-                                                src={product.size_chart_url} 
+                                                // [ĐÃ SỬA] Nén size chart
+                                                src={getOptimizedImageUrl(product.size_chart_url, 600)} 
                                                 alt="Size Chart"
                                                 className="w-full h-auto object-cover"
+                                                loading="lazy"
                                             />
                                         </div>
                                     ) : (
@@ -265,6 +285,7 @@ const ProductDetail = () => {
                                                 src="https://file.hstatic.net/200000185994/file/bang_size_ao_thun_nam_ad12822a16c44284ab94132808c1650c_1024x1024.jpg" 
                                                 alt="Size Chart Default"
                                                 className="w-full h-auto object-cover opacity-50"
+                                                loading="lazy"
                                             />
                                             <p className="text-center text-xs text-stone-400 p-2">{t('product.no_size_chart')}</p>
                                         </div>

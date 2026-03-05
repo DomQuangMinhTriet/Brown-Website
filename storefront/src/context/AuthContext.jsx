@@ -1,5 +1,5 @@
 // client/src/context/AuthContext.jsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 // [QUAN TRỌNG] Import từ file cấu hình chung, KHÔNG tự tạo client ở đây nữa
 import { supabase } from '../supabaseClient';
@@ -11,8 +11,8 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null); // Session để lấy Token
   const [loading, setLoading] = useState(true);
 
-  // Hàm lấy Token hiện tại để gọi API
-  const getToken = () => session?.access_token;
+  // Dùng useCallback để hàm này không bị tạo lại ở mỗi lần render
+  const getToken = useCallback(() => session?.access_token, [session]);
 
   useEffect(() => {
     // 1. Kiểm tra session ban đầu
@@ -38,8 +38,13 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    // Cleanup an toàn chống rò rỉ bộ nhớ (Memory Leak)
+    return () => {
+      if (listener?.subscription && typeof listener.subscription.unsubscribe === 'function') {
+        listener.subscription.unsubscribe();
+      }
+    };
+  }, []); // Giữ nguyên mảng rỗng []
 
   // Lấy Profile từ Backend của mình (Bảng customers)
   const fetchProfile = async (authUser, token) => {
@@ -76,7 +81,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  // Dùng useCallback để chống tạo mới hàm liên tục
+  const logout = useCallback(async () => {
     try {
         // 1. Gửi lệnh đăng xuất lên Server
         await supabase.auth.signOut();
@@ -93,10 +99,15 @@ export const AuthProvider = ({ children }) => {
         // 4. Force Reload trang về Home để đảm bảo sạch bộ nhớ đệm
         window.location.href = '/'; 
     }
-  };
+  }, []);
+
+  // [QUAN TRỌNG NHẤT]: Bọc object value trong useMemo để chống re-render vô tận trên điện thoại
+  const contextValue = useMemo(() => {
+    return { user, session, loading, logout, getToken };
+  }, [user, session, loading, logout, getToken]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, logout, getToken }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

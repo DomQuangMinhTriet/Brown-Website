@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 
 // ==============================
@@ -117,6 +117,29 @@ const StorefrontLayout = () => {
 };
 
 function App() {
+  // THÊM ĐOẠN NÀY VÀO TRÊN CÙNG TRONG APP.JSX
+  useEffect(() => {
+    // Đổi số này mỗi khi bạn có đợt fix lỗi lớn (VD: từ 1.0 lên 1.1)
+    const APP_VERSION = "1.1"; 
+    const localVersion = localStorage.getItem("brown_app_version");
+
+    if (localVersion !== APP_VERSION) {
+      console.log("Phát hiện version cũ, đang dọn dẹp hệ thống...");
+      
+      // Lưu lại token đăng nhập (nếu không muốn khách bị văng ra ngoài)
+      const token = localStorage.getItem("sb-xxxx-auth-token"); // Thay bằng key supabase của bạn nếu cần, không thì bỏ qua
+      
+      // Quét sạch rác cũ
+      localStorage.clear();
+      
+      // Cập nhật version mới
+      localStorage.setItem("brown_app_version", APP_VERSION);
+      
+      // Ép tải lại trang để sạch bộ nhớ
+      window.location.reload();
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

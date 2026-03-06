@@ -5,6 +5,15 @@ import { FaStore, FaShoppingCart } from 'react-icons/fa';
 import { useCart } from '../context/CartContext'; 
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
+
+// [CHỈNH SỬA] Thêm hàm nén ảnh chống tràn RAM
+const getOptimizedImageUrl = (url, width = 400) => {
+    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+    const uploadIndex = url.indexOf('upload/') + 7;
+    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
+    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
+};
+
 const Collection = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,32 +21,31 @@ const Collection = () => {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   
-  // Lấy tham số URL
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search');
   const isPosMode = searchParams.get('pos') === 'true'; 
   const categorySlug = searchParams.get('category'); 
 
-  // [MỚI] 1. State lưu tiêu đề trang (để không phụ thuộc vào sản phẩm)
   const [pageTitle, setPageTitle] = useState(t('collection.all_products'));
 
-  // [MỚI] 2. Effect riêng để lấy Tên Danh Mục đúng (Fix lỗi hiển thị sai tên)
+  // [CHỈNH SỬA] Thêm state giới hạn số lượng sản phẩm hiển thị lúc đầu
+  const [visibleCount, setVisibleCount] = useState(12);
+
   useEffect(() => {
     const fetchCategoryName = async () => {
         if (searchQuery) {
             setPageTitle(`${t('collection.search_result')}: "${searchQuery}"`);
         } else if (categorySlug) {
             try {
-                // Gọi API lấy danh sách danh mục để tìm tên đúng của Slug hiện tại
                 const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
                 if (res.data.success) {
                     const foundCat = res.data.data.find(c => c.slug === categorySlug);
-                    // Nếu tìm thấy thì lấy tên, không thì lấy chính cái slug cho đỡ trống
                     setPageTitle(foundCat ? `${foundCat.name}` : `${categorySlug}`);
                 }
             } catch (error) {
                 console.error("Lỗi lấy tên danh mục:", error);
-                setPageTitle(lang === 'en' && catData.name_en ? catData.name_en : catData.name);
+                // [CHỈNH SỬA] Fix lỗi catData is not defined trong bản gốc của bạn
+                setPageTitle(categorySlug); 
             }
         } else {
             setPageTitle(t('collection.all_products'));
@@ -45,9 +53,8 @@ const Collection = () => {
     };
 
     fetchCategoryName();
-  }, [categorySlug, searchQuery]); // Chạy lại khi URL thay đổi
+  }, [categorySlug, searchQuery]); 
 
-  // 3. Effect lấy danh sách sản phẩm (Giữ nguyên logic lọc cũ của bạn)
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -56,8 +63,6 @@ const Collection = () => {
         
         const params = [];
         if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
-        
-        // Gửi slug lên Backend (Backend đã sửa để lọc cả danh mục phụ)
         if (categorySlug) params.push(`category=${encodeURIComponent(categorySlug)}`); 
         
         const res = await axios.get(url + params.join('&'));
@@ -72,12 +77,13 @@ const Collection = () => {
       finally { setLoading(false); }
     };
     fetchProducts();
+    // [CHỈNH SỬA] Đặt lại số lượng hiển thị khi đổi danh mục
+    setVisibleCount(12);
   }, [searchParams]); 
 
   return (
     <div className={isPosMode ? "bg-stone-100 min-h-screen pb-24" : ""}>
       
-      {/* HEADER POS MODE */}
       {isPosMode && (
           <div className="bg-red-700 text-white p-4 shadow-md sticky top-20 z-40 flex justify-between items-center">
              <div className="font-bold text-lg flex items-center gap-2 uppercase">
@@ -90,50 +96,63 @@ const Collection = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* [SỬA] Hiển thị PageTitle từ State mới */}
         <div className="text-center mb-10">
             <h2 className="text-3xl font-bold text-[#573425] mb-8 uppercase">
                 {pageTitle}
             </h2>
         </div>
 
-        {/* LIST SẢN PHẨM */}
         {loading ? (
             <div className="text-center py-20">{t('collection.loading')}</div>
         ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-            {products.map(product => (
-                <Link 
-                    to={`/product/${product.slug}${isPosMode ? '?pos=true' : ''}`} 
-                    key={product.id} 
-                    className="group block text-center"
-                >
-                    <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative">
-                        <img 
-                            src={product.images?.[0]} 
-                            alt={product.name} 
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            // [THÊM] Lazy load
-                            loading="lazy"
-                            decoding="async"
-                        />
-                        
-                        {isPosMode && (
-                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">{t('collection.select')}</span>
-                            </div>
-                        )}
-                    </div>
+            <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+                {/* [CHỈNH SỬA] Dùng slice để không render thừa thẻ DOM */}
+                {products.slice(0, visibleCount).map(product => (
+                    <Link 
+                        to={`/product/${product.slug}${isPosMode ? '?pos=true' : ''}`} 
+                        key={product.id} 
+                        className="group block text-center"
+                    >
+                        <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative">
+                            <img 
+                                // [CHỈNH SỬA] Nén ảnh Thumbnail
+                                src={getOptimizedImageUrl(product.images?.[0], 400)} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                            
+                            {isPosMode && (
+                                <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="bg-white text-stone-900 px-3 py-1 text-xs font-bold rounded shadow">{t('collection.select')}</span>
+                                </div>
+                            )}
+                        </div>
 
-                    <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
-                        {lang === 'en' && product.name_en ? product.name_en : product.name}
-                    </h3>
-                    <p className="text-stone-500 font-bold mt-1 text-sm">
-                        {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
-                    </p>
-                </Link>
-            ))}
-            </div>
+                        <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
+                            {lang === 'en' && product.name_en ? product.name_en : product.name}
+                        </h3>
+                        <p className="text-stone-500 font-bold mt-1 text-sm">
+                            {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
+                        </p>
+                    </Link>
+                ))}
+                </div>
+
+                {/* [CHỈNH SỬA] Nút Tải Thêm */}
+                {visibleCount < products.length && (
+                    <div className="mt-12 text-center">
+                        <button 
+                            onClick={() => setVisibleCount(prev => prev + 12)}
+                            className="bg-stone-900 text-white px-8 py-3 rounded-full font-bold text-sm uppercase tracking-wider hover:bg-stone-800 transition-colors"
+                        >
+                            Xem thêm sản phẩm
+                        </button>
+                    </div>
+                )}
+            </>
         )}
         
         {!loading && products.length === 0 && (
@@ -143,7 +162,6 @@ const Collection = () => {
         )}
       </div>
 
-      {/* THANH THANH TOÁN POS */}
       {isPosMode && (
         <div className="fixed bottom-0 left-0 w-full bg-white border-t border-stone-200 p-4 shadow-[0_-5px_10px_rgba(0,0,0,0.1)] z-50 flex justify-between items-center">
             <div className="flex items-center gap-4">

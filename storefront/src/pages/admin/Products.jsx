@@ -4,6 +4,14 @@ import { FaPlus, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 import ProductModal from '../../components/ProductModal';
 import { toast } from 'react-toastify'; 
 
+// [CHỈNH SỬA] Thêm hàm nén ảnh cho bảng Admin
+const getOptimizedImageUrl = (url, width = 100) => {
+    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+    const uploadIndex = url.indexOf('upload/') + 7;
+    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
+    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
+};
+
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +27,6 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
-      // [CẬP NHẬT]: Gửi kèm admin=true để lấy toàn bộ dữ liệu (kể cả đang bị ẩn is_active = false)
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true`);
       if (response.data.success) {
         setProducts(response.data.data);
@@ -107,12 +114,18 @@ const Products = () => {
                     <tbody className="divide-y divide-stone-100">
                       {filteredProducts.length > 0 ? (
                           filteredProducts.map((product) => (
-                            // [CẬP NHẬT] Thêm opacity và bg xám nếu sản phẩm đang bị Ẩn
                             <tr key={product.id} className={`transition-colors group ${!product.is_active ? 'bg-stone-50/70 opacity-60 hover:opacity-100' : 'hover:bg-stone-50'}`}>
                               <td className="p-4">
                                 <div className="w-12 h-16 bg-stone-200 rounded overflow-hidden border border-stone-100">
                                     {product.images && product.images.length > 0 ? (
-                                        <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                                        <img 
+                                            // [CHỈNH SỬA] Thêm nén ảnh
+                                            src={getOptimizedImageUrl(product.images[0], 100)} 
+                                            alt={product.name} 
+                                            className="w-full h-full object-cover" 
+                                            loading="lazy" 
+                                            decoding="async" 
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-xs text-stone-400">No Img</div>
                                     )}
@@ -125,7 +138,6 @@ const Products = () => {
                               <td className="p-4 font-bold text-stone-900">{new Intl.NumberFormat('vi-VN').format(product.base_price)} ₫</td>
                               
                               <td className="p-4">
-                                {/* [CẬP NHẬT] Hiển thị Text trạng thái tương ứng */}
                                 {product.is_active !== false ? (
                                     <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-medium border border-green-100">
                                       Hiển thị

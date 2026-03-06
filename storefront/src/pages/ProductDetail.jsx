@@ -3,40 +3,33 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
-import { FaStar, FaCheck, FaHistory, FaBoxOpen } from 'react-icons/fa';
+import { FaStar, FaCheck, FaHistory, FaBoxOpen, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
-import { formatPrice } from '../utils/currencyHelper'; // [MỚI] Import helper tiền tệ
+import { formatPrice } from '../utils/currencyHelper';
 
-// --- [MỚI] HÀM NÉN ẢNH CLOUDINARY CHỐNG TRÀN RAM TRÊN MOBILE ---
 const getOptimizedImageUrl = (url, width = 800) => {
     if (!url || !url.includes('cloudinary.com')) return url;
     const uploadIndex = url.indexOf('upload/') + 7;
-    // Thêm tham số: f_auto (tự động format WebP), q_auto (nén thông minh), w_... (giới hạn chiều rộng)
     const transformations = `c_scale,w_${width},f_auto,q_auto/`;
     return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
 };
 
-// --- COMPONENT CON: THẺ SẢN PHẨM ---
 const ProductCard = ({ product, lang }) => (
     <Link to={`/product/${product.slug}`} className="group block">
         <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative bg-stone-100">
             <img 
-                // [ĐÃ SỬA] Nén ảnh Thumbnail xuống width 400px
                 src={getOptimizedImageUrl(product.images?.[0], 400)} 
                 alt={product.name} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                // [THÊM] Lazy load
                 loading="lazy"
                 decoding="async"
             />
         </div>
         <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
-            {/* Hiển thị tên tiếng Anh nếu có, không thì fallback về tiếng Việt */}
             {lang === 'en' && product.name_en ? product.name_en : product.name}
         </h3>
         <p className="text-stone-500 font-bold mt-1 text-sm">
-            {/* Đổi tiền tệ động theo ngôn ngữ */}
             {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
         </p>
     </Link>
@@ -49,16 +42,13 @@ const ProductDetail = () => {
     const { addToCart } = useCart();
     const { t, lang } = useLanguage();
     
-    // State cho 2 mục mới
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [viewedProducts, setViewedProducts] = useState([]);
-    const [mainImage, setMainImage] = useState(null); // State ảnh chính
+    const [mainImage, setMainImage] = useState(null);
 
-    // 1. Fetch sản phẩm chính + Sản phẩm liên quan + Xử lý đã xem
     useEffect(() => {
         const fetchProductData = async () => {
             try {
-                // Lấy tất cả sản phẩm về để check
                 const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`); 
                 if (res.data.success) {
                     const allProducts = res.data.data;
@@ -67,29 +57,19 @@ const ProductDetail = () => {
                     if (found) {
                         setProduct(found);
                         
-                        // --- LOGIC SẢN PHẨM LIÊN QUAN ---
                         const related = allProducts.filter(p => 
                             p.category_id === found.category_id && p.id !== found.id
                         ).slice(0, 4);
                         setRelatedProducts(related);
 
-                        // --- LOGIC LƯU & LỌC SẢN PHẨM ĐÃ XEM (QUAN TRỌNG) ---
-                        // 1. Lưu sản phẩm hiện tại vào LocalStorage
                         saveToViewedHistory(found);
 
-                        // 2. Đọc lại từ LocalStorage
                         const localHistory = JSON.parse(localStorage.getItem('viewed_products') || '[]');
-
-                        // 3. [FIX LỖI] Kiểm tra xem sản phẩm trong LocalStorage có tồn tại trong Database thật (allProducts) không?
-                        // Nếu sản phẩm đã bị xóa trong Admin, nó sẽ không tìm thấy trong allProducts -> Bị lọc bỏ.
                         const validHistory = localHistory
-                            .map(localItem => allProducts.find(realItem => realItem.id === localItem.id)) // Map sang sản phẩm thật
-                            .filter(item => item !== undefined); // Loại bỏ những cái undefined (đã bị xóa)
+                            .map(localItem => allProducts.find(realItem => realItem.id === localItem.id))
+                            .filter(item => item !== undefined); 
 
-                        // 4. Cập nhật lại LocalStorage cho sạch sẽ (Xóa rác)
                         localStorage.setItem('viewed_products', JSON.stringify(validHistory));
-
-                        // 5. Hiển thị ra màn hình (Trừ sản phẩm đang xem hiện tại)
                         setViewedProducts(validHistory.filter(p => p.id !== found.id).slice(0, 4));
                     }
                 }
@@ -99,25 +79,39 @@ const ProductDetail = () => {
         };
 
         fetchProductData();
-        // Scroll lên đầu trang khi chuyển sản phẩm
         window.scrollTo(0, 0); 
     }, [slug]);
 
-    // Effect để set ảnh mặc định khi sản phẩm thay đổi
     useEffect(() => {
-        if (product?.images?.length > 0) {
+        if (product?.images?.length > 0 && !mainImage) {
             setMainImage(product.images[0]);
         }
-    }, [product?.id]); // [ĐÃ SỬA] Thay `[product]` thành `[product?.id]` để chống vòng lặp render vô tận
+    }, [product?.id]);
 
-    // 2. Hàm lưu lịch sử xem
+    // [MỚI] SMART PRELOAD: Chỉ tải ngầm ảnh Trái và Phải khi mainImage thay đổi
+    useEffect(() => {
+        if (!product?.images?.length || !mainImage) return;
+
+        const currentIndex = product.images.indexOf(mainImage);
+        if (currentIndex === -1) return;
+
+        // Tính toán vị trí của 2 ảnh lân cận
+        const prevIndex = currentIndex <= 0 ? product.images.length - 1 : currentIndex - 1;
+        const nextIndex = currentIndex >= product.images.length - 1 ? 0 : currentIndex + 1;
+
+        // Chỉ tạo object Image tải ngầm đúng 2 ảnh này qua bộ nén Cloudinary
+        const imgPrev = new Image(); 
+        imgPrev.src = getOptimizedImageUrl(product.images[prevIndex], 800);
+        
+        const imgNext = new Image(); 
+        imgNext.src = getOptimizedImageUrl(product.images[nextIndex], 800);
+
+    }, [mainImage, product?.images]); // Chạy lại mỗi khi khách lướt sang ảnh mới
+
     const saveToViewedHistory = (currentProduct) => {
         try {
             const history = JSON.parse(localStorage.getItem('viewed_products') || '[]');
-            // Lọc bỏ sản phẩm trùng (nếu đã xem rồi thì xóa cũ để đẩy lên đầu)
             const newHistory = history.filter(item => item.id !== currentProduct.id);
-            
-            // Thêm sản phẩm hiện tại vào đầu danh sách
             newHistory.unshift({
                 id: currentProduct.id,
                 name: currentProduct.name,
@@ -125,22 +119,31 @@ const ProductDetail = () => {
                 base_price: currentProduct.base_price,
                 images: currentProduct.images
             });
-
-            // Chỉ giữ lại 8 sản phẩm gần nhất
             const limitedHistory = newHistory.slice(0, 8);
-            
             localStorage.setItem('viewed_products', JSON.stringify(limitedHistory));
         } catch (e) { console.error(e); }
     };
 
-    // Helper: Lấy tồn kho
     const getStock = (variant) => variant ? variant.quantity_remaining : 0;
+
+    const handlePrevImage = () => {
+        if (!product?.images?.length) return;
+        const currentIndex = product.images.indexOf(mainImage);
+        const prevIndex = currentIndex <= 0 ? product.images.length - 1 : currentIndex - 1;
+        setMainImage(product.images[prevIndex]);
+    };
+
+    const handleNextImage = () => {
+        if (!product?.images?.length) return;
+        const currentIndex = product.images.indexOf(mainImage);
+        const nextIndex = currentIndex >= product.images.length - 1 ? 0 : currentIndex + 1;
+        setMainImage(product.images[nextIndex]);
+    };
 
     if (!product) return <div className="min-h-screen flex justify-center items-center">{t('product.loading')}</div>;
 
     return (
         <div className="min-h-screen pt-10 pb-20 px-4 bg-white">
-             {/* SEO */}
              <SEO 
                 title={lang === 'en' && product.name_en ? product.name_en : product.name} 
                 description={(lang === 'en' && product.description_en ? product.description_en : product.description)?.substring(0, 150) + "..."} 
@@ -149,35 +152,54 @@ const ProductDetail = () => {
             />
 
             <div className="max-w-6xl mx-auto">
-                {/* --- PHẦN 1: CHI TIẾT SẢN PHẨM CHÍNH --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20">
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
-                        <div className="rounded-xl overflow-hidden aspect-[3/4]">
-                            {/* Hiển thị mainImage thay vì fix cứng ảnh đầu tiên */}
+                        <div className="rounded-xl overflow-hidden aspect-[3/4] relative group bg-stone-50">
                             <img 
-                                // [ĐÃ SỬA] Nén ảnh chính
+                                // [ĐÃ SỬA] Thêm `key` để ép React chạy lại hiệu ứng mỗi khi đổi ảnh
+                                key={mainImage}
                                 src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)} 
                                 alt={product.name} 
-                                className="w-full h-full object-cover transition-all duration-300"
-                                // Ảnh chính nên tải ngay (priority), không dùng lazy ở đây để tránh nháy hình
+                                // [ĐÃ SỬA] Áp dụng class hiệu ứng animate-fade-in
+                                className="w-full h-full object-cover transition-all animate-fade-in"
                                 fetchPriority="high"
                             />
+                            
+                            {/* Nút chuyển ảnh */}
+                            {product.images?.length > 1 && (
+                                <>
+                                    <button 
+                                        onClick={handlePrevImage}
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-stone-800 w-10 h-10 flex items-center justify-center rounded-full shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 active:scale-95"
+                                        aria-label="Ảnh trước"
+                                    >
+                                        <FaChevronLeft />
+                                    </button>
+                                    <button 
+                                        onClick={handleNextImage}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-stone-800 w-10 h-10 flex items-center justify-center rounded-full shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 active:scale-95"
+                                        aria-label="Ảnh tiếp theo"
+                                    >
+                                        <FaChevronRight />
+                                    </button>
+                                </>
+                            )}
                         </div>
-                        {/* Ảnh nhỏ (Thumbnails) nếu có nhiều ảnh */}
+                        
+                        {/* Ảnh nhỏ (Thumbnails) */}
                         {product.images?.length > 1 && (
                             <div className="grid grid-cols-4 gap-2">
                                 {product.images.map((img, idx) => (
                                     <div 
                                         key={idx} 
-                                        onClick={() => setMainImage(img)} // Click đổi ảnh
+                                        onClick={() => setMainImage(img)} 
                                         className={`
                                             aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-all
-                                            ${mainImage === img ? 'ring-2 ring-stone-900' : 'border border-transparent'}
+                                            ${mainImage === img ? 'ring-2 ring-stone-900 opacity-100' : 'border border-transparent opacity-60'}
                                         `}
                                     >
                                         <img 
-                                            // [ĐÃ SỬA] Nén ảnh thumbnails siêu nhỏ để tiết kiệm RAM
                                             src={getOptimizedImageUrl(img, 200)} 
                                             className="w-full h-full object-cover" 
                                             alt="" 
@@ -200,7 +222,6 @@ const ProductDetail = () => {
                             </div>
 
                             <p className="text-2xl font-bold text-stone-800 mb-8">
-                                {/* Format tiền tệ tự động */}
                                 {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
                             </p>
 
@@ -213,7 +234,6 @@ const ProductDetail = () => {
                                             key={variant.id}
                                             onClick={() => {
                                                 setSelectedVariant(variant);
-                                                // Nếu biến thể có ảnh riêng -> đổi ảnh chính
                                                 if (variant.image_url) {
                                                     setMainImage(variant.image_url);
                                                 }
@@ -228,7 +248,6 @@ const ProductDetail = () => {
                                             disabled={getStock(variant) <= 0}
                                         >
                                             {variant.size} - {lang === 'en' && variant.color_en ? variant.color_en : variant.color}
-                                            {/* Hiển thị tồn kho nhỏ */}
                                             {getStock(variant) > 0 && getStock(variant) < 5 && (
                                                 <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
                                             )}
@@ -272,7 +291,6 @@ const ProductDetail = () => {
                                     {product.size_chart_url ? (
                                         <div className="rounded-lg overflow-hidden border border-stone-200">
                                             <img 
-                                                // [ĐÃ SỬA] Nén size chart
                                                 src={getOptimizedImageUrl(product.size_chart_url, 600)} 
                                                 alt="Size Chart"
                                                 className="w-full h-auto object-cover"
@@ -322,6 +340,17 @@ const ProductDetail = () => {
                     </div>
                 )}
             </div>
+
+            {/* [MỚI] ĐỊNH NGHĨA CSS HIỆU ỨNG FADE-IN */}
+            <style>{`
+                @keyframes fade-in-smooth {
+                    from { opacity: 0.6; }
+                    to { opacity: 1; }
+                }
+                .animate-fade-in {
+                    animation: fade-in-smooth 0.3s ease-out forwards;
+                }
+            `}</style>
         </div>
     );
 };

@@ -13,4 +13,8 @@ router.get('/stock', inventoryController.getStock);      // Lấy tồn kho (S�
 router.get('/history', inventoryController.getHistory);  // <--- [MỚI] Lấy lịch sử nhập
 router.post('/inbound', inventoryController.inboundStock);
 router.post('/adjust', inventoryController.adjustStock);
+
+// --- HÀNG LỖI ---
+router.post('/defective', inventoryController.reportDefectiveItem);
+router.get('/defective', inventoryController.getDefectiveLogs);
 module.exports = router;

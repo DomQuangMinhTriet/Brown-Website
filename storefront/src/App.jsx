@@ -39,6 +39,7 @@ import AdminCustomers from './pages/admin/Customer';
 import Appearance from './pages/admin/Appearance';
 import Promotions from './pages/admin/Promotions';
 import CreateOrder from './pages/admin/CreateOrder';
+import DefectiveItems from './pages/admin/DefectiveItems';
 
 // --- Layout Wrapper cho Admin (Realtime & Sidebar) ---
 const AdminLayoutWrapper = () => {
@@ -163,6 +164,7 @@ function App() {
               <Route path="appearance" element={<Appearance />} />
               <Route path="reports" element={<Reports />} />
               <Route path="expenses" element={<Expenses />} />
+              <Route path="inventory/defective" element={<DefectiveItems />} />
               <Route path="orders/create" element={<CreateOrder />} />
            </Route>
         </Route>

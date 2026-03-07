@@ -22,6 +22,8 @@ const Sidebar = ({ onClose }) => {
     { path: '/admin/appearance', icon: <FaImage />, label: 'Giao diện' },
     { path: '/admin/reports', icon: <FaChartBar />, label: 'Báo cáo' },
     { path: '/admin/expenses', icon: <FaMoneyBillAlt />, label: 'Chi phí' },
+    { path: '/admin/inventory/defective', icon: <FaTimes />, label: 'Hàng lỗi' }
+
   ];
 
   return (

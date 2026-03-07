@@ -305,3 +305,112 @@ exports.adjustStock = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// --- XỬ LÝ HÀNG LỖI (DEFECTIVE ITEMS) ---
+exports.reportDefectiveItem = async (req, res) => {
+    try {
+        // [ĐÃ SỬA] Nhận thêm product_name và variant_name từ Frontend
+        const { variant_id, quantity, reason, store_id, product_name, variant_name } = req.body;
+
+        if (!variant_id || !quantity || quantity <= 0) {
+            return res.status(400).json({ success: false, message: "Dữ liệu không hợp lệ" });
+        }
+
+        const qtyToDeduct = Number(quantity);
+
+        // 1. Lấy các lô hàng đang còn tồn kho của phân loại này
+        const { data: batches, error: batchError } = await supabase
+            .from('inventory_batches')
+            .select('*')
+            .eq('variant_id', variant_id)
+            .gt('quantity_remaining', 0)
+            .order('created_at', { ascending: true });
+
+        if (batchError) throw batchError;
+
+        let remainingToDeduct = qtyToDeduct;
+        let totalLoss = 0;
+        const updates = [];
+
+        // 2. Tính toán trừ kho và gom giá vốn
+        for (const batch of batches) {
+            if (remainingToDeduct <= 0) break;
+
+            const deductQty = Math.min(batch.quantity_remaining, remainingToDeduct);
+            totalLoss += (deductQty * batch.cost_price);
+            remainingToDeduct -= deductQty;
+
+            updates.push({
+                id: batch.id,
+                quantity_remaining: batch.quantity_remaining - deductQty
+            });
+        }
+
+        if (remainingToDeduct > 0) {
+            return res.status(400).json({ success: false, message: "Số lượng báo lỗi lớn hơn số lượng tồn kho hiện có!" });
+        }
+
+        // 3. Thực hiện trừ kho trên các lô thật
+        for (const update of updates) {
+            const { error: updateError } = await supabase
+                .from('inventory_batches')
+                .update({ quantity_remaining: update.quantity_remaining })
+                .eq('id', update.id);
+            if (updateError) throw updateError;
+        }
+
+        // 4. [FIX LỖI TRỪ ĐÚP]: Lưu lịch sử Hàng lỗi
+        const { error: logError } = await supabase.from('inventory_batches').insert([{
+            variant_id,
+            store_id: store_id || 1, 
+            original_quantity: -qtyToDeduct, 
+            quantity_remaining: 0, // <--- QUAN TRỌNG: Để 0 để không bị cộng dồn thành trừ đúp tồn kho
+            cost_price: Math.round(totalLoss / qtyToDeduct), 
+            is_adjustment: true,
+            notes: `[HÀNG LỖI] ${reason}`
+        }]);
+        if (logError) throw logError;
+
+        // 5. [FIX LỖI GHI CHÚ CHI PHÍ]: Ghi chi tiết vào bảng Expenses
+        const expenseNote = `Hàng lỗi: ${quantity}x ${product_name || ''} ${variant_name ? `(${variant_name})` : ''} - Lý do: ${reason}`;
+        
+        const { error: expenseError } = await supabase.from('expenses').insert([{
+            store_id: store_id || 1,
+            category_id: 1, 
+            amount: totalLoss,
+            note: expenseNote, // <--- Ghi chú chi tiết sẽ hiện ở Báo cáo chi phí
+            expense_date: new Date().toISOString().split('T')[0]
+        }]);
+        if (expenseError) throw expenseError;
+
+        res.json({ success: true, message: "Đã trừ kho và hạch toán chi phí!", totalLoss });
+
+    } catch (error) {
+        console.error("Lỗi reportDefectiveItem:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Hàm lấy lịch sử hàng lỗi ra màn hình
+exports.getDefectiveLogs = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('inventory_batches')
+            .select(`
+                *,
+                variants (
+                    size, color, sku,
+                    products ( name, images ) 
+                )
+            `)
+            // Dùng ilike tìm kiếm mờ an toàn hơn
+            .ilike('notes', '%[HÀNG LỖI]%') 
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error("Lỗi getDefectiveLogs:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

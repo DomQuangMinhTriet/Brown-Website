@@ -84,14 +84,14 @@ const Cart = () => {
             </div>
             <div className="flex justify-between mb-4 text-stone-600">
               <span>{t('cart.shipping')}</span>
-              <span>---</span>
+              <span>{formatPrice(20000, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
             
             <hr className="border-stone-200 my-4" />
             
             <div className="flex justify-between mb-8 text-lg font-bold text-stone-900">
               <span>{t('cart.total')}</span>
-              <span>{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')}</span>
+              <span>{formatPrice(cartTotal + 20000, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
 
             <Link to="/checkout" className="block w-full bg-stone-900 text-white text-center py-4 uppercase tracking-widest text-sm font-bold hover:bg-stone-800 transition-colors">

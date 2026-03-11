@@ -333,9 +333,22 @@ const Orders = () => {
                           <button onClick={() => handleBulkAction('shipping')} disabled={processing} className="hover:text-blue-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3 border-l border-stone-700">
                               <FaShippingFast size={16}/> Giao GHN
                           </button>
-                          <button onClick={() => handleBulkAction('shipping', { skip_ghn: true })} disabled={processing} className="hover:text-yellow-300 font-bold text-xs uppercase flex flex-col items-center gap-1 px-3">
-                              <FaMotorcycle size={16}/> Tự giao
-                          </button>
+                          <button 
+                                disabled={processing} 
+                                onClick={() => {
+                                    // Hiện hộp thoại nhập mã vận đơn SPX
+                                    const code = window.prompt("Nhập mã vận đơn SPX Express (Để trống nếu tự đi giao):");
+                                    if (code !== null) {
+                                        handleUpdateStatus('shipping', false, { 
+                                            skip_ghn: true, 
+                                            tracking_code: code.trim() 
+                                        });
+                                    }
+                                }} 
+                                className="px-4 py-2 bg-white border border-stone-300 text-stone-700 rounded hover:bg-stone-100 flex items-center gap-2 text-sm font-bold shadow-sm"
+                            >
+                                <FaMotorcycle/> SPX / Tự giao
+                            </button>
                       </>
                   )}
 
@@ -467,8 +480,20 @@ const Orders = () => {
                             <button disabled={processing} onClick={() => handleUpdateStatus('shipping')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm font-bold shadow-sm">
                                 <FaShippingFast/> Giao GHN / ĐVVC
                             </button>
-                            <button disabled={processing} onClick={() => handleUpdateStatus('shipping', false, { skip_ghn: true })} className="px-4 py-2 bg-white border border-stone-300 text-stone-700 rounded hover:bg-stone-100 flex items-center gap-2 text-sm font-bold shadow-sm">
-                                <FaMotorcycle/> Tự giao / Khác
+                            <button 
+                                disabled={processing} 
+                                onClick={() => {
+                                    const code = window.prompt("Nhập mã vận đơn SPX Express (Để trống nếu tự đi giao):");
+                                    if (code !== null) {
+                                        handleUpdateStatus('shipping', false, { 
+                                            skip_ghn: true, 
+                                            tracking_code: code.trim() 
+                                        });
+                                    }
+                                }} 
+                                className="px-4 py-2 bg-white border border-stone-300 text-stone-700 rounded hover:bg-stone-100 flex items-center gap-2 text-sm font-bold shadow-sm"
+                            >
+                                <FaMotorcycle/> SPX / Tự giao
                             </button>
                         </>
                     )}

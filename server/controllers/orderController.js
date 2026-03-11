@@ -311,17 +311,16 @@ exports.getAllOrders = async (req, res) => {
     }
 };
 
+// BẮT ĐẦU ĐOẠN CẦN THAY THẾ (Hàm updateOrderStatus)
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, restock, skip_ghn } = req.body; 
+        // Nhận thêm tracking_code từ Frontend gửi lên
+        const { status, restock, skip_ghn, tracking_code } = req.body; 
 
-        // --- LOG DEBUG (Giữ lại để theo dõi) ---
         console.log("-------------------------------------------------");
         console.log(`🛠 Đang update đơn #${id} sang trạng thái: ${status}`);
 
-        // 1. Lấy thông tin đơn hàng hiện tại (SỬA LỖI Ở ĐÂY: Thêm error: fetchError)
-        
         const { data: currentOrder, error: fetchError } = await supabase
             .from('orders')
             .select(`
@@ -342,63 +341,45 @@ exports.updateOrderStatus = async (req, res) => {
             .eq('id', id)
             .single();
 
-        // Kiểm tra lỗi sau khi query
         if (fetchError || !currentOrder) {
             console.error("Lỗi tìm đơn hàng:", fetchError);
             return res.status(404).json({success: false, message: "Không tìm thấy đơn hàng"});
         }
 
-        console.log("Trạng thái cũ:", currentOrder.status);
-        console.log("Mã vận đơn hiện tại (DB):", currentOrder.shipping_tracking_code);
-
         let trackingCode = currentOrder.shipping_tracking_code;
         let updateData = { status };
 
-        // ==========================================================
-        // 2. LOGIC TỰ ĐỘNG GHN KHI CHUYỂN SANG SHIPPING
-        // ==========================================================
-        // Chỉ chạy khi: Trạng thái mới là shipping VÀ Chưa có mã vận đơn
-        // [THAY ĐỔI 2] Thêm điều kiện !skip_ghn
+        // 2. LOGIC VẬN CHUYỂN (GHN & SPX)
         if (status === 'shipping' && !trackingCode && !skip_ghn) {
             try {
                 console.log("🚀 Đang tạo đơn qua GHN...");
                 trackingCode = await createGHNOrder(currentOrder);
                 updateData.shipping_tracking_code = trackingCode;
             } catch (ghnError) {
-                // Nếu lỗi GHN -> Trả về lỗi 400 để Frontend hiển thị thông báo
                 console.error("❌ Lỗi GHN:", ghnError.message);
                 return res.status(400).json({ 
                     success: false, 
-                    message: `Lỗi tạo đơn GHN: ${ghnError.message}. Hãy thử chọn 'Tự giao hàng'.` 
+                    message: `Lỗi tạo đơn GHN: ${ghnError.message}. Hãy thử chọn 'SPX / Tự giao'.` 
                 });
             }
         } else if (status === 'shipping' && skip_ghn) {
-            console.log("🛵 Admin chọn Tự giao hàng -> Bỏ qua tạo đơn GHN.");
+            console.log("🛵 Admin chọn SPX / Tự giao hàng.");
+            // Gán mã vận đơn SPX nếu có nhập
+            if (tracking_code) {
+                trackingCode = tracking_code;
+                updateData.shipping_tracking_code = trackingCode;
+            }
         }
 
-        // ==========================================================
-        // 3. LOGIC HOÀN KHO (ĐÃ SỬA LỖI GẤP ĐÔI)
-        // ==========================================================
-        
-        // TRƯỜNG HỢP A: HỦY ĐƠN (CANCELLED)
-        // -> KHÔNG LÀM GÌ CẢ. Database đã có Trigger "restore_inventory_on_cancel" tự lo rồi.
-        // Nếu code chạy thêm ở đây sẽ bị cộng dồn thành gấp đôi.
+        // 3. LOGIC HOÀN KHO
         if (status === 'cancelled') {
              console.log("ℹ️ Đơn hủy: Để Database Trigger tự động hoàn kho.");
-        }
-
-        // TRƯỜNG HỢP B: TRẢ HÀNG (RETURNED)
-        // -> Database KHÔNG tự làm, nên Code phải tự tính toán.
-        else if (status === 'returned' && restock === true) {
-            // Chặn nếu đơn đã trả trước đó để không cộng nhiều lần
-            if (currentOrder.status === 'returned') {
-                console.warn("⚠️ Đơn này đã trả hàng rồi, không cộng kho nữa.");
-            } else {
+        } else if (status === 'returned' && restock === true) {
+            if (currentOrder.status !== 'returned') {
                 console.log("🔄 Đang xử lý trả hàng (Code hoàn kho thủ công)...");
                 const orderItems = currentOrder.order_items;
                 if (orderItems && orderItems.length > 0) {
                     for (const item of orderItems) {
-                        // Cộng vào lô hàng mới nhất (LIFO)
                         const { data: latestBatch } = await supabase.from('inventory_batches')
                             .select('id, quantity_remaining')
                             .eq('variant_id', item.variant_id)
@@ -411,7 +392,6 @@ exports.updateOrderStatus = async (req, res) => {
                                 .update({ quantity_remaining: latestBatch.quantity_remaining + item.quantity })
                                 .eq('id', latestBatch.id);
                         } else {
-                            // Nếu không tìm thấy lô nào, tạo lô điều chỉnh
                             await supabase.from('inventory_batches').insert([{
                                 variant_id: item.variant_id,
                                 original_quantity: item.quantity,
@@ -435,19 +415,20 @@ exports.updateOrderStatus = async (req, res) => {
 
         if (error) throw error;
         
-        // 5. GỬI EMAIL TỰ ĐỘNG KÈM LINK TRACKING
+        // 5. GỬI EMAIL TỰ ĐỘNG KÈM LINK TRACKING (Truyền thêm skip_ghn để xác định là SPX)
         if (status === 'shipping' && trackingCode) {
             console.log("📧 Đang gửi email tracking cho khách...");
-            sendShippingConfirmation(data, trackingCode).catch(err => console.error("Mail Error:", err));
+            sendShippingConfirmation(data, trackingCode, skip_ghn).catch(err => console.error("Mail Error:", err));
         }
 
-        res.json({ success: true, message: 'Cập nhật thành công & Đã tạo đơn GHN', data: data });
+        res.json({ success: true, message: 'Cập nhật thành công', data: data });
 
     } catch (error) {
         console.error("Update Order Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 exports.createAdminOrder = async (req, res) => {
     try {

@@ -182,12 +182,34 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
     return await sendViaResend(customerEmail, t.subject, htmlContent);
 };
 // 3. GỬI THÔNG BÁO VẬN CHUYỂN (Giữ nguyên HTML cũ)
-const sendShippingConfirmation = async (order, trackingCode) => {
+const sendShippingConfirmation = async (order, trackingCode, isSPX = false) => {
     const email = order.customer_info?.email || order.customer_email; 
     if (!email) return;
 
     const subject = `[BROWN] Đơn hàng #${order.code} đang được vận chuyển 🚚`;
-    const trackingLink = `https://khachhang.ghn.vn/order-tracking?code=${trackingCode}`;
+    
+    // Xử lý link tracking tùy theo đơn vị vận chuyển
+    const ghnTrackingLink = `https://khachhang.ghn.vn/order-tracking?code=${trackingCode}`;
+    const spxTrackingLink = `https://spx.vn/m/track?${trackingCode}`;
+
+    // Khối HTML cho mã vận đơn: Tự động đổi màu logo và Link theo hãng (Cam cho SPX, Đỏ cho GHN)
+    const trackingHtmlBlock = isSPX ? `
+        <p style="margin: 0 0 10px 0; color: #78716c; font-size: 14px; text-transform: uppercase;">Mã vận đơn (SPX Express)</p>
+        <div style="font-size: 24px; font-weight: bold; color: #ea580c; margin-bottom: 15px;">
+            ${trackingCode}
+        </div>
+        <a href="${spxTrackingLink}" target="_blank" style="display: inline-block; background-color: #ea580c; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">
+            THEO DÕI ĐƠN HÀNG TẠI SPX
+        </a>
+    ` : `
+        <p style="margin: 0 0 10px 0; color: #78716c; font-size: 14px; text-transform: uppercase;">Mã vận đơn (GHN)</p>
+        <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 15px;">
+            ${trackingCode}
+        </div>
+        <a href="${ghnTrackingLink}" target="_blank" style="display: inline-block; background-color: #292524; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">
+            THEO DÕI ĐƠN HÀNG TẠI GHN
+        </a>
+    `;
 
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
@@ -199,16 +221,10 @@ const sendShippingConfirmation = async (order, trackingCode) => {
                 <p>Tin vui! Đơn hàng <strong>${order.code}</strong> của bạn đã được bàn giao cho đơn vị vận chuyển.</p>
 
                 <div style="background-color: #f5f5f4; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
-                    <p style="margin: 0 0 10px 0; color: #78716c; font-size: 14px; text-transform: uppercase;">Mã vận đơn (GHN)</p>
-                    <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 15px;">
-                        ${trackingCode}
-                    </div>
-                    <a href="${trackingLink}" target="_blank" style="display: inline-block; background-color: #292524; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 4px; font-weight: bold;">
-                        THEO DÕI ĐƠN HÀNG
-                    </a>
+                    ${trackingHtmlBlock}
                 </div>
                 
-                <p style="font-size: 13px; color: #57534e;">*Trạng thái đơn hàng có thể mất vài giờ để cập nhật trên hệ thống vận chuyển.</p>
+                <p style="font-size: 13px; color: #57534e;">*Trạng thái đơn hàng có thể mất vài giờ để cập nhật trên hệ thống của đơn vị vận chuyển.</p>
             </div>
         </div>
     `;

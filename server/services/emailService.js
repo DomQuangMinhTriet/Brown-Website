@@ -190,7 +190,7 @@ const sendShippingConfirmation = async (order, trackingCode, isSPX = false) => {
     
     // Xử lý link tracking tùy theo đơn vị vận chuyển
     const ghnTrackingLink = `https://khachhang.ghn.vn/order-tracking?code=${trackingCode}`;
-    const spxTrackingLink = `https://spx.vn/m/track?${trackingCode}`;
+    const spxTrackingLink = `https://spx.vn/track?${trackingCode}`;
 
     // Khối HTML cho mã vận đơn: Tự động đổi màu logo và Link theo hãng (Cam cho SPX, Đỏ cho GHN)
     const trackingHtmlBlock = isSPX ? `

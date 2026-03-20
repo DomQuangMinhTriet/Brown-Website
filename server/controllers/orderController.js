@@ -701,3 +701,31 @@ async function decreaseStock(variantId, qtyNeeded) {
         remainingToDeduct -= deduct;
     }
 }
+
+// [THÊM MỚI] API CẬP NHẬT THÔNG TIN GIAO HÀNG & GHI CHÚ
+exports.updateOrderDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { customer_name, customer_phone, customer_address, note } = req.body;
+
+        const { data, error } = await supabase
+            .from('orders')
+            .update({ 
+                customer_name, 
+                customer_phone, 
+                customer_address, 
+                note 
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Cập nhật thông tin thành công', data });
+
+    } catch (error) {
+        console.error("Update Order Details Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare } from 'react-icons/fa';
+// [CHỈNH SỬA] Import thêm FaEdit, FaSave
+import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
 
@@ -10,29 +11,30 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // [MỚI] State cho Tabs và Phân trang
-  const [activeTab, setActiveTab] = useState('active'); // 'active' | 'cancelled'
+  const [activeTab, setActiveTab] = useState('active'); 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // State Modal Chi tiết
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // State chọn hàng loạt
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // [MỚI] STATE CHO FORM CHỈNH SỬA
+  const [isEditingMode, setIsEditingMode] = useState(false);
+  const [editForm, setEditForm] = useState({
+      customer_name: '', customer_phone: '', customer_address: '', note: ''
+  });
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  // [ĐÃ SỬA] Logic lọc kết hợp Tab + Tìm kiếm
   useEffect(() => {
     if (!orders) return;
     const lowerTerm = searchTerm.toLowerCase();
 
-    // 1. Lọc theo Tab
     const tabFiltered = orders.filter(o => {
       if (activeTab === 'active') {
         return ['pending', 'processing', 'shipping', 'completed'].includes(o.status);
@@ -42,7 +44,6 @@ const Orders = () => {
       return true;
     });
 
-    // 2. Lọc theo Từ khóa tìm kiếm
     const searchFiltered = tabFiltered.filter(o => 
       o.code?.toLowerCase().includes(lowerTerm) ||
       o.customer_name?.toLowerCase().includes(lowerTerm) ||
@@ -51,8 +52,6 @@ const Orders = () => {
     );
 
     setFilteredOrders(searchFiltered);
-    
-    // Reset về trang 1 và bỏ chọn các checkbox khi đổi tab hoặc tìm kiếm
     setCurrentPage(1);
     setSelectedIds([]);
   }, [searchTerm, orders, activeTab]);
@@ -68,27 +67,22 @@ const Orders = () => {
     }
   };
 
-  // [MỚI] Tính toán Phân trang
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
 
-  // [ĐÃ SỬA] HÀM CHỌN TẤT CẢ (Chỉ chọn các đơn đang hiển thị ở trang hiện tại)
   const handleSelectAll = (e) => {
       if (e.target.checked) {
           const allIdsOnPage = currentOrders.map(o => o.id);
-          // Hợp nhất id đang chọn với id trên trang hiện tại (tránh trùng lặp)
           const newSelectedIds = Array.from(new Set([...selectedIds, ...allIdsOnPage]));
           setSelectedIds(newSelectedIds);
       } else {
-          // Bỏ chọn những id thuộc trang hiện tại
           const idsOnPage = currentOrders.map(o => o.id);
           setSelectedIds(selectedIds.filter(id => !idsOnPage.includes(id)));
       }
   };
 
-  // HÀM CHỌN 1 DÒNG
   const handleSelectOne = (id) => {
       if (selectedIds.includes(id)) {
           setSelectedIds(selectedIds.filter(item => item !== id));
@@ -97,7 +91,6 @@ const Orders = () => {
       }
   };
 
-  // HÀM XỬ LÝ BULK UPDATE
   const handleBulkAction = async (status, extraData = {}) => {
       if (selectedIds.length === 0) return;
       if (!confirm(`Xác nhận chuyển ${selectedIds.length} đơn sang "${ORDER_STATUS_MAP[status]?.label || status}"?`)) return;
@@ -115,10 +108,9 @@ const Orders = () => {
           if (res.data.success) {
               toast.update(toastId, { render: `Thành công: ${res.data.results.success.length} đơn`, type: "success", isLoading: false, autoClose: 2000 });
               
-              // Cập nhật giao diện ngay lập tức
               const updatedList = orders.map(o => selectedIds.includes(o.id) ? { ...o, status: status } : o);
               setOrders(updatedList);
-              setSelectedIds([]); // Reset chọn
+              setSelectedIds([]); 
           }
       } catch (error) {
           toast.update(toastId, { render: "Lỗi xử lý", type: "error", isLoading: false, autoClose: 3000 });
@@ -129,7 +121,6 @@ const Orders = () => {
       }
   };
 
-  // Hàm xử lý đổi trạng thái
   const handleUpdateStatus = async (newStatus, restock = false, extraData = {}) => {
     if (!selectedOrder) return;
     setProcessing(true);
@@ -154,7 +145,37 @@ const Orders = () => {
     }
   };
 
-  // Hàm render màu sắc trạng thái
+  // [MỚI] HÀM MỞ CHẾ ĐỘ SỬA
+  const handleEditClick = () => {
+    setEditForm({
+        customer_name: selectedOrder.customer_name || '',
+        customer_phone: selectedOrder.customer_phone || '',
+        customer_address: selectedOrder.customer_address || '',
+        note: selectedOrder.note || ''
+    });
+    setIsEditingMode(true);
+  };
+
+  // [MỚI] HÀM LƯU THÔNG TIN
+  const handleSaveDetails = async () => {
+    setProcessing(true);
+    try {
+        const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrder.id}/details`, editForm);
+        if (res.data.success) {
+            toast.success("Cập nhật thông tin thành công!");
+            // Cập nhật giao diện hiện tại
+            const updatedOrder = { ...selectedOrder, ...editForm };
+            setSelectedOrder(updatedOrder);
+            setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+            setIsEditingMode(false);
+        }
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Lỗi cập nhật thông tin");
+    } finally {
+        setProcessing(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     return (
       <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${ORDER_STATUS_MAP[status]?.color || "bg-gray-100"}`}>
@@ -163,7 +184,6 @@ const Orders = () => {
     );
   };
 
-  // Helper xác định trạng thái chung của các đơn được chọn
   const getSelectedStatusGroup = () => {
       const selected = orders.filter(o => selectedIds.includes(o.id));
       if (selected.length === 0) return null;
@@ -181,13 +201,11 @@ const Orders = () => {
 
   return (
     <div className="p-4 md:p-8 relative min-h-screen">
-      {/* Header Responsive */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <h1 className="text-xl md:text-2xl font-bold text-stone-800 flex items-center gap-2">
             <FaBox /> Quản lý Đơn hàng
           </h1>
 
-          {/* Thanh công cụ */}
           <div className="bg-white p-2 rounded-lg shadow-sm border border-stone-200 w-full md:w-auto">
             <div className="relative md:w-80">
                 <FaSearch className="absolute left-3 top-3 text-stone-400"/>
@@ -202,7 +220,6 @@ const Orders = () => {
           </div>
       </div>
 
-      {/* [MỚI] Hệ thống Tabs */}
       <div className="flex gap-6 border-b border-stone-200 mb-6">
         <button
           className={`pb-3 px-1 text-sm font-bold border-b-2 transition-colors ${activeTab === 'active' ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
@@ -218,14 +235,12 @@ const Orders = () => {
         </button>
       </div>
 
-      {/* Bảng Đơn hàng (Responsive Table) */}
       <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden mb-24">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1100px]">
             <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 uppercase text-xs">
                 <tr>
                     <th className="p-4 w-10">
-                        {/* Checkbox All kiểm tra xem trên trang hiện tại có item nào không, và tất cả có đang được chọn không */}
                         <input 
                             type="checkbox" 
                             onChange={handleSelectAll} 
@@ -275,7 +290,11 @@ const Orders = () => {
                     </td>
                     <td className="p-4 text-right">
                         <button 
-                            onClick={() => { setSelectedOrder(order); setShowModal(true); }}
+                            onClick={() => { 
+                                setSelectedOrder(order); 
+                                setIsEditingMode(false); // Reset trạng thái edit khi mở modal
+                                setShowModal(true); 
+                            }}
                             className="text-stone-500 hover:text-stone-900 flex items-center gap-1 ml-auto p-2 hover:bg-stone-100 rounded"
                         >
                             <FaEye /> Chi tiết
@@ -287,7 +306,6 @@ const Orders = () => {
             </table>
         </div>
 
-        {/* [MỚI] THANH PHÂN TRANG (PAGINATION) */}
         {totalPages > 1 && (
             <div className="p-4 border-t border-stone-200 flex justify-between items-center bg-stone-50">
                 <span className="text-sm text-stone-500 hidden md:block">
@@ -316,7 +334,6 @@ const Orders = () => {
         )}
       </div>
 
-      {/* THANH CÔNG CỤ HÀNG LOẠT (BULK ACTIONS BAR) */}
       {selectedIds.length > 0 && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 z-40 animate-bounce-in">
               <span className="font-bold text-sm flex items-center gap-2">
@@ -355,7 +372,7 @@ const Orders = () => {
 
                   {statusGroup === 'mixed' && (
                       <span className="text-yellow-400 text-xs italic font-medium px-2">
-                          ⚠️ Vui lòng chỉ chọn các đơn có cùng trạng thái (Cùng là Chờ xử lý HOẶC Cùng là Đang giao).
+                          ⚠️ Vui lòng chỉ chọn các đơn có cùng trạng thái.
                       </span>
                   )}
                   {!['pending_group', 'shipping_group', 'mixed'].includes(statusGroup) && statusGroup !== null && (
@@ -369,7 +386,6 @@ const Orders = () => {
           </div>
       )}
 
-      {/* MODAL CHI TIẾT ĐƠN HÀNG */}
       {showModal && selectedOrder && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
@@ -388,29 +404,64 @@ const Orders = () => {
 
                 <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                        {/* Cột Trái: Thông tin khách & Ship */}
-                        <div className="md:col-span-1 space-y-6">
-                            <div>
-                                <h4 className="font-bold text-stone-800 uppercase text-xs mb-2 border-b pb-1">Khách hàng</h4>
-                                <p className="font-bold">{selectedOrder.customer_name}</p>
-                                <p className="text-sm">{selectedOrder.customer_phone}</p>
-                                <p className="text-sm text-stone-600">{selectedOrder.customer_email}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-stone-800 uppercase text-xs mb-2 border-b pb-1">Địa chỉ giao hàng</h4>
-                                <p className="text-sm bg-stone-50 p-3 rounded border text-stone-700">
-                                    {selectedOrder.customer_address || "Tại quầy"}
-                                </p>
+                        {/* CỘT TRÁI: THÔNG TIN KHÁCH & GHI CHÚ */}
+                        <div className="md:col-span-1 space-y-4">
+                            <div className="flex justify-between items-center border-b pb-1">
+                                <h4 className="font-bold text-stone-800 uppercase text-xs">Thông tin giao hàng</h4>
+                                {!isEditingMode && ['pending', 'processing'].includes(selectedOrder.status) && (
+                                    <button onClick={handleEditClick} className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 font-medium">
+                                        <FaEdit /> Sửa
+                                    </button>
+                                )}
                             </div>
                             
-                            <div>
-                                <h4 className="font-bold text-stone-800 uppercase text-xs mb-2 border-b pb-1">Ghi chú đơn hàng</h4>
-                                <div className="text-sm bg-yellow-50 border border-yellow-200 p-3 rounded text-stone-700 italic">
-                                    {selectedOrder.note ? selectedOrder.note : "Không có ghi chú"}
+                            {/* KHU VỰC HIỂN THỊ HOẶC SỬA */}
+                            {isEditingMode ? (
+                                <div className="space-y-3 animate-fade-in bg-stone-50 p-3 rounded border border-stone-200">
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-500 uppercase">Tên khách hàng</label>
+                                        <input type="text" className="w-full border p-2 rounded text-sm outline-none mt-1 focus:border-stone-500" value={editForm.customer_name} onChange={e => setEditForm({...editForm, customer_name: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-500 uppercase">Số điện thoại</label>
+                                        <input type="text" className="w-full border p-2 rounded text-sm outline-none mt-1 focus:border-stone-500" value={editForm.customer_phone} onChange={e => setEditForm({...editForm, customer_phone: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-500 uppercase">Địa chỉ</label>
+                                        <textarea className="w-full border p-2 rounded text-sm outline-none mt-1 h-16 focus:border-stone-500" value={editForm.customer_address} onChange={e => setEditForm({...editForm, customer_address: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-stone-500 uppercase">Ghi chú</label>
+                                        <textarea className="w-full border border-yellow-300 bg-yellow-50 p-2 rounded text-sm outline-none mt-1 h-16 focus:border-yellow-500" value={editForm.note} onChange={e => setEditForm({...editForm, note: e.target.value})} />
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-2 border-t mt-2">
+                                        <button onClick={() => setIsEditingMode(false)} className="px-4 py-2 text-xs font-bold border rounded hover:bg-stone-200">Hủy</button>
+                                        <button onClick={handleSaveDetails} disabled={processing} className="px-4 py-2 text-xs font-bold bg-stone-900 text-white rounded hover:bg-black flex items-center gap-1 disabled:opacity-50">
+                                            <FaSave /> Lưu
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <p className="font-bold">{selectedOrder.customer_name}</p>
+                                        <p className="text-sm">{selectedOrder.customer_phone}</p>
+                                        <p className="text-sm text-stone-600">{selectedOrder.customer_email}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm bg-stone-50 p-3 rounded border text-stone-700">
+                                            {selectedOrder.customer_address || "Tại quầy"}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm bg-yellow-50 border border-yellow-200 p-3 rounded text-stone-700 italic">
+                                            {selectedOrder.note ? selectedOrder.note : "Không có ghi chú"}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
-                            <div>
+                            <div className="mt-6">
                                  <h4 className="font-bold text-stone-800 uppercase text-xs mb-2 border-b pb-1">Thanh toán</h4>
                                  <p className="text-sm uppercase font-bold text-blue-700">{selectedOrder.payment_method}</p>
                             </div>
@@ -456,7 +507,6 @@ const Orders = () => {
                     </div>
                 </div>
 
-                {/* Footer: Các nút hành động */}
                 <div className="p-4 md:p-6 bg-stone-50 border-t flex flex-wrap justify-end gap-3 shrink-0">
                     
                     {['pending', 'processing'].includes(selectedOrder.status) && (

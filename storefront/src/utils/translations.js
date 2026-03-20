@@ -148,6 +148,9 @@ export const translations = {
       swift_instructions: "Vui lòng chuyển khoản đúng số tiền vào tài khoản dưới đây. Hãy ghi Mã đơn hàng hoặc Số điện thoại của bạn vào nội dung chuyển khoản.",
       swift_code: "Mã SWIFT",
       address: "Địa chỉ",
+
+      emailNoteTitle: "Kiểm tra hộp thư của bạn",
+      emailNoteDesc: "Chúng tôi đã gửi email xác nhận đơn hàng. Bạn cũng sẽ nhận được email thông báo kèm mã vận đơn khi đơn hàng bắt đầu được giao."
     },
     auth: {
       login_title: "ĐĂNG NHẬP",
@@ -350,6 +353,9 @@ export const translations = {
       swift_instructions: "Please wire transfer the exact amount to our bank account below. Include your Phone Number or Name in the transfer remark so we can verify your payment.",
       swift_code: "SWIFT Code",
       address: "Address",
+
+      emailNoteTitle: "Check your inbox",
+      emailNoteDesc: "We've sent an order confirmation email. You will also receive a shipping update with a tracking number once your order is on its way."
     },
     auth: {
       login_title: "LOGIN",

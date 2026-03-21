@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-// [CHỈNH SỬA] Import thêm FaArrowLeft, FaArrowRight để làm nút di chuyển ảnh ngang cho đẹp
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import imageCompression from 'browser-image-compression';
@@ -20,7 +19,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     description: '',
     category_id: '',
     collection_ids: [],
-    is_active: true
+    is_active: true,
+    is_preorder: false, // [MỚI]
+    preorder_note: ''   // [MỚI]
   });
 
   const [images, setImages] = useState([]);
@@ -67,7 +68,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             description: productToEdit.description || '',
             category_id: productToEdit.category_id || '',
             collection_ids: loadedCollectionIds,
-            is_active: productToEdit.is_active !== undefined ? productToEdit.is_active : true 
+            is_active: productToEdit.is_active !== undefined ? productToEdit.is_active : true,
+            is_preorder: productToEdit.is_preorder || false, // [MỚI]
+            preorder_note: productToEdit.preorder_note || '' // [MỚI]
         });
 
         setImages(productToEdit.images || []);
@@ -82,7 +85,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         })));
 
       } else {
-        setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [], is_active: true });
+        setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [], is_active: true, is_preorder: false, preorder_note: '' });
         setImages([]);
         setVariants([]);
         setSizeChart('');
@@ -354,6 +357,36 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         </div>
                     </label>
                 </div>
+
+                {/* [MỚI] GIAO DIỆN PREORDER */}
+                <div className="md:col-span-2 border-t border-stone-200 pt-4 mt-2">
+                    <label className="label mb-2">Chế độ đặt trước (Preorder)</label>
+                    <div className={`flex flex-col gap-3 p-4 border rounded-lg transition-colors w-full ${formData.is_preorder ? 'bg-blue-50 border-blue-200' : 'bg-stone-50 border-stone-200'}`}>
+                        <label className="flex items-center gap-3 cursor-pointer w-fit">
+                            <input 
+                                type="checkbox" 
+                                className="w-5 h-5 accent-blue-600 cursor-pointer shrink-0"
+                                checked={formData.is_preorder} 
+                                onChange={(e) => setFormData({...formData, is_preorder: e.target.checked})}
+                            />
+                            <span className={`font-bold text-sm sm:text-base ${formData.is_preorder ? 'text-blue-700' : 'text-stone-600'}`}>
+                                Cho phép khách Đặt trước
+                            </span>
+                        </label>
+                        
+                        {formData.is_preorder && (
+                            <div className="mt-2 animate-fade-in w-full md:w-2/3">
+                                <label className="text-xs font-bold text-stone-500 mb-1 block">Ghi chú Preorder (Hiển thị trên Web cho khách)</label>
+                                <input 
+                                    className="input text-sm bg-white" 
+                                    placeholder="VD: Hàng order dự kiến trả sau 10-15 ngày..." 
+                                    value={formData.preorder_note} 
+                                    onChange={e => setFormData({...formData, preorder_note: e.target.value})} 
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* HÌNH ẢNH GALLERY */}
@@ -371,7 +404,6 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                 className="w-full h-full object-cover" 
                                 loading="lazy" 
                             />
-                            {/* [CHỈNH SỬA TẠI ĐÂY] Đã đổi thành thanh toolbar dưới cùng, sử dụng mũi tên trái/phải, luộn hiện trên Mobile */}
                             <div className="absolute inset-x-0 bottom-0 bg-black/60 flex items-center justify-between px-2 py-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                 <button type="button" onClick={() => moveImage(idx, -1)} className="text-white hover:text-stone-300 p-1 bg-black/40 rounded-sm">
                                     <FaArrowLeft size={10}/>
@@ -409,11 +441,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                     <div className="relative w-32 h-40 sm:w-24 sm:h-32 border border-stone-200 rounded overflow-hidden group bg-white shadow-sm shrink-0 p-1">
                         <img 
                             src={getOptimizedImageUrl(sizeChart, 200)} 
-                            /* [CHỈNH SỬA TẠI ĐÂY] Đổi từ object-cover thành object-contain để không bị crop ngang ảnh */
                             className="w-full h-full object-contain" 
                             loading="lazy" 
                         />
-                        {/* [CHỈNH SỬA] Nút xóa luôn hiển thị trên mobile */}
                         <button type="button" onClick={() => setSizeChart('')} className="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full text-xs shadow-md opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <FaTrash size={10}/>
                         </button>

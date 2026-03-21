@@ -119,7 +119,8 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active } = req.body;
+        // [MỚI] Hứng thêm is_preorder và preorder_note
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
         
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
@@ -138,7 +139,9 @@ exports.createProduct = async (req, res) => {
                 name, slug, base_price, description, category_id, images, 
                 size_chart_url: size_chart_url || null,  
                 name_en, description_en,
-                is_active: is_active !== undefined ? is_active : true // [CẬP NHẬT]
+                is_active: is_active !== undefined ? is_active : true,
+                is_preorder: is_preorder || false, // [MỚI]
+                preorder_note: preorder_note || null // [MỚI]
             }])
             .select()
             .single();
@@ -178,8 +181,8 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        // [CẬP NHẬT] Hứng thêm is_active từ Frontend gửi lên
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active } = req.body;
+        // [MỚI] Hứng thêm is_preorder và preorder_note
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
         
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
@@ -199,7 +202,9 @@ exports.updateProduct = async (req, res) => {
                 name, slug, base_price, description, category_id, images, 
                 size_chart_url: size_chart_url || null, 
                 name_en, description_en,
-                is_active: is_active !== undefined ? is_active : true // [CẬP NHẬT] Cập nhật trạng thái
+                is_active: is_active !== undefined ? is_active : true,
+                is_preorder: is_preorder || false, // [MỚI]
+                preorder_note: preorder_note || null // [MỚI]
             })
             .eq('id', id);
 
@@ -284,7 +289,6 @@ exports.deleteProduct = async (req, res) => {
         const { error } = await supabase.from('products').delete().eq('id', id);
 
         if (error) {
-            // [CẬP NHẬT] Xử lý lỗi khóa ngoại (do đã có đơn hàng)
             if (error.code === '23503') { 
                 return res.status(400).json({ 
                     success: false, 

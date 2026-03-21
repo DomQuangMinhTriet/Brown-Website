@@ -142,6 +142,10 @@ const ProductDetail = () => {
 
     if (!product) return <div className="min-h-screen flex justify-center items-center">{t('product.loading')}</div>;
 
+    // Các biến kiểm tra trạng thái hiển thị nút mua
+    const isOutOfStock = getStock(selectedVariant) <= 0;
+    const canBuy = selectedVariant && (product.is_preorder || !isOutOfStock);
+
     return (
         <div className="min-h-screen pt-10 pb-20 px-4 bg-white">
              <SEO 
@@ -157,11 +161,9 @@ const ProductDetail = () => {
                     <div className="space-y-4">
                         <div className="rounded-xl overflow-hidden aspect-[3/4] relative group bg-stone-50">
                             <img 
-                                // [ĐÃ SỬA] Thêm `key` để ép React chạy lại hiệu ứng mỗi khi đổi ảnh
                                 key={mainImage}
                                 src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)} 
                                 alt={product.name} 
-                                // [ĐÃ SỬA] Áp dụng class hiệu ứng animate-fade-in
                                 className="w-full h-full object-cover transition-all animate-fade-in"
                                 fetchPriority="high"
                             />
@@ -243,9 +245,9 @@ const ProductDetail = () => {
                                                 ${selectedVariant?.id === variant.id 
                                                     ? 'border-stone-900 bg-stone-900 text-white' 
                                                     : 'border-stone-200 text-stone-600 hover:border-stone-900'}
-                                                ${getStock(variant) <= 0 ? 'opacity-50 cursor-not-allowed bg-stone-100' : ''}
+                                                ${!product.is_preorder && getStock(variant) <= 0 ? 'opacity-50 cursor-not-allowed bg-stone-100' : ''}
                                             `}
-                                            disabled={getStock(variant) <= 0}
+                                            disabled={!product.is_preorder && getStock(variant) <= 0}
                                         >
                                             {variant.size} - {lang === 'en' && variant.color_en ? variant.color_en : variant.color}
                                             {getStock(variant) > 0 && getStock(variant) < 5 && (
@@ -258,23 +260,37 @@ const ProductDetail = () => {
                                     <div className="mt-2 text-xs text-stone-500 font-medium">
                                         {getStock(selectedVariant) > 0 
                                             ? `${t('product.in_stock')} ${getStock(selectedVariant)}` 
-                                            : <span className="text-red-500">{t('product.out_of_stock')}</span>}
+                                            : product.is_preorder 
+                                                ? <span className="text-blue-600 font-bold">{lang === 'en' ? 'Available for Pre-order' : 'Sản phẩm này cho phép Đặt trước (Pre-order)'}</span>
+                                                : <span className="text-red-500">{t('product.out_of_stock')}</span>}
                                     </div>
                                 )}
                             </div>
 
+                            {/* HIỂN THỊ GHI CHÚ PREORDER NẾU CÓ */}
+                            {product.is_preorder && product.preorder_note && (
+                                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-sm text-blue-800 flex items-start gap-2">
+                                        <span className="mt-0.5">ℹ️</span> 
+                                        <span>{product.preorder_note}</span>
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Nút Mua */}
                             <button 
                                 onClick={() => addToCart(product, selectedVariant, 1)}
-                                disabled={!selectedVariant || getStock(selectedVariant) <= 0}
+                                disabled={!canBuy}
                                 className={`
                                     w-full py-4 rounded-xl font-bold text-white uppercase tracking-wider shadow-lg transition-transform active:scale-95 mb-8
-                                    ${(!selectedVariant || getStock(selectedVariant) <= 0)
-                                        ? 'bg-stone-300 cursor-not-allowed shadow-none' 
-                                        : 'bg-red-600 hover:bg-red-700'}
+                                    ${!canBuy ? 'bg-stone-300 cursor-not-allowed shadow-none' : 'bg-red-600 hover:bg-red-700'}
                                 `}
                             >
-                                {!selectedVariant ? t('product.select_variant') : getStock(selectedVariant) <= 0 ? t('product.out_of_stock') : t('product.add_to_cart')}
+                                {!selectedVariant 
+                                    ? t('product.select_variant') 
+                                    : isOutOfStock 
+                                        ? (product.is_preorder ? (lang === 'en' ? 'PRE-ORDER NOW' : 'ĐẶT TRƯỚC SẢN PHẨM NÀY') : t('product.out_of_stock')) 
+                                        : t('product.add_to_cart')}
                             </button>
 
                             {/* --- MÔ TẢ & SIZE CHART --- */}

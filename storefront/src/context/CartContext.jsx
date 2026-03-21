@@ -57,7 +57,8 @@ export const CartProvider = ({ children }) => {
                   size: variant.size, 
                   price: Number(product.base_price),
                   quantity: Number(quantity), // FIX: Ép kiểu số
-                  max_stock: Number(variant.quantity_remaining || 0)
+                  max_stock: Number(variant.quantity_remaining || 0),
+                  is_preorder: product.is_preorder || false // [MỚI] Lưu cờ preorder
               }];
           }
       });

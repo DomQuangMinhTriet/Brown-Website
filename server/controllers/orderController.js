@@ -76,6 +76,12 @@ exports.createOrder = async (req, res) => {
 
         const { customer, items, payment_method, voucher_code, shipping_fee, note, lang } = parseResult.data;
         console.log("👉 Dữ liệu Customer sau khi Validate:", customer);
+
+        // [CẬP NHẬT] Đảm bảo an toàn ở Backend: Chặn mọi mail không phải @gmail.com
+        if (customer.email && !customer.email.toLowerCase().endsWith('@gmail.com')) {
+            return res.status(400).json({ success: false, message: 'Hệ thống chỉ hỗ trợ gửi thông báo qua địa chỉ @gmail.com' });
+        }
+
         // ==============================================================================
         // B. [ĐÃ CHỈNH SỬA] XÁC ĐỊNH KHÁCH HÀNG (Ưu tiên Login -> Tìm SĐT -> Tạo mới)
         // ==============================================================================
@@ -127,16 +133,17 @@ exports.createOrder = async (req, res) => {
         // ==============================================================================
         const cleanItems = [];
         let subtotal_check = 0;
+        const itemsToNegative = []; // [MỚI] Mảng chứa các item cần ép số âm cho Preorder
 
         const variantIds = items.map(i => i.variant_id);
         
-        // [ĐÃ SỬA]: Truy vấn thêm inventory_batches để lấy số lượng tồn kho
+        // [ĐÃ SỬA]: Truy vấn thêm is_preorder để kiểm tra
         const { data: variantsDB, error: varError } = await supabase
             .from('variants')
             .select(`
                 id, 
                 current_price, 
-                products(base_price),
+                products(base_price, is_preorder),
                 inventory_batches(quantity_remaining) 
             `)
             .in('id', variantIds);
@@ -149,16 +156,27 @@ exports.createOrder = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Sản phẩm không còn tồn tại.` });
             }
 
-            // [LOGIC MỚI BỔ SUNG]: Tính tổng tồn kho hiện tại của sản phẩm này
+            // Tính tổng tồn kho hiện tại của sản phẩm này
             const totalStock = variant.inventory_batches
                 ? variant.inventory_batches.reduce((sum, batch) => sum + (Number(batch.quantity_remaining) || 0), 0)
                 : 0;
 
-            // [CHẶN LỖI]: Trả về lỗi ngay nếu khách đặt lố số lượng đang có
-            if (item.quantity > totalStock) {
+            // Lấy cờ Preorder
+            const isPreorder = variant.products?.is_preorder;
+
+            // [CHẶN LỖI]: Bỏ qua chặn nếu isPreorder là true
+            if (!isPreorder && item.quantity > totalStock) {
                 return res.status(400).json({ 
                     success: false, 
                     message: `Rất tiếc! Một sản phẩm trong giỏ hàng của bạn hiện chỉ còn ${totalStock} chiếc. Vui lòng cập nhật lại số lượng.` 
+                });
+            }
+
+            // [MỚI] Ghi nhận số lượng bị thiếu để trừ âm sau khi RPC chạy xong (Dành cho Preorder)
+            if (item.quantity > totalStock) {
+                itemsToNegative.push({
+                    variant_id: item.variant_id,
+                    excess_qty: item.quantity - totalStock
                 });
             }
 
@@ -221,8 +239,9 @@ exports.createOrder = async (req, res) => {
                 name: customer.fullName,
                 phone: customer.phone,
                 email: customer.email,
-                // Lưu địa chỉ dạng chuỗi hiển thị
-                address: customer.address + (customer.province ? `, ${customer.district}, ${customer.province}` : ''),
+                // [CẬP NHẬT CHÍNH] Nối thêm chuỗi customer.ward (Xã/Phường) vào địa chỉ để lưu vào Database.
+                // Các Đơn hàng mới từ bây giờ khi xuất hiện bên giao diện Admin sẽ thấy rõ cả Xã/Phường
+                address: customer.address + (customer.province ? `, ${customer.ward || ''}, ${customer.district || ''}, ${customer.province || ''}` : ''),
                 // Lưu ID địa chỉ để dùng cho GHN sau này
                 province_id: customer.province_id,
                 district_id: customer.district_id,
@@ -238,6 +257,38 @@ exports.createOrder = async (req, res) => {
         if (error) {
             console.error("RPC Error:", error);
             return res.status(400).json({ success: false, message: error.message });
+        }
+
+        // ==============================================================================
+        // [MỚI] ÉP TỒN KHO XUỐNG SỐ ÂM CHO HÀNG PREORDER
+        // ==============================================================================
+        if (itemsToNegative.length > 0) {
+            for (const neg of itemsToNegative) {
+                // Tìm lô hàng mới nhất (để gánh số âm)
+                const { data: latestBatch } = await supabase
+                    .from('inventory_batches')
+                    .select('id, quantity_remaining')
+                    .eq('variant_id', neg.variant_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                
+                if (latestBatch) {
+                    await supabase.from('inventory_batches')
+                        .update({ quantity_remaining: latestBatch.quantity_remaining - neg.excess_qty })
+                        .eq('id', latestBatch.id);
+                } else {
+                    // Nếu sản phẩm chưa từng nhập kho bao giờ, tạo lô ảo mang số âm
+                    await supabase.from('inventory_batches').insert([{
+                        variant_id: neg.variant_id,
+                        original_quantity: 0,
+                        quantity_remaining: -neg.excess_qty,
+                        cost_price: 0,
+                        is_adjustment: true,
+                        notes: 'Lô âm tự động (Khách Preorder)'
+                    }]);
+                }
+            }
         }
 
         // ==============================================================================

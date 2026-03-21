@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag, FaCalendarAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaCheckCircle, FaExclamationCircle, FaTimes, FaTag, FaCalendarAlt, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
@@ -193,8 +193,30 @@ const Checkout = () => {
   const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
 
   // QR Code Nội địa
-  const transferContent = `${formData.phone} ${formData.fullName}`.trim().replace(/\s+/g, '%20').toUpperCase();
+  const transferContent = formData.phone ? `BROWN${formData.phone.replace(/\D/g, '')}` : '';
   const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
+
+  // =========================================================================
+  // AUTO POLLING (Quét xem tiền vào chưa)
+  // =========================================================================
+  useEffect(() => {
+      let interval;
+      if (shippingType === 'domestic' && formData.phone.length >= 8 && !isTransferConfirmed && !isOrderSuccess) {
+          interval = setInterval(async () => {
+              try {
+                  const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/payments/check?content=${transferContent}&amount=${finalTotal}`);
+                  if (res.data.success && res.data.isPaid) {
+                      setIsTransferConfirmed(true); 
+                      toast.success("🎉 Ting Ting! Đã nhận được thanh toán.");
+                      clearInterval(interval); 
+                  }
+              } catch (error) {
+                  console.error("Lỗi quét thanh toán", error);
+              }
+          }, 5000); 
+      }
+      return () => clearInterval(interval);
+  }, [shippingType, formData.phone, isTransferConfirmed, isOrderSuccess, finalTotal, transferContent]);
 
   // =========================================================================
   // HÀM LÕI ĐỂ GỬI ĐƠN HÀNG LÊN SERVER 
@@ -268,6 +290,12 @@ const Checkout = () => {
 
     if (!isFormValid()) {
         toast.warning(t('checkout.toast_missing_info'));
+        return;
+    }
+
+    // [CẬP NHẬT] Kiểm tra đuôi email phải là @gmail.com
+    if (formData.email && !formData.email.toLowerCase().endsWith('@gmail.com')) {
+        toast.error(lang === 'en' ? 'Please use a @gmail.com address, or leave it blank and contact via IG.' : 'Vui lòng sử dụng @gmail.com để nhận thông báo. Hoặc để trống và LH Zalo/IG.');
         return;
     }
 
@@ -366,23 +394,37 @@ const Checkout = () => {
                                     className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
                                     value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})}
                                 />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input 
-                                        type="text" placeholder={t('checkout.phone')} required
-                                        className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
-                                    />
-                                    <input 
-                                        type="email" placeholder={t('checkout.email')}
-                                        className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
-                                        value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-                                    />
+                                
+                                {/* [CẬP NHẬT] Đã bọc div để hiển thị ghi chú đỏ cho Gmail */}
+                                <div className="grid grid-cols-2 gap-4 items-start">
+                                    <div>
+                                        <input 
+                                            type="text" placeholder={t('checkout.phone')} required
+                                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                                            value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                                        />
+                                    </div>
+                                    <div>
+                                        <input 
+                                            type="email" placeholder={t('checkout.email')}
+                                            className="w-full p-3 border border-stone-200 rounded focus:border-stone-900 outline-none"
+                                            value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                                        />
+                                        <p className="text-[10px] text-red-500 mt-1.5 italic leading-tight">
+                                            {lang === 'en' ? '* Required @gmail.com to receive notifications. Or leave blank.' : '* Bắt buộc dùng @gmail.com. Khác vui lòng để trống và LH Zalo/IG.'}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* --- KHU VỰC CHỌN ĐỊA CHỈ --- */}
                                 <div className="border-t border-stone-200 pt-6 mt-6">
-                                    <h3 className="text-xl font-serif font-bold text-stone-900 mb-4 uppercase tracking-wider">{t('checkout.address')}</h3>
+                                    <h3 className="text-xl font-serif font-bold text-stone-900 uppercase tracking-wider">{t('checkout.address')}</h3>
                                     
+                                    {/* [CẬP NHẬT] Thêm câu nhắc nhở khách dùng địa chỉ cũ */}
+                                    <p className="text-xs text-stone-500 italic mb-4 mt-1">
+                                        {lang === 'en' ? '* Please use your familiar shipping address for the fastest delivery.' : '* Vui lòng ưu tiên sử dụng địa chỉ nhận hàng cũ (nếu có) để thuận tiện giao hàng.'}
+                                    </p>
+
                                     {/* NÚT TOGGLE TRONG NƯỚC / QUỐC TẾ */}
                                     <div className="flex gap-4 mb-6">
                                         <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded cursor-pointer transition-colors ${shippingType === 'domestic' ? 'border-stone-900 bg-stone-50 font-bold text-stone-900' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}>
@@ -543,20 +585,30 @@ const Checkout = () => {
 
                                         <div className="flex justify-between text-xs mt-2 mb-4 pt-2 border-t border-stone-200 border-dashed">
                                             <span className="text-stone-500">{t('checkout.bank_transfer_content')}:</span>
-                                            <span className="font-medium text-blue-600">{formData.phone} {formData.fullName}</span>
+                                            <span className="font-medium text-blue-600">{transferContent}</span>
                                         </div>
 
-                                        <div className="bg-blue-50 border border-blue-200 p-3 rounded mb-4 text-left">
-                                            <label className="flex items-start gap-3 cursor-pointer select-none">
+                                        {/* KHUNG TRẠNG THÁI THANH TOÁN (Auto/Manual) */}
+                                        <div className={`border p-3 rounded mb-4 text-left transition-colors ${isTransferConfirmed ? 'bg-green-50 border-green-400' : 'bg-blue-50 border-blue-200'}`}>
+                                            <label className="flex items-center gap-3 cursor-pointer select-none">
                                                 <input 
                                                     type="checkbox" 
-                                                    className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                                                    className={`w-5 h-5 cursor-pointer ${isTransferConfirmed ? 'accent-green-600' : 'accent-blue-600'}`}
                                                     checked={isTransferConfirmed}
                                                     onChange={(e) => setIsTransferConfirmed(e.target.checked)}
                                                 />
-                                                <span className="text-sm font-bold text-stone-800">
-                                                    {t('checkout.confirm_transfer')} {formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}
-                                                </span>
+                                                <div className="flex-1">
+                                                    <span className="text-sm font-bold text-stone-800 block">
+                                                        {isTransferConfirmed 
+                                                            ? `Đã nhận được ${formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}` 
+                                                            : "Đang chờ thanh toán..."}
+                                                    </span>
+                                                    {!isTransferConfirmed && formData.phone.length >= 8 && (
+                                                        <span className="text-xs text-blue-600 flex items-center gap-2 mt-1 font-medium">
+                                                            <FaSpinner className="animate-spin" /> Hệ thống tự động kiểm tra mỗi 5s
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </label>
                                         </div>
                                         

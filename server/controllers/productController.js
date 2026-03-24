@@ -119,7 +119,6 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        // [MỚI] Hứng thêm is_preorder và preorder_note
         const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
         
         const name_en = await autoTranslate(name);
@@ -140,8 +139,8 @@ exports.createProduct = async (req, res) => {
                 size_chart_url: size_chart_url || null,  
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
-                is_preorder: is_preorder || false, // [MỚI]
-                preorder_note: preorder_note || null // [MỚI]
+                is_preorder: is_preorder || false, 
+                preorder_note: preorder_note || null 
             }])
             .select()
             .single();
@@ -181,7 +180,6 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        // [MỚI] Hứng thêm is_preorder và preorder_note
         const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
         
         const name_en = await autoTranslate(name);
@@ -203,8 +201,8 @@ exports.updateProduct = async (req, res) => {
                 size_chart_url: size_chart_url || null, 
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
-                is_preorder: is_preorder || false, // [MỚI]
-                preorder_note: preorder_note || null // [MỚI]
+                is_preorder: is_preorder || false, 
+                preorder_note: preorder_note || null 
             })
             .eq('id', id);
 
@@ -217,38 +215,56 @@ exports.updateProduct = async (req, res) => {
             await supabase.from('product_collections').insert(collectionData);
         }
 
-        // 3. Xử lý Variants
-        const { data: oldVariants } = await supabase.from('variants').select('id').eq('product_id', id);
+        // 3. Xử lý Variants [ĐÃ SỬA LỖI TẠI ĐÂY]
+        // Lấy full thông tin size và color của các biến thể cũ để đối chiếu
+        const { data: oldVariants } = await supabase.from('variants').select('id, size, color').eq('product_id', id);
         const oldVariantIds = oldVariants.map(v => v.id);
         
-        const { count } = await supabase
-            .from('inventory_batches')
-            .select('*', { count: 'exact', head: true })
-            .in('variant_id', oldVariantIds);
-
-        const hasHistory = count > 0;
+        let hasHistory = false;
+        if (oldVariantIds.length > 0) {
+            const { count } = await supabase
+                .from('inventory_batches')
+                .select('*', { count: 'exact', head: true })
+                .in('variant_id', oldVariantIds);
+            hasHistory = count > 0;
+        }
 
         if (hasHistory) {
             if (variants && variants.length > 0) {
                 for (const v of variants) {
-                    await supabase.from('variants')
-                        .update({ 
-                            image_url: v.image_url || null, 
+                    // Kiểm tra xem biến thể này đã có trong DB chưa
+                    const existingVariant = oldVariants.find(ov => ov.size === v.size && ov.color === v.color);
+
+                    if (existingVariant) {
+                        // Đã có -> Chỉ Update (Không xóa do có lịch sử kho)
+                        await supabase.from('variants')
+                            .update({ 
+                                image_url: v.image_url || null, 
+                                sku: v.sku,
+                                color_en: v.color_en || null 
+                            })
+                            .eq('id', existingVariant.id);
+                    } else {
+                        // Chưa có -> Insert mới hoàn toàn
+                        await supabase.from('variants').insert([{
+                            product_id: id,
+                            size: v.size,
+                            color: v.color,
+                            color_en: v.color_en || null, 
                             sku: v.sku,
-                            color_en: v.color_en || null 
-                        })
-                        .eq('product_id', id)
-                        .eq('size', v.size)
-                        .eq('color', v.color);
+                            image_url: v.image_url || null 
+                        }]);
+                    }
                 }
             }
             
             return res.json({ 
                 success: true, 
-                message: 'Đã cập nhật thông tin. (Không thể sửa Size/Màu vì có lịch sử kho)' 
+                message: 'Cập nhật thành công! Đã thêm biến thể mới (Các biến thể cũ được giữ nguyên do có lịch sử kho).' 
             });
         } 
         else {
+            // Nếu chưa từng nhập kho, xóa trắng đi làm lại cho sạch
             await supabase.from('variants').delete().eq('product_id', id);
             
             if (variants && variants.length > 0) {

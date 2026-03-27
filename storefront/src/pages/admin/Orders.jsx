@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 // [CHỈNH SỬA] Import thêm FaEdit, FaSave
-import { FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave } from 'react-icons/fa';
+import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
 
@@ -20,6 +20,9 @@ const Orders = () => {
   const [processing, setProcessing] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState([]);
+
+const [showExportModal, setShowExportModal] = useState(false);
+const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
   // [MỚI] STATE CHO FORM CHỈNH SỬA
   const [isEditingMode, setIsEditingMode] = useState(false);
@@ -199,6 +202,32 @@ const Orders = () => {
 
   const statusGroup = getSelectedStatusGroup();
 
+    const handleExportOrders = async () => {
+        try {
+            const query = new URLSearchParams();
+            if (exportDates.start) query.append('startDate', exportDates.start);
+            if (exportDates.end) query.append('endDate', exportDates.end);
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/export/sapo?${query.toString()}`);
+            if (!response.ok) throw new Error('Lỗi xuất file');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Sapo_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            
+            setShowExportModal(false);
+            toast.success('Xuất danh sách đơn hàng thành công');
+        } catch (error) {
+            console.error(error);
+            toast.error('Không thể xuất file Excel');
+        }
+    };
+
   return (
     <div className="p-4 md:p-8 relative min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -206,18 +235,24 @@ const Orders = () => {
             <FaBox /> Quản lý Đơn hàng
           </h1>
 
-          <div className="bg-white p-2 rounded-lg shadow-sm border border-stone-200 w-full md:w-auto">
-            <div className="relative md:w-80">
-                <FaSearch className="absolute left-3 top-3 text-stone-400"/>
-                <input 
-                    type="text" 
-                    placeholder="Tìm đơn, tên, SĐT, ghi chú..." 
-                    className="w-full pl-10 p-2 border-none outline-none text-sm"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                />
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="bg-white p-2 rounded-lg shadow-sm border border-stone-200 flex-1 md:flex-none">
+                <div className="relative md:w-80">
+                    <FaSearch className="absolute left-3 top-3 text-stone-400"/>
+                    <input 
+                        type="text" placeholder="Tìm đơn, tên, SĐT, ghi chú..." 
+                        className="w-full pl-10 p-2 border-none outline-none text-sm"
+                        value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
-          </div>
+            <button 
+                onClick={() => setShowExportModal(true)}
+                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg shadow-sm font-bold text-sm shrink-0"
+            >
+                <FaFileExcel size={16} /> <span className="hidden md:inline">Xuất Sapo</span>
+            </button>
+        </div>
       </div>
 
       <div className="flex gap-6 border-b border-stone-200 mb-6">
@@ -560,6 +595,35 @@ const Orders = () => {
                             </button>
                         </div>
                     )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* [MỚI] EXPORT SAPO MODAL */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-fade-in">
+                <div className="p-4 border-b bg-stone-50 flex justify-between items-center">
+                    <h3 className="font-bold text-lg text-stone-800">Xuất đơn hàng (Sapo)</h3>
+                    <button onClick={() => setShowExportModal(false)} className="text-stone-400 hover:text-red-500 text-xl leading-none">&times;</button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <p className="text-xs text-stone-500 italic mb-2">Bỏ trống nếu muốn tải xuống toàn bộ đơn hàng trong hệ thống.</p>
+                    <div>
+                        <label className="block text-sm font-bold text-stone-700 mb-1">Từ ngày</label>
+                        <input type="date" className="w-full border border-stone-300 p-2 rounded outline-none focus:border-stone-900" value={exportDates.start} onChange={e => setExportDates({...exportDates, start: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-stone-700 mb-1">Đến ngày</label>
+                        <input type="date" className="w-full border border-stone-300 p-2 rounded outline-none focus:border-stone-900" value={exportDates.end} onChange={e => setExportDates({...exportDates, end: e.target.value})} />
+                    </div>
+                </div>
+                <div className="p-4 bg-stone-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-bold text-stone-600 hover:bg-stone-200 rounded transition-colors">Hủy bỏ</button>
+                    <button onClick={handleExportOrders} className="px-4 py-2 text-sm font-bold bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 shadow transition-colors">
+                        <FaFileExcel /> Tải file Excel
+                    </button>
                 </div>
             </div>
         </div>

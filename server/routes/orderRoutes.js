@@ -23,4 +23,7 @@ router.put('/:id/details', orderController.updateOrderDetails);
 // Route update trạng thái đơn lẻ (Dòng này phải nằm dưới bulk-status và details)
 router.put('/:id/status', orderController.updateOrderStatus);
 router.post('/create-admin', orderController.createAdminOrder);
+
+router.get('/export/sapo', orderController.exportOrdersToSapoExcel);
+
 module.exports = router;

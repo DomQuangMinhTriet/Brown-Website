@@ -1,3 +1,4 @@
+const exceljs = require('exceljs');
 const supabase = require('../config/supabase');
 const translate = require('translate-google');
 
@@ -319,5 +320,173 @@ exports.deleteProduct = async (req, res) => {
     } catch (error) {
         console.error("Delete Error:", error);
         res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// [MỚI] XUẤT EXCEL THEO CHUẨN SAPO
+exports.exportProductsToSapoExcel = async (req, res) => {
+    try {
+        // 1. Lấy toàn bộ dữ liệu sản phẩm, biến thể và tồn kho
+        const { data: products, error } = await supabase
+            .from('products')
+            .select(`
+                *,
+                variants (
+                    id, size, color, sku, image_url, current_price,
+                    inventory_batches ( quantity_remaining, cost_price, created_at ) 
+                ),
+                categories!fk_products_main_category (name)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // 2. Chuẩn bị file Excel
+        const workbook = new exceljs.Workbook();
+        const worksheet = workbook.addWorksheet('Danh sách sản phẩm');
+
+        // Định nghĩa chính xác các cột theo mẫu Sapo
+        worksheet.columns = [
+            { header: 'Đường dẫn/Alias', key: 'alias', width: 25 },
+            { header: 'Tên sản phẩm*', key: 'name', width: 40 },
+            { header: 'Mô tả sản phẩm', key: 'description', width: 30 },
+            { header: 'Nhãn hiệu', key: 'brand', width: 15 },
+            { header: 'Loại sản phẩm', key: 'category', width: 20 },
+            { header: 'Nhóm ngành nghề tính thuế GTGT, TNCN', key: 'tax_group', width: 15 },
+            { header: 'Tags', key: 'tags', width: 15 },
+            { header: 'Yêu cầu vận chuyển', key: 'require_shipping', width: 15 },
+            { header: 'Hiển thị*', key: 'is_active', width: 15 },
+            { header: 'Thuộc tính 1', key: 'attr1_name', width: 15 },
+            { header: 'Giá trị thuộc tính 1', key: 'attr1_val', width: 20 },
+            { header: 'Thuộc tính 2', key: 'attr2_name', width: 15 },
+            { header: 'Giá trị thuộc tính 2', key: 'attr2_val', width: 20 },
+            { header: 'Thuộc tính 3', key: 'attr3_name', width: 15 },
+            { header: 'Giá trị thuộc tính 3', key: 'attr3_val', width: 20 },
+            { header: 'Áp dụng thuế', key: 'taxable', width: 15 },
+            { header: 'Mã SKU', key: 'sku', width: 20 },
+            { header: 'Barcode', key: 'barcode', width: 15 },
+            { header: 'Đơn vị tính', key: 'unit', width: 15 },
+            { header: 'Ảnh đại diện', key: 'main_image', width: 40 },
+            { header: 'Chú thích ảnh', key: 'image_alt', width: 15 },
+            { header: 'Thẻ tiêu đề(SEO Title)', key: 'seo_title', width: 15 },
+            { header: 'Thẻ mô tả(SEO Description)', key: 'seo_desc', width: 15 },
+            { header: 'Mô tả ngắn', key: 'short_desc', width: 15 },
+            { header: 'Quản lý kho', key: 'inventory_tracker', width: 15 },
+            { header: 'Quản lý lô - HSD', key: 'lot_tracking', width: 15 },
+            { header: 'Số ngày cảnh báo trước hết hạn', key: 'expire_warning', width: 15 },
+            { header: 'Khối lượng', key: 'weight', width: 15 },
+            { header: 'Đơn vị khối lượng', key: 'weight_unit', width: 15 },
+            { header: 'Ảnh phiên bản', key: 'variant_image', width: 40 },
+            { header: 'Cho phép tiếp tục mua khi hết hàng', key: 'continue_selling', width: 25 },
+            { header: 'Giá', key: 'price', width: 15 },
+            { header: 'Giá so sánh', key: 'compare_price', width: 15 },
+            { header: 'Giá vốn', key: 'cost_price', width: 15 },
+            { header: 'Cửa hàng chính_Tồn kho', key: 'stock', width: 20 },
+            { header: 'Id phiên bản', key: 'variant_id', width: 15 }
+        ];
+
+        // 3. Đổ dữ liệu vào hàng (Logic: Dòng đầu tiên đầy đủ, các dòng biến thể sau ẩn thông tin chung)
+        products.forEach(product => {
+            const alias = product.slug;
+            const categoryName = product.categories?.name || '';
+            const isActive = product.is_active ? 'Có' : 'Không';
+            const isPreorder = product.is_preorder ? 'Có' : 'Không';
+            const mainImage = product.images && product.images.length > 0 ? product.images[0] : '';
+            
+            // Xóa HTML tags trong mô tả (Sapo nhận text trơn hoặc HTML)
+            let description = product.description || '';
+
+            if (product.variants && product.variants.length > 0) {
+                product.variants.forEach((variant, index) => {
+                    const isFirst = index === 0; // Đánh dấu dòng biến thể đầu tiên của sản phẩm
+
+                    // Tính tồn kho
+                    const totalStock = variant.inventory_batches 
+                        ? variant.inventory_batches.reduce((sum, batch) => sum + (Number(batch.quantity_remaining) || 0), 0)
+                        : 0;
+
+                    // Tính giá vốn (lấy lô mới nhất)
+                    let costPrice = 0;
+                    if (variant.inventory_batches && variant.inventory_batches.length > 0) {
+                        const sortedBatches = variant.inventory_batches.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                        costPrice = sortedBatches[0].cost_price || 0;
+                    }
+
+                    worksheet.addRow({
+                        alias: alias,
+                        name: isFirst ? product.name : '',
+                        description: isFirst ? description : '',
+                        brand: '',
+                        category: isFirst ? categoryName : '',
+                        tax_group: '101',
+                        tags: '',
+                        require_shipping: isFirst ? 'Có' : '',
+                        is_active: isFirst ? isActive : '',
+                        
+                        attr1_name: variant.size ? 'Kích thước' : '',
+                        attr1_val: variant.size || '',
+                        attr2_name: variant.color ? 'Màu sắc' : '',
+                        attr2_val: variant.color || '',
+                        attr3_name: '',
+                        attr3_val: '',
+                        
+                        taxable: 'Không',
+                        sku: variant.sku || '',
+                        barcode: '',
+                        unit: isFirst ? 'Cái' : '', // Đơn vị tính mặc định
+                        main_image: isFirst ? mainImage : '',
+                        image_alt: '',
+                        seo_title: '',
+                        seo_desc: '',
+                        short_desc: '',
+                        
+                        inventory_tracker: 'Sapo', // Chữ "Sapo" để Sapo hiểu là quản lý kho
+                        lot_tracking: '',
+                        expire_warning: '',
+                        weight: '',
+                        weight_unit: '',
+                        
+                        variant_image: variant.image_url || '',
+                        continue_selling: isPreorder, // Preorder chính là "Cho phép tiếp tục mua"
+                        
+                        price: variant.current_price || product.base_price || 0,
+                        compare_price: product.base_price || 0,
+                        cost_price: costPrice,
+                        stock: totalStock,
+                        variant_id: variant.id || '' // Rất quan trọng khi cập nhật Sapo
+                    });
+                });
+            } else {
+                // Trường hợp sản phẩm không có biến thể nào
+                worksheet.addRow({
+                    alias: alias,
+                    name: product.name,
+                    description: description,
+                    category: categoryName,
+                    require_shipping: 'Có',
+                    is_active: isActive,
+                    taxable: 'Không',
+                    unit: 'Cái',
+                    main_image: mainImage,
+                    inventory_tracker: 'Sapo',
+                    continue_selling: isPreorder,
+                    price: product.base_price || 0,
+                    compare_price: product.base_price || 0,
+                    cost_price: 0,
+                    stock: 0
+                });
+            }
+        });
+
+        // 4. Trả file về cho trình duyệt tải xuống
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=' + `Sapo_Products_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (error) {
+        console.error("Export Sapo Excel Error:", error);
+        res.status(500).json({ success: false, message: 'Lỗi xuất file Excel Sapo: ' + error.message });
     }
 };

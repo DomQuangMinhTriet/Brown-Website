@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const { sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdmin } = require('../services/emailService');
 const { calculateShippingFee, createGHNOrder } = require('../services/shippingService'); // <--- IMPORT HELPER
 const { z } = require('zod');
+const exceljs = require('exceljs');
 
 // --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
 const orderSchema = z.object({
@@ -778,5 +779,194 @@ exports.updateOrderDetails = async (req, res) => {
     } catch (error) {
         console.error("Update Order Details Error:", error);
         res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
+exports.exportOrdersToSapoExcel = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        // [ĐÃ SỬA] Hàm làm sạch, định dạng và LỌC chuẩn số điện thoại Việt Nam
+        const formatSapoPhone = (phone) => {
+            if (!phone) return null;
+            
+            // 1. Xóa tất cả các ký tự không phải là số (khoảng trắng, dấu +, -, .)
+            let cleaned = phone.toString().replace(/\D/g, '');
+            
+            // 2. Chuyển đổi mã vùng 84 thành đầu số 0
+            if (cleaned.startsWith('84')) {
+                cleaned = '0' + cleaned.slice(2);
+            } 
+            // Nếu chưa có số 0 ở đầu thì thêm vào (đề phòng Excel nuốt số 0)
+            else if (!cleaned.startsWith('0')) {
+                cleaned = '0' + cleaned;
+            }
+            
+            // 3. Kiểm tra xem có đúng định dạng SĐT Việt Nam không (10 số, đầu 03, 05, 07, 08, 09)
+            const vnPhoneRegex = /^0[35789]\d{8}$/;
+            
+            if (vnPhoneRegex.test(cleaned)) {
+                return cleaned; // Nếu chuẩn VN thì lấy
+            }
+            
+            // Nếu không chuẩn VN (SĐT nước ngoài, bị thiếu/dư số) -> Bỏ qua (trả về null)
+            return null;
+        };
+
+        // 1. Truy vấn đơn hàng
+        let query = supabase
+            .from('orders')
+            .select(`
+                *,
+                customers ( email ),
+                order_items (
+                    quantity, price_at_purchase,
+                    variants (
+                        sku, size, color,
+                        products ( name )
+                    )
+                )
+            `)
+            .order('created_at', { ascending: true }); // Sắp xếp cũ đến mới
+
+        if (startDate) {
+            query = query.gte('created_at', startDate);
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            query = query.lte('created_at', end.toISOString());
+        }
+
+        const { data: orders, error } = await query;
+        if (error) throw error;
+
+        // 2. Tạo Workbook
+        const workbook = new exceljs.Workbook();
+        const worksheet = workbook.addWorksheet('FileNhapDonHang');
+
+        // Định dạng 3 dòng Header theo chuẩn Sapo
+        worksheet.addRow([
+            'STT*', 'Thông tin đơn hàng', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+            'Thông tin mua hàng', '', '', '', '', '', '', '', '', '', '', '', 'Thuế', '',
+            'Khách hàng', '', 'Địa chỉ giao hàng', '', '', '', '', '', '', 'Thông tin khác', '', '', ''
+        ]);
+        worksheet.addRow([
+            '', 'Mã đơn hàng', 'Nguồn đơn hàng', 'Ngày đặt hàng', 'Tác động tồn kho', 'Cho phép bán âm', 'Gửi email thông báo', 'Giá đã bao gồm thuế', 'Trạng thái thanh toán', 'Phương thức thanh toán', 'Trạng thái giao hàng', 'Hình thức giao hàng', 'Đối tác vận chuyển', 'Phí giao hàng', 'Giảm giá đơn hàng', '', '',
+            'Mã phiên bản', 'Tên sản phẩm', 'Tên phiên bản', 'SKU', 'Đơn vị', 'Số lượng*', 'Giá bán', 'Giảm giá sản phẩm', 'Khối lượng', 'Yêu cầu vận chuyển', 'Ghi chú sản phẩm', 'Nhãn hiệu', '', '',
+            'Số điện thoại', 'Email', 'Họ khách hàng', 'Tên khách hàng', 'SĐT giao hàng', 'Địa chỉ', 'Tỉnh thành', 'Quận huyện', 'Phường xã', 'SĐT nhân viên phụ trách', 'Ghi chú', 'Tags', 'Tham chiếu'
+        ]);
+        worksheet.addRow([
+            '', '', '', '', '', '', '', '', '', '', '', '', '', '', '%', 'VND', 'Mô tả',
+            '', '', '', '', '', '', '', '', '', '', '', '', 'Tỉ lệ', 'Số tiền',
+            '', '', '', '', '', '', '', '', '', '', '', '', ''
+        ]);
+
+        worksheet.mergeCells('B1:Q1');
+        worksheet.mergeCells('R1:AC1');
+        worksheet.mergeCells('AD1:AE1');
+        worksheet.mergeCells('AF1:AG1');
+        worksheet.mergeCells('AH1:AN1');
+        worksheet.mergeCells('AO1:AR1');
+
+        // 3. Đổ dữ liệu
+        let stt = 1;
+        orders.forEach(order => {
+            const date = new Date(order.created_at);
+            const vnTime = new Date(date.getTime() + 7 * 60 * 60 * 1000); 
+            const formattedDate = vnTime.toISOString().replace('T', ' ').substring(0, 16); 
+
+            const isPaid = order.payment_method !== 'cod' ? 'Đã thanh toán' : (['completed'].includes(order.status) ? 'Đã thanh toán' : 'Chưa thanh toán');
+            const paymentMethodStr = order.payment_method === 'cod' ? 'Thanh toán COD' : 'Chuyển khoản';
+            
+            let deliveryStatus = 'Chưa giao hàng';
+            if (order.status === 'shipping') deliveryStatus = 'Đang giao hàng';
+            if (order.status === 'completed') deliveryStatus = 'Đã giao hàng';
+
+            let province = null, district = null, ward = null, street = order.customer_address || null;
+            if (street) {
+                const addrParts = street.split(',').map(s => s.trim());
+                if (addrParts.length >= 4) {
+                    province = addrParts[addrParts.length - 1];
+                    district = addrParts[addrParts.length - 2];
+                    ward = addrParts[addrParts.length - 3];
+                    street = addrParts.slice(0, addrParts.length - 3).join(', ');
+                }
+            }
+
+            // Gọi hàm formatSapoPhone để lọc các số không hợp lệ
+            const sapoPhone = formatSapoPhone(order.customer_phone);
+
+            if (order.order_items && order.order_items.length > 0) {
+                order.order_items.forEach((item, index) => {
+                    const isFirst = index === 0;
+
+                    worksheet.addRow([
+                        stt, // 1
+                        isFirst ? order.code : null, // 2
+                        isFirst ? 'Web' : null, // 3
+                        isFirst ? formattedDate : null, // 4
+                        isFirst ? 'Có' : null, // 5
+                        isFirst ? 'Không' : null, // 6
+                        isFirst ? 'Có' : null, // 7
+                        isFirst ? 'Có' : null, // 8
+                        isFirst ? isPaid : null, // 9
+                        isFirst ? paymentMethodStr : null, // 10
+                        isFirst ? deliveryStatus : null, // 11
+                        isFirst ? 'Giao hàng' : null, // 12
+                        isFirst ? 'other' : null,  // 13
+                        isFirst ? (order.shipping_fee || 0) : null, // 14
+                        
+                        null, // 15
+                        isFirst ? (order.discount_amount || null) : null, // 16
+                        isFirst ? (order.voucher_code || null) : null, // 17
+                        
+                        null, // 18
+                        item.variants?.products?.name || null, // 19
+                        `${item.variants?.size || ''} - ${item.variants?.color || ''}`.trim(), // 20
+                        item.variants?.sku || null, // 21
+                        'Cái', // 22
+                        item.quantity, // 23
+                        item.price_at_purchase, // 24
+                        null, // 25
+                        null, // 26
+                        'Có', // 27
+                        null, // 28
+                        null, // 29
+                        null, // 30
+                        null, // 31
+                        
+                        // Nếu sapoPhone = null (khách nước ngoài / lỗi), ô này sẽ trống
+                        isFirst ? sapoPhone : null, // 32. SĐT Khách hàng
+                        isFirst ? (order.customers?.email || null) : null, // 33
+                        isFirst ? order.customer_name : null, // 34
+                        null, // 35
+                        isFirst ? sapoPhone : null, // 36. SĐT Giao hàng
+                        
+                        isFirst ? street : null, // 37
+                        isFirst ? province : null, // 38
+                        isFirst ? district : null, // 39
+                        isFirst ? ward : null, // 40
+                        null, // 41
+                        isFirst ? (order.note || null) : null, // 42
+                        null, // 43
+                        null  // 44
+                    ]);
+                });
+            }
+            stt++;
+        });
+
+        // 4. Trả file về trình duyệt
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=Sapo_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (error) {
+        console.error("Export Sapo Orders Error:", error);
+        res.status(500).json({ success: false, message: 'Lỗi xuất file Excel: ' + error.message });
     }
 };

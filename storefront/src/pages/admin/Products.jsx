@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { FaPlus, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaEdit, FaTrash, FaFileExcel } from 'react-icons/fa';
 import ProductModal from '../../components/ProductModal';
 import { toast } from 'react-toastify'; 
 
@@ -67,6 +67,26 @@ const Products = () => {
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Hàm xử lý xuất file Excel
+  const handleExportSapo = async () => {
+      try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/export/sapo`);
+          const blob = await response.blob();
+          
+          // Tạo đường link ảo để trình duyệt tự tải file về
+          const url = window.URL.createObjectURL(new Blob([blob]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `Sapo_Products_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+          document.body.appendChild(link);
+          link.click();
+          link.parentNode.removeChild(link);
+      } catch (error) {
+          console.error("Lỗi xuất file:", error);
+          toast.error("Không thể xuất file Excel");
+      }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -76,8 +96,17 @@ const Products = () => {
         </div>
         
         <button 
+            onClick={handleExportSapo}
+            className="ml-auto bg-green-600 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-stone-800 shadow-lg transition-all"
+            //className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow font-bold text-sm"
+        >
+            <FaFileExcel size={14} />
+            Xuất file Sapo
+        </button>
+
+        <button 
             onClick={handleCreate} 
-            className="bg-stone-900 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-stone-800 shadow-lg transition-all"
+            className="bg-stone-900 text-white px-6 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-green-800 shadow-lg transition-all"
         >
           <FaPlus size={14} /> Thêm sản phẩm
         </button>

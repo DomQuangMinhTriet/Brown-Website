@@ -8,14 +8,6 @@ import { toast } from 'react-toastify';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
 
-// --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
-// const MY_BANK = {
-//   BANK_ID: 'SACOMBANK', 
-//   ACCOUNT_NO: '0902173763', 
-//   ACCOUNT_NAME: 'LUU THI PHUONG QUYNH', 
-//   TEMPLATE: 'compact' 
-// };
-
 // CẤU HÌNH API GHN ĐỂ LẤY ĐỊA CHỈ CHUẨN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce'; 
 const GHN_API_BASE = 'https://online-gateway.ghn.vn/shiip/public-api/master-data';
@@ -46,7 +38,7 @@ const Checkout = () => {
   // SHIPPING TYPE (DOMESTIC/INTERNATIONAL) 
   const [shippingType, setShippingType] = useState('domestic');
 
-  // [MỚI THÊM] State quản lý màn hình đặt hàng thành công
+  // State quản lý màn hình đặt hàng thành công
   const [isOrderSuccess, setIsOrderSuccess] = useState(false);
 
   // Form State
@@ -57,8 +49,8 @@ const Checkout = () => {
     country: '', state_province: '', city: '', zipcode: ''
   });
   
-  // Payment & Shipping
-  const [shippingFee, setShippingFee] = useState(20000); 
+  // [CẬP NHẬT] Đặt state shippingFee = 0 để không cộng vào số tiền khách cần chuyển khoản
+  const [shippingFee, setShippingFee] = useState(0); 
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -115,11 +107,9 @@ const Checkout = () => {
 
   // Nếu giỏ hàng rỗng -> Quay về
   useEffect(() => {
-    // Chỉ tự động quay về giỏ hàng nếu chưa ở màn hình thành công
     if (cartItems.length === 0 && !isOrderSuccess) navigate('/cart');
   }, [cartItems, navigate, isOrderSuccess]);
   
-  // SỬA LOGIC CHANGE ĐỂ GỌI API GHN
   const handleProvinceChange = async (e) => {
     const pid = parseInt(e.target.value); 
     const pname = e.target.options[e.target.selectedIndex].text;
@@ -151,17 +141,15 @@ const Checkout = () => {
     const wname = e.target.options[e.target.selectedIndex].text;
     setFormData({...formData, ward_code: wcode, ward_name: wname});
     
-    // Giả lập tính xong phí ship nội địa
-    setShippingFee(20000); 
+    // [CẬP NHẬT] Tạm thời set phí ship = 0 để không cộng vào total, chỉ hiển thị UI là 20k
+    setShippingFee(0); 
   };
 
-    const handleCountryChange = (e) => {
-        const selectedCountry = e.target.value;
-        setFormData({...formData, country: selectedCountry});
-        
-        // Nếu là đơn quốc tế, set phí ship = 0 để tính Total chỉ gồm tiền quần áo
-        setShippingFee(0); 
-    };
+  const handleCountryChange = (e) => {
+      const selectedCountry = e.target.value;
+      setFormData({...formData, country: selectedCountry});
+      setShippingFee(0); 
+  };
 
   // XỬ LÝ VOUCHER
   const handleApplyVoucher = async () => {
@@ -192,31 +180,20 @@ const Checkout = () => {
 
   const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
 
-  // QR Code Nội địa
-  const transferContent = formData.phone ? `BROWN${formData.phone.replace(/\D/g, '')}` : '';
-  //const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
-
   // =========================================================================
-  // AUTO POLLING (Quét xem tiền vào chưa)
+  // [ĐÃ TẮT] AUTO POLLING - Tắt chức năng check 5s vì chưa liên kết Bank
   // =========================================================================
+  /*
   useEffect(() => {
       let interval;
       if (shippingType === 'domestic' && formData.phone.length >= 8 && !isTransferConfirmed && !isOrderSuccess) {
           interval = setInterval(async () => {
-              try {
-                  const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/payments/check?content=${transferContent}&amount=${finalTotal}`);
-                  if (res.data.success && res.data.isPaid) {
-                      setIsTransferConfirmed(true); 
-                      toast.success("🎉 Ting Ting! Đã nhận được thanh toán.");
-                      clearInterval(interval); 
-                  }
-              } catch (error) {
-                  console.error("Lỗi quét thanh toán", error);
-              }
+              ...
           }, 5000); 
       }
       return () => clearInterval(interval);
-  }, [shippingType, formData.phone, isTransferConfirmed, isOrderSuccess, finalTotal, transferContent]);
+  }, [...]);
+  */
 
   // =========================================================================
   // HÀM LÕI ĐỂ GỬI ĐƠN HÀNG LÊN SERVER 
@@ -269,7 +246,6 @@ const Checkout = () => {
     }
   };
 
-  // Hàm validate dùng chung để check xem đã điền đủ form chưa
   const isFormValid = () => {
     if (shippingType === 'domestic') {
         return formData.fullName && formData.phone && formData.street && formData.ward_code;
@@ -278,10 +254,9 @@ const Checkout = () => {
     }
   };
 
-  // Bắt sự kiện submit form (CHỈ DÀNH CHO NỘI ĐỊA)
   const handleDomesticSubmit = async (e) => {
     e.preventDefault();
-    if (shippingType === 'international') return; // Chặn enter key nếu đang ở tab quốc tế
+    if (shippingType === 'international') return; 
 
     if (tetStatus.code === 'CLOSED') {
         toast.error(t('checkout.toast_tet_closed'));
@@ -293,7 +268,6 @@ const Checkout = () => {
         return;
     }
 
-    // [CẬP NHẬT] Kiểm tra đuôi email phải là @gmail.com
     if (formData.email && !formData.email.toLowerCase().endsWith('@gmail.com')) {
         toast.error(lang === 'en' ? 'Please use a @gmail.com address, or leave it blank and contact via IG.' : 'Vui lòng sử dụng @gmail.com để nhận thông báo. Hoặc để trống và LH Zalo/IG.');
         return;
@@ -318,7 +292,6 @@ const Checkout = () => {
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
         
-        {/* KIỂM TRA NẾU THÀNH CÔNG -> HIỆN MÀN HÌNH CHỜ MAIL */}
         {isOrderSuccess ? (
             <div className="text-center py-20 bg-stone-50 rounded-xl border border-stone-200 animate-fade-in">
                 <div className="text-6xl mb-4 text-green-500 flex justify-center">
@@ -328,7 +301,6 @@ const Checkout = () => {
                     {lang === 'en' ? 'Order Placed Successfully!' : 'Đặt hàng thành công!'}
                 </h2>
 
-                {/* KHUNG THÔNG BÁO CHECK EMAIL */}
                 <div className="max-w-md mx-auto mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4 text-left shadow-sm">
                     <div className="bg-blue-100 p-2 rounded-full shrink-0">
                         <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -357,7 +329,6 @@ const Checkout = () => {
                 </div>
             </div>
         ) : (
-            /* TOÀN BỘ FORM CHECKOUT HIỆN TẠI (CHƯA THÀNH CÔNG) */
             <>
                 <Link to="/cart" className="flex items-center text-stone-500 hover:text-stone-900 mb-8 w-fit">
                     <FaArrowLeft className="mr-2" /> {t('checkout.back_to_cart')}
@@ -395,7 +366,6 @@ const Checkout = () => {
                                     value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})}
                                 />
                                 
-                                {/* [CẬP NHẬT] Đã bọc div để hiển thị ghi chú đỏ cho Gmail */}
                                 <div className="grid grid-cols-2 gap-4 items-start">
                                     <div>
                                         <input 
@@ -416,16 +386,13 @@ const Checkout = () => {
                                     </div>
                                 </div>
 
-                                {/* --- KHU VỰC CHỌN ĐỊA CHỈ --- */}
                                 <div className="border-t border-stone-200 pt-6 mt-6">
                                     <h3 className="text-xl font-serif font-bold text-stone-900 uppercase tracking-wider">{t('checkout.address')}</h3>
                                     
-                                    {/* [CẬP NHẬT] Thêm câu nhắc nhở khách dùng địa chỉ cũ */}
                                     <p className="text-xs text-stone-500 italic mb-4 mt-1">
                                         {lang === 'en' ? '* Please use your familiar shipping address for the fastest delivery.' : '* Vui lòng ưu tiên sử dụng địa chỉ nhận hàng cũ (nếu có) để thuận tiện giao hàng.'}
                                     </p>
 
-                                    {/* NÚT TOGGLE TRONG NƯỚC / QUỐC TẾ */}
                                     <div className="flex gap-4 mb-6">
                                         <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded cursor-pointer transition-colors ${shippingType === 'domestic' ? 'border-stone-900 bg-stone-50 font-bold text-stone-900' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}>
                                             <input type="radio" name="shippingType" value="domestic" className="hidden" checked={shippingType === 'domestic'} 
@@ -439,7 +406,6 @@ const Checkout = () => {
                                         </label>
                                     </div>
 
-                                    {/* FORM ĐỊA CHỈ TƯƠNG ỨNG */}
                                     {shippingType === 'domestic' ? (
                                         <div className="grid grid-cols-3 gap-2 mb-4">
                                             <select className="p-3 border rounded outline-none bg-white" value={formData.province_id} onChange={handleProvinceChange} required>
@@ -492,9 +458,7 @@ const Checkout = () => {
                             
                             <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-100 text-center">
                                 
-                                {/* 1. MÃ GIẢM GIÁ & TÍNH TIỀN CHUNG */}
                                 <div className="bg-stone-50 p-4 rounded text-left text-sm space-y-3 mb-6">
-                                    {/* VOUCHER INPUT */}
                                     <div className="flex gap-2 mb-2">
                                         <div className="relative flex-1">
                                             <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none"><FaTag className="text-stone-400 text-xs" /></div>
@@ -513,12 +477,14 @@ const Checkout = () => {
                                         <span className="text-stone-500">{t('checkout.subtotal')}:</span>
                                         <span className="font-medium">{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')} </span>
                                     </div>
+
+                                    {/* [CẬP NHẬT] Hiển thị UI phí ship 20k nhưng ghi chú là thanh toán sau */}
                                     <div className="flex justify-between">
                                         <span className="text-stone-500">{t('checkout.shipping_fee')}:</span>
                                         <span className="font-medium">
                                             {shippingType === 'international' && formData.country
                                                 ? <span className="text-orange-600 font-bold">{lang === 'en' ? 'To be quoted' : 'Sẽ báo giá sau'}</span>
-                                                : (isCalculatingFee ? <span className="text-stone-400 italic">...</span> : formatPrice(shippingFee, lang === 'en' ? 'USD' : 'VND'))
+                                                : <span>{formatPrice(20000, lang === 'en' ? 'USD' : 'VND')}</span>
                                             }
                                         </span>
                                     </div>
@@ -530,51 +496,54 @@ const Checkout = () => {
                                         </div>
                                     )}
 
+                                    {/* [CẬP NHẬT] Tính tổng tiền (Không tính phí ship) và hiển thị thông báo ở dưới */}
                                     <div className="flex justify-between border-t border-stone-200 pt-2">
-                                        <span className="text-stone-900 font-bold">{t('checkout.total')}:</span>
+                                        <span className="text-stone-900 font-bold">{lang === 'en' ? 'Amount to transfer' : 'Số tiền cần chuyển'}:</span>
                                         <span className="font-bold text-xl text-red-600">{formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')} </span>
                                     </div>
+                                    {shippingType === 'domestic' && (
+                                        <div className="mt-2 text-right">
+                                            <p className="text-[11px] text-stone-500 italic leading-relaxed">
+                                                {lang === 'en' 
+                                                    ? '* The shipping fee (20.000đ) will be paid directly to the courier upon delivery. If you prefer to pay the full amount upfront, please contact us via Instagram/Zalo.' 
+                                                    : '* Phí vận chuyển (20.000đ) vui lòng thanh toán cho shipper khi nhận hàng. Nếu bạn muốn thanh toán toàn bộ, vui lòng liên hệ IG/Zalo.'}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/*2. CHỌN KHU VỰC THANH TOÁN*/}
+                                {/* [CẬP NHẬT] XỬ LÝ THANH TOÁN QUỐC TẾ -> ĐIỀU HƯỚNG SANG INSTAGRAM */}
                                 {shippingType === 'international' ? (
-                                    <div className="animate-fade-in">
-                                        {/* CẬP NHẬT: THÔNG TIN ACB CHO KHÁCH QUỐC TẾ */}
-                                        <div className="bg-stone-50 border border-stone-200 p-5 rounded-lg text-sm leading-relaxed text-left text-stone-800 mb-6">
-                                            <h3 className="font-bold text-base mb-4 border-b border-stone-200 pb-2 uppercase tracking-wider text-stone-900">
-                                                {lang === 'en' ? 'Bank Transfer Information' : 'Thông tin chuyển khoản'}
-                                            </h3>
-                                            <div className="space-y-2">
-                                                <p><strong className="text-stone-900 inline-block w-28">Name:</strong> HO KINH DOANH BROWNVN</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Bank Name:</strong> ACB (Asia Commercial Bank)</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Account No:</strong> 49060577</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Branch:</strong> PGD Tan Son Nhi</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">SWIFT CODE:</strong> ASCBVNVX</p>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            disabled
-                                            className="w-full py-4 rounded font-bold uppercase bg-stone-300 text-stone-500 cursor-not-allowed"
+                                    <div className="animate-fade-in text-center bg-stone-50 border border-stone-200 p-6 rounded-lg mb-6">
+                                        <FaExclamationCircle className="text-3xl text-stone-400 mx-auto mb-3"/>
+                                        <h3 className="font-bold text-stone-800 mb-2">
+                                            {lang === 'en' ? 'International Orders' : 'Đơn hàng quốc tế'}
+                                        </h3>
+                                        <p className="text-sm text-stone-600 mb-4">
+                                            {lang === 'en' ? 'Please contact us directly via Instagram to place an international order and get shipping quotes.' : 'Vui lòng liên hệ trực tiếp qua Instagram để đặt hàng và nhận báo giá vận chuyển quốc tế.'}
+                                        </p>
+                                        <a 
+                                            href="https://instagram.com/brown.vn" 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="inline-block bg-stone-900 text-white font-bold py-3 px-6 rounded hover:bg-stone-800 transition-colors shadow-sm"
                                         >
-                                            {lang === 'en' ? 'International payment temporarily disabled' : 'Tạm ngưng thanh toán quốc tế'}
-                                        </button>
+                                            {lang === 'en' ? 'Contact on Instagram' : 'Liên hệ Instagram'}
+                                        </a>
                                     </div>
                                 ) : (
                                     // ==========================================
-                                    // GIAO DIỆN VIETQR CHO ĐƠN NỘI ĐỊA
+                                    // GIAO DIỆN CHUYỂN KHOẢN CHO ĐƠN NỘI ĐỊA
                                     // ==========================================
                                     <>
                                         {formData.phone ? (
                                             <div className="animate-fade-in mb-6">
                                                 <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr') || 'Quét mã QR dưới đây để thanh toán:'}</p>
                                                 
-                                                {/* CẬP NHẬT: Ảnh tĩnh QR full width fit với khung */}
                                                 <div className="flex justify-center mb-4">
                                                     <img src="/QR.jpg" alt="ACB QR Code" className="w-full object-contain border border-stone-200 rounded-lg shadow-sm" />
                                                 </div>
 
-                                                {/* Bổ sung text ngân hàng rõ ràng cho khách dễ copy */}
                                                 <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-900 border border-blue-100 text-left space-y-1 mb-4">
                                                     <p><strong>Ngân hàng:</strong> ACB (Ngân hàng TMCP Á Châu)</p>
                                                     <p><strong>Số tài khoản:</strong> 49060577</p>
@@ -589,7 +558,7 @@ const Checkout = () => {
                                             </div>
                                         )}
 
-                                        {/* KHUNG TRẠNG THÁI THANH TOÁN (Auto/Manual) */}
+                                        {/* [CẬP NHẬT] KHUNG TICK CHỌN CHUYỂN KHOẢN THỦ CÔNG */}
                                         <div className={`border p-3 rounded mb-4 text-left transition-colors ${isTransferConfirmed ? 'bg-green-50 border-green-400' : 'bg-blue-50 border-blue-200'}`}>
                                             <label className="flex items-center gap-3 cursor-pointer select-none">
                                                 <input 
@@ -601,14 +570,9 @@ const Checkout = () => {
                                                 <div className="flex-1">
                                                     <span className="text-sm font-bold text-stone-800 block">
                                                         {isTransferConfirmed 
-                                                            ? `Đã nhận được ${formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}` 
-                                                            : "Đang chờ thanh toán..."}
+                                                            ? `Tôi đã chuyển ${formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}` 
+                                                            : `Xác nhận đã chuyển ${formatPrice(finalTotal, lang === 'en' ? 'USD' : 'VND')}`}
                                                     </span>
-                                                    {!isTransferConfirmed && formData.phone.length >= 8 && (
-                                                        <span className="text-xs text-blue-600 flex items-center gap-2 mt-1 font-medium">
-                                                            <FaSpinner className="animate-spin" /> Hệ thống tự động kiểm tra mỗi 5s
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </label>
                                         </div>

@@ -9,12 +9,12 @@ import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
 
 // --- CẤU HÌNH TÀI KHOẢN NHẬN TIỀN ---
-const MY_BANK = {
-  BANK_ID: 'SACOMBANK', 
-  ACCOUNT_NO: '0902173763', 
-  ACCOUNT_NAME: 'LUU THI PHUONG QUYNH', 
-  TEMPLATE: 'compact' 
-};
+// const MY_BANK = {
+//   BANK_ID: 'SACOMBANK', 
+//   ACCOUNT_NO: '0902173763', 
+//   ACCOUNT_NAME: 'LUU THI PHUONG QUYNH', 
+//   TEMPLATE: 'compact' 
+// };
 
 // CẤU HÌNH API GHN ĐỂ LẤY ĐỊA CHỈ CHUẨN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce'; 
@@ -194,7 +194,7 @@ const Checkout = () => {
 
   // QR Code Nội địa
   const transferContent = formData.phone ? `BROWN${formData.phone.replace(/\D/g, '')}` : '';
-  const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
+  //const qrUrl = `https://img.vietqr.io/image/${MY_BANK.BANK_ID}-${MY_BANK.ACCOUNT_NO}-${MY_BANK.TEMPLATE}.png?amount=${finalTotal}&addInfo=${transferContent}`;
 
   // =========================================================================
   // AUTO POLLING (Quét xem tiền vào chưa)
@@ -539,21 +539,17 @@ const Checkout = () => {
                                 {/*2. CHỌN KHU VỰC THANH TOÁN*/}
                                 {shippingType === 'international' ? (
                                     <div className="animate-fade-in">
-                                        {/* KHUNG HIỂN THỊ THÔNG TIN CHUYỂN KHOẢN QUỐC TẾ MỚI */}
+                                        {/* CẬP NHẬT: THÔNG TIN ACB CHO KHÁCH QUỐC TẾ */}
                                         <div className="bg-stone-50 border border-stone-200 p-5 rounded-lg text-sm leading-relaxed text-left text-stone-800 mb-6">
                                             <h3 className="font-bold text-base mb-4 border-b border-stone-200 pb-2 uppercase tracking-wider text-stone-900">
                                                 {lang === 'en' ? 'Bank Transfer Information' : 'Thông tin chuyển khoản'}
                                             </h3>
                                             <div className="space-y-2">
-                                                <p><strong className="text-stone-900 inline-block w-28">Name:</strong> Le Thi My Nhi</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Name bank:</strong> Techcombank</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Number:</strong> 19037727414020</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">SWIFT CODE:</strong> VTCBVNVX</p>
-                                                <p><strong className="text-stone-900 inline-block w-28">Post code:</strong> 700000</p>
-                                                <p className="flex items-start">
-                                                    <strong className="text-stone-900 shrink-0 w-28">Address:</strong> 
-                                                    <span>15 Nguyen Xuan Khoat streets, Tan Son Nhi ward, Tan Phu District Ho Chi Minh City</span>
-                                                </p>
+                                                <p><strong className="text-stone-900 inline-block w-28">Name:</strong> HO KINH DOANH BROWNVN</p>
+                                                <p><strong className="text-stone-900 inline-block w-28">Bank Name:</strong> ACB (Asia Commercial Bank)</p>
+                                                <p><strong className="text-stone-900 inline-block w-28">Account No:</strong> 49060577</p>
+                                                <p><strong className="text-stone-900 inline-block w-28">Branch:</strong> PGD Tan Son Nhi</p>
+                                                <p><strong className="text-stone-900 inline-block w-28">SWIFT CODE:</strong> ASCBVNVX</p>
                                             </div>
                                         </div>
 
@@ -571,22 +567,27 @@ const Checkout = () => {
                                     <>
                                         {formData.phone ? (
                                             <div className="animate-fade-in mb-6">
-                                                <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr')}</p>
+                                                <p className="text-sm text-stone-500 mb-4">{t('checkout.scan_qr') || 'Quét mã QR dưới đây để thanh toán:'}</p>
+                                                
+                                                {/* CẬP NHẬT: Ảnh tĩnh QR full width fit với khung */}
                                                 <div className="flex justify-center mb-4">
-                                                    <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain border border-stone-200 rounded-lg" />
+                                                    <img src="/QR.jpg" alt="ACB QR Code" className="w-full object-contain border border-stone-200 rounded-lg shadow-sm" />
+                                                </div>
+
+                                                {/* Bổ sung text ngân hàng rõ ràng cho khách dễ copy */}
+                                                <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-900 border border-blue-100 text-left space-y-1 mb-4">
+                                                    <p><strong>Ngân hàng:</strong> ACB (Ngân hàng TMCP Á Châu)</p>
+                                                    <p><strong>Số tài khoản:</strong> 49060577</p>
+                                                    <p><strong>Chủ tài khoản:</strong> HO KINH DOANH BROWNVN</p>
+                                                    <p><strong>Chi nhánh:</strong> PGD Tân Sơn Nhì</p>
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="h-48 flex flex-col items-center justify-center bg-stone-50 rounded text-stone-400 mb-6 animate-fade-in">
                                                 <FaExclamationCircle className="text-2xl mb-2"/>
-                                                <span>{t('checkout.qr_notice')}</span>
+                                                <span>{t('checkout.qr_notice') || 'Vui lòng nhập số điện thoại để xem mã chuyển khoản'}</span>
                                             </div>
                                         )}
-
-                                        <div className="flex justify-between text-xs mt-2 mb-4 pt-2 border-t border-stone-200 border-dashed">
-                                            <span className="text-stone-500">{t('checkout.bank_transfer_content')}:</span>
-                                            <span className="font-medium text-blue-600">{transferContent}</span>
-                                        </div>
 
                                         {/* KHUNG TRẠNG THÁI THANH TOÁN (Auto/Manual) */}
                                         <div className={`border p-3 rounded mb-4 text-left transition-colors ${isTransferConfirmed ? 'bg-green-50 border-green-400' : 'bg-blue-50 border-blue-200'}`}>

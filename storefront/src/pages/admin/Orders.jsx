@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-// [CHỈNH SỬA] Import thêm FaEdit, FaSave
-import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave } from 'react-icons/fa';
+// [CHỈNH SỬA] Import thêm FaEdit, FaSave, FaDownload
+import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave, FaDownload } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
 
@@ -228,6 +228,34 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
         }
     };
 
+    // [MỚI] Hàm xuất Excel chạy chung API gốc, gọi API truyền param ids
+    const handleExportSelectedSapo = async () => {
+        if (selectedIds.length === 0) return toast.warning("Vui lòng chọn ít nhất 1 đơn hàng để xuất!");
+        
+        const toastId = toast.loading("Đang xuất file Excel...");
+        try {
+            const query = new URLSearchParams();
+            query.append('ids', selectedIds.join(','));
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/export/sapo?${query.toString()}`);
+            if (!response.ok) throw new Error('Lỗi xuất file');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Sapo_Selected_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            
+            toast.update(toastId, { render: `Đã xuất ${selectedIds.length} đơn hàng!`, type: "success", isLoading: false, autoClose: 3000 });
+        } catch (error) {
+            console.error(error);
+            toast.update(toastId, { render: "Không thể xuất file Excel", type: "error", isLoading: false, autoClose: 3000 });
+        }
+    };
+
   return (
     <div className="p-4 md:p-8 relative min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -246,6 +274,17 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
                     />
                 </div>
             </div>
+            
+            {/* [MỚI] Nút XUẤT CHỌN chỉ hiện khi đã chọn đơn hàng */}
+            {selectedIds.length > 0 && (
+                <button 
+                    onClick={handleExportSelectedSapo}
+                    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-bold text-sm shrink-0"
+                >
+                    <FaDownload size={16} /> <span className="hidden md:inline">Xuất chọn ({selectedIds.length})</span>
+                </button>
+            )}
+
             <button 
                 onClick={() => setShowExportModal(true)}
                 className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg shadow-sm font-bold text-sm shrink-0"

@@ -94,7 +94,11 @@ const StorefrontLayout = () => {
           <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
              <div>
                 <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.about')}</h3>
-                <p className="text-stone-400 leading-relaxed">{t('footer.desc')}</p>
+                {/* <p className="text-stone-400 leading-relaxed">{t('footer.desc')}</p> */}
+                <p className="text-stone-300 font-bold uppercase text-sm">Hộ Kinh Doanh BROWNVN</p>
+                    <p className="text-stone-400 text-xs mt-1">Mã số HKD: 089300017764</p>
+                    <p className="text-stone-400 text-xs">Cấp ngày: 11/03/2026</p>
+                    <p className="text-stone-400 text-xs">Nơi cấp: UBND Phường Tân Sơn Nhì</p>
              </div>
              <div>
                 <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.contact')}</h3>

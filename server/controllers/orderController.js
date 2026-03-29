@@ -783,34 +783,25 @@ exports.updateOrderDetails = async (req, res) => {
 };
 
 // [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
+// [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
 exports.exportOrdersToSapoExcel = async (req, res) => {
     try {
-        const { startDate, endDate } = req.query;
+        // [CẬP NHẬT Ở ĐÂY]: Nhận thêm biến ids từ query URL
+        const { startDate, endDate, ids } = req.query;
 
-        // [ĐÃ SỬA] Hàm làm sạch, định dạng và LỌC chuẩn số điện thoại Việt Nam
+        // Hàm làm sạch, định dạng và LỌC chuẩn số điện thoại Việt Nam
         const formatSapoPhone = (phone) => {
             if (!phone) return null;
-            
-            // 1. Xóa tất cả các ký tự không phải là số (khoảng trắng, dấu +, -, .)
             let cleaned = phone.toString().replace(/\D/g, '');
-            
-            // 2. Chuyển đổi mã vùng 84 thành đầu số 0
             if (cleaned.startsWith('84')) {
                 cleaned = '0' + cleaned.slice(2);
-            } 
-            // Nếu chưa có số 0 ở đầu thì thêm vào (đề phòng Excel nuốt số 0)
-            else if (!cleaned.startsWith('0')) {
+            } else if (!cleaned.startsWith('0')) {
                 cleaned = '0' + cleaned;
             }
-            
-            // 3. Kiểm tra xem có đúng định dạng SĐT Việt Nam không (10 số, đầu 03, 05, 07, 08, 09)
             const vnPhoneRegex = /^0[35789]\d{8}$/;
-            
             if (vnPhoneRegex.test(cleaned)) {
-                return cleaned; // Nếu chuẩn VN thì lấy
+                return cleaned; 
             }
-            
-            // Nếu không chuẩn VN (SĐT nước ngoài, bị thiếu/dư số) -> Bỏ qua (trả về null)
             return null;
         };
 
@@ -830,14 +821,25 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             `)
             .order('created_at', { ascending: true }); // Sắp xếp cũ đến mới
 
-        if (startDate) {
-            query = query.gte('created_at', startDate);
+        // =======================================================
+        // [LOGIC MỚI BỔ SUNG]: LỌC DỮ LIỆU TRƯỚC KHI XUẤT
+        // =======================================================
+        if (ids) {
+            // Trường hợp 1: Nếu Frontend truyền danh sách ID (Xuất các đơn đã chọn)
+            const idArray = ids.split(',').map(id => id.trim());
+            query = query.in('id', idArray);
+        } else {
+            // Trường hợp 2: Nếu không có ID, lọc theo ngày tháng (Xuất tất cả hoặc theo mốc thời gian)
+            if (startDate) {
+                query = query.gte('created_at', startDate);
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                query = query.lte('created_at', end.toISOString());
+            }
         }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            query = query.lte('created_at', end.toISOString());
-        }
+        // =======================================================
 
         const { data: orders, error } = await query;
         if (error) throw error;

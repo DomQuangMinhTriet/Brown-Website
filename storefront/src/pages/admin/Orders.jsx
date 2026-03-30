@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-// [CHỈNH SỬA] Import thêm FaEdit, FaSave, FaDownload
 import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave, FaDownload } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
@@ -21,10 +20,9 @@ const Orders = () => {
 
   const [selectedIds, setSelectedIds] = useState([]);
 
-const [showExportModal, setShowExportModal] = useState(false);
-const [exportDates, setExportDates] = useState({ start: '', end: '' });
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
-  // [MỚI] STATE CHO FORM CHỈNH SỬA
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [editForm, setEditForm] = useState({
       customer_name: '', customer_phone: '', customer_address: '', note: ''
@@ -36,8 +34,8 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
   useEffect(() => {
     if (!orders) return;
-    const lowerTerm = searchTerm.toLowerCase();
-
+    
+    // 1. Lọc theo Tab trạng thái
     const tabFiltered = orders.filter(o => {
       if (activeTab === 'active') {
         return ['pending', 'processing', 'shipping', 'completed'].includes(o.status);
@@ -47,12 +45,19 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
       return true;
     });
 
-    const searchFiltered = tabFiltered.filter(o => 
-      o.code?.toLowerCase().includes(lowerTerm) ||
-      o.customer_name?.toLowerCase().includes(lowerTerm) ||
-      o.customer_phone?.includes(searchTerm) ||
-      o.note?.toLowerCase().includes(lowerTerm) 
-    );
+    // 2. Lọc theo ô tìm kiếm (Đã bọc an toàn ép kiểu String để tránh sập app)
+    const lowerTerm = searchTerm ? searchTerm.toLowerCase().trim() : '';
+    
+    let searchFiltered = tabFiltered;
+    if (lowerTerm) {
+        searchFiltered = tabFiltered.filter(o => {
+            const matchCode = o.code ? String(o.code).toLowerCase().includes(lowerTerm) : false;
+            const matchName = o.customer_name ? String(o.customer_name).toLowerCase().includes(lowerTerm) : false;
+            const matchPhone = o.customer_phone ? String(o.customer_phone).includes(lowerTerm) : false;
+            const matchNote = o.note ? String(o.note).toLowerCase().includes(lowerTerm) : false;
+            return matchCode || matchName || matchPhone || matchNote;
+        });
+    }
 
     setFilteredOrders(searchFiltered);
     setCurrentPage(1);
@@ -62,7 +67,14 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
   const fetchOrders = async () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
-      setOrders(res.data.data);
+      
+      // [BẢN VÁ LỖI TẠI ĐÂY] Chuẩn hóa mọi status từ DB về lowercase để không bị mất đơn hàng
+      const normalizedOrders = res.data.data.map(order => ({
+          ...order,
+          status: order.status ? order.status.toLowerCase() : 'pending'
+      }));
+      
+      setOrders(normalizedOrders);
     } catch (error) {
       console.error(error);
     } finally {
@@ -148,7 +160,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
     }
   };
 
-  // [MỚI] HÀM MỞ CHẾ ĐỘ SỬA
   const handleEditClick = () => {
     setEditForm({
         customer_name: selectedOrder.customer_name || '',
@@ -159,14 +170,12 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
     setIsEditingMode(true);
   };
 
-  // [MỚI] HÀM LƯU THÔNG TIN
   const handleSaveDetails = async () => {
     setProcessing(true);
     try {
         const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrder.id}/details`, editForm);
         if (res.data.success) {
             toast.success("Cập nhật thông tin thành công!");
-            // Cập nhật giao diện hiện tại
             const updatedOrder = { ...selectedOrder, ...editForm };
             setSelectedOrder(updatedOrder);
             setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
@@ -228,7 +237,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
         }
     };
 
-    // [MỚI] Hàm xuất Excel chạy chung API gốc, gọi API truyền param ids
     const handleExportSelectedSapo = async () => {
         if (selectedIds.length === 0) return toast.warning("Vui lòng chọn ít nhất 1 đơn hàng để xuất!");
         
@@ -275,7 +283,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
                 </div>
             </div>
             
-            {/* [MỚI] Nút XUẤT CHỌN chỉ hiện khi đã chọn đơn hàng */}
             {selectedIds.length > 0 && (
                 <button 
                     onClick={handleExportSelectedSapo}
@@ -366,7 +373,7 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
                         <button 
                             onClick={() => { 
                                 setSelectedOrder(order); 
-                                setIsEditingMode(false); // Reset trạng thái edit khi mở modal
+                                setIsEditingMode(false); 
                                 setShowModal(true); 
                             }}
                             className="text-stone-500 hover:text-stone-900 flex items-center gap-1 ml-auto p-2 hover:bg-stone-100 rounded"
@@ -478,7 +485,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
                 <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                        {/* CỘT TRÁI: THÔNG TIN KHÁCH & GHI CHÚ */}
                         <div className="md:col-span-1 space-y-4">
                             <div className="flex justify-between items-center border-b pb-1">
                                 <h4 className="font-bold text-stone-800 uppercase text-xs">Thông tin giao hàng</h4>
@@ -489,7 +495,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
                                 )}
                             </div>
                             
-                            {/* KHU VỰC HIỂN THỊ HOẶC SỬA */}
                             {isEditingMode ? (
                                 <div className="space-y-3 animate-fade-in bg-stone-50 p-3 rounded border border-stone-200">
                                     <div>
@@ -541,7 +546,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
                             </div>
                         </div>
 
-                        {/* Cột Phải: Danh sách sản phẩm */}
                         <div className="md:col-span-2">
                             <h4 className="font-bold text-stone-800 uppercase text-xs mb-4 border-b pb-1">Sản phẩm đã đặt</h4>
                             <div className="space-y-3 mb-6">
@@ -639,7 +643,6 @@ const [exportDates, setExportDates] = useState({ start: '', end: '' });
         </div>
       )}
 
-      {/* [MỚI] EXPORT SAPO MODAL */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-fade-in">

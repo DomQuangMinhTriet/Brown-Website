@@ -900,6 +900,17 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             // Gọi hàm formatSapoPhone để lọc các số không hợp lệ
             const sapoPhone = formatSapoPhone(order.customer_phone);
 
+            // [MỚI THÊM] - Kiểm tra ghi chú để set Nguồn đơn hàng
+            let orderSource = 'Web';
+            if (order.note) {
+                const lowerNote = order.note.toLowerCase();
+                if (lowerNote.includes('đã thanh toán')) {
+                    orderSource = 'Web - Đã thanh toán';
+                } else if (lowerNote.includes('chưa thanh toán')) {
+                    orderSource = 'Web - Chưa thanh toán';
+                }
+            }
+
             if (order.order_items && order.order_items.length > 0) {
                 order.order_items.forEach((item, index) => {
                     const isFirst = index === 0;
@@ -907,7 +918,7 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                     worksheet.addRow([
                         stt, // 1
                         isFirst ? order.code : null, // 2
-                        isFirst ? 'Web' : null, // 3
+                        isFirst ? orderSource : null, // 3 - [ĐÃ SỬA TẠI ĐÂY] Đổi từ 'Web' sang orderSource
                         isFirst ? formattedDate : null, // 4
                         isFirst ? 'Có' : null, // 5
                         isFirst ? 'Không' : null, // 6

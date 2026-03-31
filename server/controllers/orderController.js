@@ -783,7 +783,6 @@ exports.updateOrderDetails = async (req, res) => {
 };
 
 // [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
-// [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
 exports.exportOrdersToSapoExcel = async (req, res) => {
     try {
         // [CẬP NHẬT Ở ĐÂY]: Nhận thêm biến ids từ query URL
@@ -903,12 +902,23 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             // [MỚI THÊM] - Kiểm tra ghi chú và mã đơn để set Nguồn đơn hàng
             let orderSource = 'Web';
             
-            // Nối số điện thoại nếu có (sapoPhone đã được đưa về dạng chuẩn 0xxxxx)
-            if (sapoPhone) {
-                orderSource += ` - ${sapoPhone}`;
+            // Lấy nội dung ghi chú (tài khoản IG), lọc sạch chữ Đã thanh toán
+            if (order.note) {
+                // Xóa dấu xuống dòng
+                let cleanNote = order.note.replace(/\r?\n|\r/g, ' ');
+                // Xóa chữ "đã thanh toán" (có hoặc không có ngoặc vuông/tròn), không phân biệt hoa thường
+                cleanNote = cleanNote.replace(/[\[\(]?đã thanh toán[\]\)]?/gi, '');
+                // Xóa chữ "chưa thanh toán" đề phòng trường hợp ghi chú có chữ này
+                cleanNote = cleanNote.replace(/[\[\(]?chưa thanh toán[\]\)]?/gi, '');
+                // Xóa khoảng trắng thừa hoặc dấu gạch nối thừa ở đầu/cuối
+                cleanNote = cleanNote.replace(/\s+/g, ' ').replace(/^[-,\s]+|[-,\s]+$/g, '').trim();
+
+                if (cleanNote) {
+                    orderSource += ` - ${cleanNote}`;
+                }
             }
 
-            // Kiểm tra điều kiện thêm hậu tố "- R"
+            // Kiểm tra điều kiện thêm hậu tố "- R" (dựa vào mã đơn ORD hoặc ghi chú GỐC có chữ đã thanh toán)
             let isPrepaid = false;
             if (order.code && order.code.startsWith('ORD')) {
                 isPrepaid = true;

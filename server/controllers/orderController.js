@@ -783,7 +783,6 @@ exports.updateOrderDetails = async (req, res) => {
 };
 
 // [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
-// [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
 exports.exportOrdersToSapoExcel = async (req, res) => {
     try {
         // [CẬP NHẬT Ở ĐÂY]: Nhận thêm biến ids từ query URL
@@ -900,13 +899,18 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             // Gọi hàm formatSapoPhone để lọc các số không hợp lệ
             const sapoPhone = formatSapoPhone(order.customer_phone);
 
-            // [MỚI THÊM] - Kiểm tra ghi chú để set Nguồn đơn hàng
+            // [MỚI THÊM] - Kiểm tra ghi chú và mã đơn để set Nguồn đơn hàng
             let orderSource = 'Web';
+            
+            if (order.code && order.code.startsWith('ORD')) {
+                orderSource = 'Web - Đã thanh toán';
+            }
+            
             if (order.note) {
                 const lowerNote = order.note.toLowerCase();
                 if (lowerNote.includes('đã thanh toán')) {
                     orderSource = 'Web - Đã thanh toán';
-                } else if (lowerNote.includes('chưa thanh toán')) {
+                } else {
                     orderSource = 'Web - Chưa thanh toán';
                 }
             }

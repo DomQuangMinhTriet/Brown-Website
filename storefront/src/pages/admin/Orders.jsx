@@ -35,7 +35,6 @@ const Orders = () => {
   useEffect(() => {
     if (!orders) return;
     
-    // 1. Lọc theo Tab trạng thái
     const tabFiltered = orders.filter(o => {
       if (activeTab === 'active') {
         return ['pending', 'processing', 'shipping', 'completed'].includes(o.status);
@@ -45,7 +44,6 @@ const Orders = () => {
       return true;
     });
 
-    // 2. Lọc theo ô tìm kiếm (Đã bọc an toàn ép kiểu String để tránh sập app)
     const lowerTerm = searchTerm ? searchTerm.toLowerCase().trim() : '';
     
     let searchFiltered = tabFiltered;
@@ -68,7 +66,6 @@ const Orders = () => {
     try {
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`);
       
-      // [BẢN VÁ LỖI TẠI ĐÂY] Chuẩn hóa mọi status từ DB về lowercase để không bị mất đơn hàng
       const normalizedOrders = res.data.data.map(order => ({
           ...order,
           status: order.status ? order.status.toLowerCase() : 'pending'
@@ -231,6 +228,8 @@ const Orders = () => {
             
             setShowExportModal(false);
             toast.success('Xuất danh sách đơn hàng thành công');
+            
+            setTimeout(() => { fetchOrders(); }, 1500);
         } catch (error) {
             console.error(error);
             toast.error('Không thể xuất file Excel');
@@ -258,6 +257,9 @@ const Orders = () => {
             link.parentNode.removeChild(link);
             
             toast.update(toastId, { render: `Đã xuất ${selectedIds.length} đơn hàng!`, type: "success", isLoading: false, autoClose: 3000 });
+            
+            setSelectedIds([]);
+            setTimeout(() => { fetchOrders(); }, 1500);
         } catch (error) {
             console.error(error);
             toast.update(toastId, { render: "Không thể xuất file Excel", type: "error", isLoading: false, autoClose: 3000 });
@@ -318,7 +320,7 @@ const Orders = () => {
 
       <div className="bg-white rounded-xl shadow border border-stone-200 overflow-hidden mb-24">
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1100px]">
+            <table className="w-full text-left border-collapse min-w-[1200px]">
             <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 uppercase text-xs">
                 <tr>
                     <th className="p-4 w-10">
@@ -335,12 +337,13 @@ const Orders = () => {
                     <th className="p-4">Tổng tiền</th>
                     <th className="p-4">Trạng thái</th>
                     <th className="p-4">Ngày tạo</th>
+                    <th className="p-4 text-center">Đã xuất</th>
                     <th className="p-4 text-right">Hành động</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
-                {loading ? <tr><td colSpan="8" className="p-6 text-center text-stone-500">Đang tải...</td></tr> : 
-                currentOrders.length === 0 ? <tr><td colSpan="8" className="p-6 text-center text-stone-500">Không tìm thấy đơn hàng nào.</td></tr> :
+                {loading ? <tr><td colSpan="9" className="p-6 text-center text-stone-500">Đang tải...</td></tr> : 
+                currentOrders.length === 0 ? <tr><td colSpan="9" className="p-6 text-center text-stone-500">Không tìm thấy đơn hàng nào.</td></tr> :
                 currentOrders.map(order => (
                 <tr key={order.id} className={`transition-colors ${selectedIds.includes(order.id) ? 'bg-blue-50' : 'hover:bg-stone-50'}`}>
                     <td className="p-4">
@@ -369,6 +372,18 @@ const Orders = () => {
                     <td className="p-4 text-sm text-stone-500">
                         {new Date(order.created_at).toLocaleDateString('vi-VN')}
                     </td>
+
+                    <td className="p-4 text-center">
+                        {order.exported_at ? (
+                            <div className="flex flex-col items-center justify-center text-green-600" title={`Đã tải xuống lúc: ${new Date(order.exported_at).toLocaleString('vi-VN')}`}>
+                                <FaCheckCircle size={15}/>
+                                <span className="text-[10px] text-stone-500 mt-1 font-medium">{new Date(order.exported_at).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                        ) : (
+                            <span className="text-stone-300 text-xs">-</span>
+                        )}
+                    </td>
+
                     <td className="p-4 text-right">
                         <button 
                             onClick={() => { 

@@ -785,10 +785,8 @@ exports.updateOrderDetails = async (req, res) => {
 // [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
 exports.exportOrdersToSapoExcel = async (req, res) => {
     try {
-        // [CẬP NHẬT Ở ĐÂY]: Nhận thêm biến ids từ query URL
         const { startDate, endDate, ids } = req.query;
 
-        // Hàm làm sạch, định dạng và LỌC chuẩn số điện thoại Việt Nam
         const formatSapoPhone = (phone) => {
             if (!phone) return null;
             let cleaned = phone.toString().replace(/\D/g, '');
@@ -804,7 +802,6 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             return null;
         };
 
-        // 1. Truy vấn đơn hàng
         let query = supabase
             .from('orders')
             .select(`
@@ -818,17 +815,12 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                     )
                 )
             `)
-            .order('created_at', { ascending: true }); // Sắp xếp cũ đến mới
+            .order('created_at', { ascending: true });
 
-        // =======================================================
-        // [LOGIC MỚI BỔ SUNG]: LỌC DỮ LIỆU TRƯỚC KHI XUẤT
-        // =======================================================
         if (ids) {
-            // Trường hợp 1: Nếu Frontend truyền danh sách ID (Xuất các đơn đã chọn)
             const idArray = ids.split(',').map(id => id.trim());
             query = query.in('id', idArray);
         } else {
-            // Trường hợp 2: Nếu không có ID, lọc theo ngày tháng (Xuất tất cả hoặc theo mốc thời gian)
             if (startDate) {
                 query = query.gte('created_at', startDate);
             }
@@ -838,16 +830,30 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                 query = query.lte('created_at', end.toISOString());
             }
         }
-        // =======================================================
 
         const { data: orders, error } = await query;
         if (error) throw error;
 
-        // 2. Tạo Workbook
+        // =======================================================
+        // [CẬP NHẬT MỚI]: LƯU THỜI GIAN XUẤT VÀO DATABASE
+        // =======================================================
+        if (orders && orders.length > 0) {
+            const exportedIds = orders.map(o => o.id);
+            const currentTime = new Date().toISOString();
+            
+            supabase
+                .from('orders')
+                .update({ exported_at: currentTime })
+                .in('id', exportedIds)
+                .then(({ error: updateError }) => {
+                    if (updateError) console.error("Lỗi cập nhật exported_at:", updateError);
+                });
+        }
+        // =======================================================
+
         const workbook = new exceljs.Workbook();
         const worksheet = workbook.addWorksheet('FileNhapDonHang');
 
-        // Định dạng 3 dòng Header theo chuẩn Sapo
         worksheet.addRow([
             'STT*', 'Thông tin đơn hàng', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
             'Thông tin mua hàng', '', '', '', '', '', '', '', '', '', '', '', 'Thuế', '',
@@ -871,7 +877,6 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
         worksheet.mergeCells('AH1:AN1');
         worksheet.mergeCells('AO1:AR1');
 
-        // 3. Đổ dữ liệu
         let stt = 1;
         orders.forEach(order => {
             const date = new Date(order.created_at);
@@ -896,21 +901,14 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                 }
             }
 
-            // Gọi hàm formatSapoPhone để lọc các số không hợp lệ
             const sapoPhone = formatSapoPhone(order.customer_phone);
 
-            // [MỚI THÊM] - Kiểm tra ghi chú và mã đơn để set Nguồn đơn hàng
             let orderSource = 'Web';
             
-            // Lấy nội dung ghi chú (tài khoản IG), lọc sạch chữ Đã thanh toán
             if (order.note) {
-                // Xóa dấu xuống dòng
                 let cleanNote = order.note.replace(/\r?\n|\r/g, ' ');
-                // Xóa chữ "đã thanh toán" (có hoặc không có ngoặc vuông/tròn), không phân biệt hoa thường
                 cleanNote = cleanNote.replace(/[\[\(]?đã thanh toán[\]\)]?/gi, '');
-                // Xóa chữ "chưa thanh toán" đề phòng trường hợp ghi chú có chữ này
                 cleanNote = cleanNote.replace(/[\[\(]?chưa thanh toán[\]\)]?/gi, '');
-                // Xóa khoảng trắng thừa hoặc dấu gạch nối thừa ở đầu/cuối
                 cleanNote = cleanNote.replace(/\s+/g, ' ').replace(/^[-,\s]+|[-,\s]+$/g, '').trim();
 
                 if (cleanNote) {
@@ -918,7 +916,6 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                 }
             }
 
-            // Kiểm tra điều kiện thêm hậu tố "- R" (dựa vào mã đơn ORD hoặc ghi chú GỐC có chữ đã thanh toán)
             let isPrepaid = false;
             if (order.code && order.code.startsWith('ORD')) {
                 isPrepaid = true;
@@ -938,7 +935,7 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                     worksheet.addRow([
                         stt, // 1
                         isFirst ? order.code : null, // 2
-                        isFirst ? orderSource : null, // 3 - [ĐÃ SỬA TẠI ĐÂY] Đổi từ 'Web' sang orderSource
+                        isFirst ? orderSource : null, // 3 
                         isFirst ? formattedDate : null, // 4
                         isFirst ? 'Có' : null, // 5
                         isFirst ? 'Không' : null, // 6
@@ -950,11 +947,9 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                         isFirst ? 'Giao hàng' : null, // 12
                         isFirst ? 'other' : null,  // 13
                         isFirst ? (order.shipping_fee || 0) : null, // 14
-                        
                         null, // 15
                         isFirst ? (order.discount_amount || null) : null, // 16
                         isFirst ? (order.voucher_code || null) : null, // 17
-                        
                         null, // 18
                         item.variants?.products?.name || null, // 19
                         `${item.variants?.size || ''} - ${item.variants?.color || ''}`.trim(), // 20
@@ -969,14 +964,11 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                         null, // 29
                         null, // 30
                         null, // 31
-                        
-                        // Nếu sapoPhone = null (khách nước ngoài / lỗi), ô này sẽ trống
                         isFirst ? sapoPhone : null, // 32. SĐT Khách hàng
                         isFirst ? (order.customers?.email || null) : null, // 33
                         isFirst ? order.customer_name : null, // 34
                         null, // 35
                         isFirst ? sapoPhone : null, // 36. SĐT Giao hàng
-                        
                         isFirst ? street : null, // 37
                         isFirst ? province : null, // 38
                         isFirst ? district : null, // 39
@@ -991,7 +983,6 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             stt++;
         });
 
-        // 4. Trả file về trình duyệt
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=Sapo_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
 

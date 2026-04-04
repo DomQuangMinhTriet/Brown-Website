@@ -25,5 +25,5 @@ router.put('/:id/status', orderController.updateOrderStatus);
 router.post('/create-admin', orderController.createAdminOrder);
 
 router.get('/export/sapo', orderController.exportOrdersToSapoExcel);
-
+router.get('/export/spx', orderController.exportOrdersToSPXExcel);
 module.exports = router;

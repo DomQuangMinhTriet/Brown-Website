@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave, FaDownload, FaCopy } from 'react-icons/fa';
+import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave, FaDownload } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
 
@@ -21,7 +21,6 @@ const Orders = () => {
   const [selectedIds, setSelectedIds] = useState([]);
 
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportType, setExportType] = useState('sapo'); 
   const [exportDates, setExportDates] = useState({ start: '', end: '' });
 
   const [isEditingMode, setIsEditingMode] = useState(false);
@@ -209,86 +208,63 @@ const Orders = () => {
 
   const statusGroup = getSelectedStatusGroup();
 
-  const openExportModal = (type) => {
-      setExportType(type);
-      setShowExportModal(true);
-  };
+    const handleExportOrders = async () => {
+        try {
+            const query = new URLSearchParams();
+            if (exportDates.start) query.append('startDate', exportDates.start);
+            if (exportDates.end) query.append('endDate', exportDates.end);
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/export/sapo?${query.toString()}`);
+            if (!response.ok) throw new Error('Lỗi xuất file');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Sapo_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            
+            setShowExportModal(false);
+            toast.success('Xuất danh sách đơn hàng thành công');
+            
+            setTimeout(() => { fetchOrders(); }, 1500);
+        } catch (error) {
+            console.error(error);
+            toast.error('Không thể xuất file Excel');
+        }
+    };
 
-  const handleExportOrdersAll = async () => {
-      try {
-          const query = new URLSearchParams();
-          if (exportDates.start) query.append('startDate', exportDates.start);
-          if (exportDates.end) query.append('endDate', exportDates.end);
-          
-          const endpoint = exportType === 'spx' ? '/api/orders/export/spx' : '/api/orders/export/sapo';
-          const response = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}?${query.toString()}`);
-          
-          if (!response.ok) throw new Error('Lỗi xuất file');
-          
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(new Blob([blob]));
-          const link = document.createElement('a');
-          link.href = url;
-          const fileName = exportType === 'spx' ? `SPX_Orders_${new Date().toISOString().slice(0,10)}.xlsx` : `Sapo_Orders_${new Date().toISOString().slice(0,10)}.xlsx`;
-          link.setAttribute('download', fileName);
-          document.body.appendChild(link);
-          link.click();
-          link.parentNode.removeChild(link);
-          
-          setShowExportModal(false);
-          toast.success(`Xuất danh sách ${exportType.toUpperCase()} thành công`);
-          
-          setTimeout(() => { fetchOrders(); }, 1500);
-      } catch (error) {
-          console.error(error);
-          toast.error(`Không thể xuất file ${exportType.toUpperCase()}`);
-      }
-  };
-
-  const handleExportSelected = async (type) => {
-      if (selectedIds.length === 0) return toast.warning("Vui lòng chọn ít nhất 1 đơn hàng để xuất!");
-      
-      const toastId = toast.loading(`Đang xuất file ${type.toUpperCase()}...`);
-      try {
-          const query = new URLSearchParams();
-          query.append('ids', selectedIds.join(','));
-          
-          const endpoint = type === 'spx' ? '/api/orders/export/spx' : '/api/orders/export/sapo';
-          const response = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}?${query.toString()}`);
-          
-          if (!response.ok) throw new Error('Lỗi xuất file');
-          
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(new Blob([blob]));
-          const link = document.createElement('a');
-          link.href = url;
-          const fileName = type === 'spx' ? `SPX_Selected_${new Date().toISOString().slice(0,10)}.xlsx` : `Sapo_Selected_${new Date().toISOString().slice(0,10)}.xlsx`;
-          link.setAttribute('download', fileName);
-          document.body.appendChild(link);
-          link.click();
-          link.parentNode.removeChild(link);
-          
-          toast.update(toastId, { render: `Đã xuất ${selectedIds.length} đơn hàng!`, type: "success", isLoading: false, autoClose: 3000 });
-          
-          setSelectedIds([]);
-          setTimeout(() => { fetchOrders(); }, 1500);
-      } catch (error) {
-          console.error(error);
-          toast.update(toastId, { render: `Không thể xuất file ${type.toUpperCase()}`, type: "error", isLoading: false, autoClose: 3000 });
-      }
-  };
-
-  const copySmartAddress = () => {
-      if (!selectedOrder) return;
-      const copyText = `${selectedOrder.customer_name} - ${selectedOrder.customer_phone} - ${selectedOrder.customer_address}`;
-      
-      navigator.clipboard.writeText(copyText).then(() => {
-          toast.success("Đã copy nhanh thông tin, hãy dán (Ctrl+V) vào SPX!");
-      }).catch(err => {
-          console.error("Lỗi copy: ", err);
-          toast.error("Không thể copy tự động, vui lòng copy thủ công.");
-      });
-  };
+    const handleExportSelectedSapo = async () => {
+        if (selectedIds.length === 0) return toast.warning("Vui lòng chọn ít nhất 1 đơn hàng để xuất!");
+        
+        const toastId = toast.loading("Đang xuất file Excel...");
+        try {
+            const query = new URLSearchParams();
+            query.append('ids', selectedIds.join(','));
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/export/sapo?${query.toString()}`);
+            if (!response.ok) throw new Error('Lỗi xuất file');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Sapo_Selected_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            
+            toast.update(toastId, { render: `Đã xuất ${selectedIds.length} đơn hàng!`, type: "success", isLoading: false, autoClose: 3000 });
+            
+            setSelectedIds([]);
+            setTimeout(() => { fetchOrders(); }, 1500);
+        } catch (error) {
+            console.error(error);
+            toast.update(toastId, { render: "Không thể xuất file Excel", type: "error", isLoading: false, autoClose: 3000 });
+        }
+    };
 
   return (
     <div className="p-4 md:p-8 relative min-h-screen">
@@ -297,9 +273,9 @@ const Orders = () => {
             <FaBox /> Quản lý Đơn hàng
           </h1>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="bg-white p-2 rounded-lg shadow-sm border border-stone-200 flex-1 md:flex-none">
-                <div className="relative md:w-64 lg:w-80">
+                <div className="relative md:w-80">
                     <FaSearch className="absolute left-3 top-3 text-stone-400"/>
                     <input 
                         type="text" placeholder="Tìm đơn, tên, SĐT, ghi chú..." 
@@ -309,25 +285,21 @@ const Orders = () => {
                 </div>
             </div>
             
-            {selectedIds.length > 0 ? (
-                <div className="flex gap-2 animate-fade-in">
-                    <button onClick={() => handleExportSelected('sapo')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-3 rounded-lg shadow-sm font-bold text-xs shrink-0">
-                        <FaDownload size={14} /> Xuất Sapo ({selectedIds.length})
-                    </button>
-                    <button onClick={() => handleExportSelected('spx')} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-3 rounded-lg shadow-sm font-bold text-xs shrink-0">
-                        <FaDownload size={14} /> Xuất SPX ({selectedIds.length})
-                    </button>
-                </div>
-            ) : (
-                <div className="flex gap-2">
-                    <button onClick={() => openExportModal('sapo')} className="flex items-center gap-2 bg-stone-200 hover:bg-stone-300 text-stone-700 px-3 py-3 rounded-lg shadow-sm font-bold text-xs shrink-0">
-                        <FaFileExcel size={14} /> Sapo
-                    </button>
-                    <button onClick={() => openExportModal('spx')} className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-3 rounded-lg shadow-sm font-bold text-xs shrink-0">
-                        <FaFileExcel size={14} /> SPX
-                    </button>
-                </div>
+            {selectedIds.length > 0 && (
+                <button 
+                    onClick={handleExportSelectedSapo}
+                    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg shadow-sm font-bold text-sm shrink-0"
+                >
+                    <FaDownload size={16} /> <span className="hidden md:inline">Xuất chọn ({selectedIds.length})</span>
+                </button>
             )}
+
+            <button 
+                onClick={() => setShowExportModal(true)}
+                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg shadow-sm font-bold text-sm shrink-0"
+            >
+                <FaFileExcel size={16} /> <span className="hidden md:inline">Xuất Sapo</span>
+            </button>
         </div>
       </div>
 
@@ -401,31 +373,15 @@ const Orders = () => {
                         {new Date(order.created_at).toLocaleDateString('vi-VN')}
                     </td>
 
-                    {/* [CẬP NHẬT] Render cột Đã Xuất hiển thị riêng biệt Sapo và SPX */}
                     <td className="p-4 text-center">
-                        <div className="flex flex-col items-center justify-center gap-1.5">
-                            {order.exported_sapo_at && (
-                                <div className="flex items-center gap-1 text-blue-700 bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold" title={`Xuất Sapo lúc: ${new Date(order.exported_sapo_at).toLocaleString('vi-VN')}`}>
-                                    <FaCheckCircle size={10}/> SAPO
-                                </div>
-                            )}
-                            {order.exported_spx_at && (
-                                <div className="flex items-center gap-1 text-orange-700 bg-orange-100 px-2 py-0.5 rounded text-[10px] font-bold" title={`Xuất SPX lúc: ${new Date(order.exported_spx_at).toLocaleString('vi-VN')}`}>
-                                    <FaCheckCircle size={10}/> SPX
-                                </div>
-                            )}
-                            
-                            {/* Dự phòng cho các đơn cũ đã xuất trước khi update code */}
-                            {!order.exported_sapo_at && !order.exported_spx_at && order.exported_at && (
-                                <div className="flex items-center gap-1 text-stone-600 bg-stone-200 px-2 py-0.5 rounded text-[10px] font-bold" title={`Đã xuất lúc: ${new Date(order.exported_at).toLocaleString('vi-VN')}`}>
-                                    <FaCheckCircle size={10}/> Đã xuất
-                                </div>
-                            )}
-
-                            {!order.exported_sapo_at && !order.exported_spx_at && !order.exported_at && (
-                                <span className="text-stone-300 text-xs">-</span>
-                            )}
-                        </div>
+                        {order.exported_at ? (
+                            <div className="flex flex-col items-center justify-center text-green-600" title={`Đã tải xuống lúc: ${new Date(order.exported_at).toLocaleString('vi-VN')}`}>
+                                <FaCheckCircle size={15}/>
+                                <span className="text-[10px] text-stone-500 mt-1 font-medium">{new Date(order.exported_at).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                        ) : (
+                            <span className="text-stone-300 text-xs">-</span>
+                        )}
                     </td>
 
                     <td className="p-4 text-right">
@@ -546,16 +502,11 @@ const Orders = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                         <div className="md:col-span-1 space-y-4">
                             <div className="flex justify-between items-center border-b pb-1">
-                                <h4 className="font-bold text-stone-800 uppercase text-xs">Thông hướng giao hàng</h4>
+                                <h4 className="font-bold text-stone-800 uppercase text-xs">Thông tin giao hàng</h4>
                                 {!isEditingMode && ['pending', 'processing'].includes(selectedOrder.status) && (
-                                    <div className="flex gap-2">
-                                        <button onClick={copySmartAddress} title="Copy nhanh cho SPX" className="text-orange-600 hover:text-orange-800 text-xs flex items-center gap-1 font-medium bg-orange-50 px-2 py-1 rounded">
-                                            <FaCopy /> Copy
-                                        </button>
-                                        <button onClick={handleEditClick} className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 font-medium bg-blue-50 px-2 py-1 rounded">
-                                            <FaEdit /> Sửa
-                                        </button>
-                                    </div>
+                                    <button onClick={handleEditClick} className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 font-medium">
+                                        <FaEdit /> Sửa
+                                    </button>
                                 )}
                             </div>
                             
@@ -710,8 +661,8 @@ const Orders = () => {
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-fade-in">
-                <div className={`p-4 border-b flex justify-between items-center ${exportType === 'spx' ? 'bg-orange-50' : 'bg-stone-50'}`}>
-                    <h3 className={`font-bold text-lg ${exportType === 'spx' ? 'text-orange-800' : 'text-stone-800'}`}>Xuất đơn hàng ({exportType.toUpperCase()})</h3>
+                <div className="p-4 border-b bg-stone-50 flex justify-between items-center">
+                    <h3 className="font-bold text-lg text-stone-800">Xuất đơn hàng (Sapo)</h3>
                     <button onClick={() => setShowExportModal(false)} className="text-stone-400 hover:text-red-500 text-xl leading-none">&times;</button>
                 </div>
                 <div className="p-6 space-y-4">
@@ -727,7 +678,7 @@ const Orders = () => {
                 </div>
                 <div className="p-4 bg-stone-50 border-t flex justify-end gap-2">
                     <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-bold text-stone-600 hover:bg-stone-200 rounded transition-colors">Hủy bỏ</button>
-                    <button onClick={handleExportOrdersAll} className={`px-4 py-2 text-sm font-bold text-white rounded flex items-center gap-2 shadow transition-colors ${exportType === 'spx' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                    <button onClick={handleExportOrders} className="px-4 py-2 text-sm font-bold bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 shadow transition-colors">
                         <FaFileExcel /> Tải file Excel
                     </button>
                 </div>

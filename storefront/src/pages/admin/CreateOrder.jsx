@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
-// [MỚI] CẤU HÌNH API GHN ĐỂ LẤY ĐỊA CHỈ CHUẨN
+// CẤU HÌNH API GHN ĐỂ LẤY ĐỊA CHỈ CHUẨN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce'; 
 const GHN_API_BASE = 'https://online-gateway.ghn.vn/shiip/public-api/master-data';
 
@@ -13,7 +13,7 @@ const CreateOrder = () => {
     const [cart, setCart] = useState([]);
     const [search, setSearch] = useState('');
 
-    // [MỚI] STATE TỈNH/QUẬN/PHƯỜNG
+    // STATE TỈNH/QUẬN/PHƯỜNG
     const [provinces, setProvinces] = useState([]);
     const [districts, setDistricts] = useState([]);
     const [wards, setWards] = useState([]);
@@ -29,8 +29,11 @@ const CreateOrder = () => {
     const [paymentMethod, setPaymentMethod] = useState('cod');
     const [isPaid, setIsPaid] = useState(false);
     
-    // [MỚI] Thêm state quản lý phí ship, mặc định là 20.000đ
+    // Thêm state quản lý phí ship, mặc định là 20.000đ
     const [shippingFee, setShippingFee] = useState(0);
+
+    // [MỚI] State quản lý nội dung sổ nháp
+    const [tempText, setTempText] = useState('');
 
     // Load sản phẩm và Tỉnh/TP khi vào trang
     useEffect(() => {
@@ -52,7 +55,7 @@ const CreateOrder = () => {
         fetchProvinces();
     }, []);
 
-    // [MỚI] LOGIC XỬ LÝ CHỌN ĐỊA CHỈ TỪ DROPDOWN
+    // LOGIC XỬ LÝ CHỌN ĐỊA CHỈ TỪ DROPDOWN
     const handleProvinceChange = async (e) => {
         const pid = parseInt(e.target.value); 
         const pname = e.target.options[e.target.selectedIndex].text;
@@ -126,7 +129,7 @@ const CreateOrder = () => {
 
     const removeFromCart = (variantId) => setCart(prev => prev.filter(item => item.variant_id !== variantId));
     
-    // [MỚI] Tách riêng tiền hàng và tổng tiền
+    // Tách riêng tiền hàng và tổng tiền
     const itemsTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const totalAmount = itemsTotal + Number(shippingFee);
 
@@ -135,7 +138,7 @@ const CreateOrder = () => {
         if (cart.length === 0) return toast.error("Giỏ hàng trống!");
         if (!customerInfo.phone) return toast.error("Vui lòng nhập SĐT khách hàng");
 
-        // [MỚI] Ghép chuỗi địa chỉ chuẩn có dấu phẩy để xuất Excel mượt mà
+        // Ghép chuỗi địa chỉ chuẩn có dấu phẩy để xuất Excel mượt mà
         let finalAddress = customerInfo.address || "Tại quầy"; 
         if (customerInfo.province_id && customerInfo.district_id && customerInfo.ward_code && customerInfo.street) {
             finalAddress = `${customerInfo.street}, ${customerInfo.ward_name}, ${customerInfo.district_name}, ${customerInfo.province_name}`;
@@ -159,7 +162,6 @@ const CreateOrder = () => {
             payment_method: paymentMethod, 
             is_paid: isPaid,
             note: customerInfo.note,
-            // [MỚI] Gửi phí ship xuống Backend
             shipping_fee: Number(shippingFee)
         };
 
@@ -197,6 +199,8 @@ const CreateOrder = () => {
                 setSearch('');
                 // Reset lại phí ship về 0 cho đơn tiếp theo
                 setShippingFee(0);
+                // [MỚI] Reset lại ô nháp
+                setTempText('');
             }
         } catch (error) {
             console.error(error);
@@ -255,11 +259,31 @@ const CreateOrder = () => {
             {/* CỘT 2: THÔNG TIN KHÁCH HÀNG */}
             <div className="lg:w-1/4 w-full p-4 lg:p-6 lg:overflow-y-auto bg-stone-50 border-r border-stone-200 lg:h-full">
                 <h2 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUser/> Khách hàng</h2>
+                
                 <div className="space-y-4">
+                    {/* [MỚI] SỔ NHÁP */}
+                    <div className="bg-yellow-50 border border-yellow-200 p-3 rounded shadow-sm">
+                        <label className="text-[11px] font-bold text-yellow-700 block mb-2 uppercase tracking-wide">
+                            Nháp / Dán thông tin tạm
+                        </label>
+                        <textarea 
+                            className="w-full p-2 border border-yellow-300 rounded bg-white text-sm outline-none focus:border-yellow-500 resize-none overflow-hidden text-stone-700"
+                            placeholder="Ví dụ: Triết - 0901... - 123 Lê Lợi..."
+                            value={tempText}
+                            rows={2}
+                            onChange={(e) => {
+                                setTempText(e.target.value);
+                                // Tự động giãn chiều cao theo nội dung
+                                e.target.style.height = 'auto';
+                                e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                        />
+                    </div>
+
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Tên khách (*)</label><input className="w-full p-2 border rounded bg-white text-sm" value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} /></div>
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Điện thoại (*)</label><div className="relative"><FaPhone className="absolute left-3 top-3 text-stone-400 text-xs"/><input className="w-full pl-8 p-2 border rounded bg-white text-sm" value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} /></div></div>
                     
-                    {/* [MỚI] KHU VỰC CHỌN ĐỊA CHỈ GHN */}
+                    {/* KHU VỰC CHỌN ĐỊA CHỈ GHN */}
                     <div className="border-t border-stone-200 pt-4 mt-2">
                         <label className="text-xs font-bold text-stone-500 block mb-2">Địa chỉ giao hàng</label>
                         <div className="space-y-2">

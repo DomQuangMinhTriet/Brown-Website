@@ -919,6 +919,10 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
             let isPrepaid = false;
             if (order.code && order.code.startsWith('ORD')) {
                 isPrepaid = true;
+                // [NÂNG CẤP] Nếu mã đơn là ORD, lấy tên khách hàng chèn vào nguồn đơn hàng
+                if (order.customer_name) {
+                    orderSource += ` - ${order.customer_name}`;
+                }
             }
             if (order.note && order.note.toLowerCase().includes('đã thanh toán')) {
                 isPrepaid = true;

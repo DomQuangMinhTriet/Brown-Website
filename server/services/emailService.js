@@ -133,10 +133,10 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
         bankDetails: isPaid 
             ? `<div style="color: #166534; font-weight: bold;">✅ Thanh toán thành công. Cảm ơn bạn!</div>`
             : `
-                <li>Ngân hàng: <b>Sacombank</b></li>
-                <li>Số TK: <b>0902173763</b></li>
-                <li>Chủ TK: <b>LUU THI PHUONG QUYNH</b></li>
-                <li>Nội dung: SĐT <b> ${order.customer_name}</b></li>
+                <li>Ngân hàng: <b>ACB - PGD TAN SON NHI</b></li>
+                <li>Số TK: <b>49060577</b></li>
+                <li>Chủ TK: <b>HO KINH DOANH BROWNVN</b></li>
+                <li>Nội dung: <b>${order.customer_phone}</b> + <b> ${order.customer_name}</b></li>
             `,
         processingNote: isPaid 
             ? "Chúng tôi đang chuẩn bị hàng và sẽ sớm giao cho đơn vị vận chuyển." 

@@ -149,7 +149,7 @@ export const translations = {
       swift_code: "Mã SWIFT",
       address: "Địa chỉ",
 
-      emailNoteTitle: "Kiểm tra hộp thư của bạn",
+      emailNoteTitle: "Kiểm tra hộp thư của bạn (Nếu không thấy, vui lòng kiểm tra trong hộp thư Spam) ",
       emailNoteDesc: "Chúng tôi đã gửi email xác nhận đơn hàng. Bạn cũng sẽ nhận được email thông báo kèm mã vận đơn khi đơn hàng bắt đầu được giao."
     },
     auth: {
@@ -354,7 +354,7 @@ export const translations = {
       swift_code: "SWIFT Code",
       address: "Address",
 
-      emailNoteTitle: "Check your inbox",
+      emailNoteTitle: "Check your inbox (If you don't see it, please check your Spam folder)",
       emailNoteDesc: "We've sent an order confirmation email. You will also receive a shipping update with a tracking number once your order is on its way."
     },
     auth: {

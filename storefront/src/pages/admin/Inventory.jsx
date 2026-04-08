@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'; // <--- Quan trọng nhất là dòng này
 import axios from 'axios';
-import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave, FaTrash } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave, FaTrash, FaCheck, FaUndo } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 // Import các hook của bạn (nếu file nằm ở thư mục hooks ngang cấp pages thì sửa đường dẫn)
 import { useAsync, useKeyedAsync } from '../../hooks/useAsync';
@@ -81,10 +81,29 @@ const Inventory = () => {
       
       if (supRes.data.success) setSuppliers(supRes.data.data);
       if (storeRes.data.success) setStores(storeRes.data.data);
-      if (prodRes.data.success) setProducts(prodRes.data.data);
+      
+      if (prodRes.data.success) {
+          let allProducts = prodRes.data.data;
 
-      if (supRes.data.data.length > 0) setSelectedSupplier(supRes.data.data[0].id);
-      if (storeRes.data.data.length > 0) setSelectedStore(storeRes.data.data[0].id);
+          // [MỚI] Kéo thêm sản phẩm "Phụ kiện BrownVN" đang bị ẩn
+          try {
+              const accRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders/accessory`);
+              if (accRes.data.success && accRes.data.data) {
+                  // Tránh thêm trùng lặp nếu danh sách đã có
+                  if (!allProducts.find(p => p.id === accRes.data.data.id)) {
+                      allProducts.push(accRes.data.data);
+                  }
+              }
+          } catch (e) {
+              console.log("Không tải được phụ kiện ẩn");
+          }
+
+          // Cập nhật toàn bộ danh sách sản phẩm (bao gồm cả phụ kiện) vào State
+          setProducts(allProducts);
+      }
+
+      if (supRes.data.data && supRes.data.data.length > 0) setSelectedSupplier(supRes.data.data[0].id);
+      if (storeRes.data.data && storeRes.data.data.length > 0) setSelectedStore(storeRes.data.data[0].id);
 
     } catch (error) { console.error("Lỗi data:", error); }
   };

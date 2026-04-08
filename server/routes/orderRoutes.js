@@ -26,4 +26,5 @@ router.post('/create-admin', orderController.createAdminOrder);
 
 router.get('/export/sapo', orderController.exportOrdersToSapoExcel);
 
+router.get('/accessory', orderController.getAccessoryProduct);
 module.exports = router;

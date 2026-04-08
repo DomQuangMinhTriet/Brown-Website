@@ -998,3 +998,27 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi xuất file Excel: ' + error.message });
     }
 };
+
+// [THÊM MỚI] API kéo riêng sản phẩm "Phụ kiện BrownVN" đang bị ẩn cho Admin
+exports.getAccessoryProduct = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('products')
+            .select(`
+                *,
+                variants (*)
+            `)
+            .eq('name', 'Phụ kiện BrownVN')
+            .single();
+
+        if (error) {
+            // Không văng lỗi nếu lỡ quên chưa tạo sản phẩm, trả về null để Frontend ko sập
+            return res.json({ success: true, data: null });
+        }
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error("Get Accessory Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

@@ -3,6 +3,15 @@ import axios from 'axios';
 import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
+
+// [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
+  const formatColorForTranslate = (color) => {
+      if (!color) return '';
+      const c = color.toString().trim();
+      if (c.toLowerCase() === 'xanh') return 'Xanh dương'; 
+      return c;
+  };
+
 const CreateOrder = () => {
     // Dữ liệu
     const [products, setProducts] = useState([]);

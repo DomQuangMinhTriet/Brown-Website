@@ -266,6 +266,13 @@ const Orders = () => {
         }
     };
 
+    // [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
+    const formatColorForTranslate = (color) => {
+        if (!color) return '';
+        const c = color.toString().trim();
+        if (c.toLowerCase() === 'xanh') return 'Xanh dương'; 
+        return c;
+    };
   return (
     <div className="p-4 md:p-8 relative min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -572,7 +579,7 @@ const Orders = () => {
                                         <div className="flex-1">
                                             <p className="font-bold text-stone-800 text-sm md:text-base">{item.product_name || item.variants?.products?.name}</p>
                                             <p className="text-xs text-stone-500">
-                                                Size: <span className="font-bold">{item.variants?.size}</span> | Màu: <span className="font-bold">{item.variants?.color}</span>
+                                                Size: <span className="font-bold">{item.variants?.size}</span> | Màu: <span className="font-bold">{formatColorForTranslate(item.variants?.color)}</span>
                                             </p>
                                         </div>
                                         <div className="text-right">

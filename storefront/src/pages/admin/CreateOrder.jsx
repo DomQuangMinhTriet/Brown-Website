@@ -238,7 +238,7 @@ const CreateOrder = () => {
                         <div key={item.variant_id} className="flex justify-between items-start border-b pb-2">
                             <div className="flex-1 pr-4">
                                 <div className="font-bold text-sm">{item.name}</div>
-                                <div className="text-xs text-stone-500">{item.size} / {item.color}</div>
+                                <div className="text-xs text-stone-500">{item.size} / {formatColorForTranslate(item.color)}</div>
                                 
                                 {/* HIỂN THỊ Ô NHẬP GIÁ NẾU LÀ PHỤ KIỆN BROWNVN */}
                                 {item.name === 'Phụ kiện BrownVN' ? (

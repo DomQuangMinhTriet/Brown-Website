@@ -782,6 +782,22 @@ exports.updateOrderDetails = async (req, res) => {
     }
 };
 
+// Hàm từ điển ép dịch màu sắc sang tiếng Anh chuẩn xác
+const translateColorToEn = (color) => {
+    if (!color) return '';
+    const normalized = color.toString().toLowerCase().trim();
+    const colorMap = {
+        'xanh': 'Blue',
+        'xanh dương': 'Blue',
+        'xanh nước biển': 'Blue',
+        'xanh navy': 'Navy Blue',
+        'xanh lá': 'Green',
+        'xanh rêu': 'Olive Green',
+        // Thêm các màu khác nếu cần...
+    };
+    return colorMap[normalized] || color;
+};
+
 // [MỚI] XUẤT EXCEL ĐƠN HÀNG THEO CHUẨN SAPO
 exports.exportOrdersToSapoExcel = async (req, res) => {
     try {
@@ -956,7 +972,7 @@ exports.exportOrdersToSapoExcel = async (req, res) => {
                         isFirst ? (order.voucher_code || null) : null, // 17
                         null, // 18
                         item.variants?.products?.name || null, // 19
-                        `${item.variants?.size || ''} - ${item.variants?.color || ''}`.trim(), // 20
+                        `${item.variants?.size || ''} - ${translateColorToEn(item.variants?.color)}`.trim(), // 20
                         item.variants?.sku || null, // 21
                         'Cái', // 22
                         item.quantity, // 23

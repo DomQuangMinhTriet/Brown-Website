@@ -20,8 +20,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     category_id: '',
     collection_ids: [],
     is_active: true,
-    is_preorder: false, // [MỚI]
-    preorder_note: ''   // [MỚI]
+    is_preorder: false,
+    preorder_note: ''   
   });
 
   const [images, setImages] = useState([]);
@@ -32,7 +32,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
-  const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', sku: '', image_url: '' });
+  // [BỔ SUNG color_en]
+  const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', color_en: '', sku: '', image_url: '' });
   const fileInputRef = useRef(null);
 
   const formatCurrencyInput = (value) => {
@@ -69,8 +70,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             category_id: productToEdit.category_id || '',
             collection_ids: loadedCollectionIds,
             is_active: productToEdit.is_active !== undefined ? productToEdit.is_active : true,
-            is_preorder: productToEdit.is_preorder || false, // [MỚI]
-            preorder_note: productToEdit.preorder_note || '' // [MỚI]
+            is_preorder: productToEdit.is_preorder || false,
+            preorder_note: productToEdit.preorder_note || '' 
         });
 
         setImages(productToEdit.images || []);
@@ -80,6 +81,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         setVariants(safeVariants.map(v => ({
             size: v.size || '',
             color: v.color || '',
+            color_en: v.color_en || '', // [BỔ SUNG map color_en]
             sku: v.sku || '',
             image_url: v.image_url || ''
         })));
@@ -90,7 +92,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         setVariants([]);
         setSizeChart('');
       }
-      setCurrentVariant({ size: '', color: '', sku: '', image_url: '' });
+      // [BỔ SUNG reset color_en]
+      setCurrentVariant({ size: '', color: '', color_en: '', sku: '', image_url: '' });
     }
   }, [isOpen, productToEdit]);
 
@@ -182,11 +185,13 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     };
 
   const handleAddVariant = () => {
+      // Có thể yêu cầu nhập color_en hoặc không tùy bạn. Ở đây chỉ check color, size, sku
       if(!currentVariant.size || !currentVariant.color || !currentVariant.sku) {
           return toast.warn("Vui lòng nhập đủ Size, Màu, SKU");
       }
       setVariants([...variants, { ...currentVariant, image_url: currentVariant.image_url || '' }]);
-      setCurrentVariant({ size: '', color: '', sku: '', image_url: '' });
+      // [BỔ SUNG reset color_en]
+      setCurrentVariant({ size: '', color: '', color_en: '', sku: '', image_url: '' });
   };
 
   const handleRemoveVariant = (index) => {
@@ -455,14 +460,19 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             <div className="bg-stone-50 p-4 rounded-lg border border-stone-200">
                 <label className="label mb-3 block text-stone-700">Phân loại hàng (Size / Màu sắc)</label>
                 
+                {/* [ĐÃ BỔ SUNG Ô NHẬP MÀU TIẾNG ANH] */}
                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 mb-6 items-end">
                     <div className="col-span-1 sm:w-24">
                         <span className="text-xs font-bold text-stone-500 mb-1 block">Size</span>
                         <input className="input text-sm py-2" placeholder="S, M..." value={currentVariant.size} onChange={e => setCurrentVariant({...currentVariant, size: e.target.value})} />
                     </div>
                     <div className="col-span-1 sm:w-32">
-                        <span className="text-xs font-bold text-stone-500 mb-1 block">Màu sắc</span>
+                        <span className="text-xs font-bold text-stone-500 mb-1 block">Màu (VN)</span>
                         <input className="input text-sm py-2" placeholder="Đen..." value={currentVariant.color} onChange={e => setCurrentVariant({...currentVariant, color: e.target.value})} />
+                    </div>
+                    <div className="col-span-1 sm:w-32">
+                        <span className="text-xs font-bold text-stone-500 mb-1 block">Màu (EN)</span>
+                        <input className="input text-sm py-2" placeholder="Black..." value={currentVariant.color_en} onChange={e => setCurrentVariant({...currentVariant, color_en: e.target.value})} />
                     </div>
                     <div className="col-span-2 sm:flex-1 sm:min-w-[120px]">
                         <span className="text-xs font-bold text-stone-500 mb-1 block">Mã lưu kho (SKU)</span>
@@ -479,7 +489,10 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                             
                             <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto flex-1">
                                 <span className="font-bold min-w-[40px] text-center bg-stone-100 px-2 py-1 rounded text-sm">{v.size}</span>
-                                <span className="text-stone-600 min-w-[60px] truncate text-sm font-medium">{v.color}</span>
+                                {/* [BỔ SUNG hiển thị color_en] */}
+                                <span className="text-stone-600 min-w-[60px] truncate text-sm font-medium">
+                                    {v.color} {v.color_en && <span className="text-xs font-normal text-stone-400">({v.color_en})</span>}
+                                </span>
                                 <span className="font-mono text-stone-500 text-xs py-1 px-2 bg-stone-50 border border-stone-100 rounded ml-auto sm:ml-0">{v.sku}</span>
                             </div>
                             

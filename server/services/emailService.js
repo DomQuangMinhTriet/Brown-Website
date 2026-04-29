@@ -93,13 +93,27 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
     // Kiểm tra xem đã thanh toán qua PayPal chưa
     const isPaid = order.payment_method === 'done';
 
+    // [BỔ SUNG] Lấy các trường thông tin chi tiết truyền từ orderController
+    const customerPhone = order.customer_phone || order.phone || 'Chưa cung cấp';
+    const customerAddress = order.customer_address || order.address || 'Chưa cung cấp';
+    const subtotal = formatMoney(order.subtotal || 0, lang);
+    const shippingFee = formatMoney(order.shipping_fee || 0, lang);
+    const discountAmount = formatMoney(order.discount_amount || 0, lang);
+
     // TỪ ĐIỂN DỊCH THUẬT MINI CHO MAIL (Đã cập nhật PayPal)
     const t = lang === 'en' ? {
         subject: `[BROWN] Order Confirmation #${order.code || order.id}`,
         header: "ORDER CONFIRMED",
         greeting: `Hello <b>${order.customer_name}</b>,`,
         thanks: `Thank you for shopping at BROWN. Your order <b>${order.code || order.id}</b> has been received.`,
+        shippingTitle: "Shipping Information:", // [BỔ SUNG]
+        customerNameLabel: "Name:", // [BỔ SUNG]
+        phoneLabel: "Phone:", // [BỔ SUNG]
+        addressLabel: "Address:", // [BỔ SUNG]
         detailsTitle: "Order Details:",
+        subtotalLabel: "Subtotal:", // [BỔ SUNG]
+        shippingLabel: "Shipping Fee:", // [BỔ SUNG]
+        discountLabel: "Discount:", // [BỔ SUNG]
         totalLabel: "Total Amount:",
         methodLabel: "Payment Method:",
         methodValue: isPaid ? "PayPal / Credit Card" : "Bank Transfer",
@@ -109,11 +123,10 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
         bankDetails: isPaid 
             ? `<div style="color: #166534; font-weight: bold;">✅ Payment Successful. Thank you!</div>`
             : `
-                <li>Bank: <b>Techcombank</b></li>
-                <li>SWIFT Code: <b>VTCBVNVX</b></li>
-                <li>Account Name: <b>Le Thi My Nhi</b></li>
-                <li>Account No: <b>19037727414020</b></li>
-                <li>Remark: Phone <b>${order.customer_name}</b></li>
+                <li>Bank: <b>ACB - PGD TAN SON NHI</b></li>
+                <li>Account No: <b>49060577</b></li>
+                <li>Account Name: <b>HO KINH DOANH BROWNVN</b></li>
+                <li>Remark: <b>${order.customer_phone} + ${order.customer_name}</b></li>
             `,
         processingNote: isPaid 
             ? "We are preparing your order for shipment." 
@@ -123,7 +136,14 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
         header: "ĐƠN HÀNG ĐÃ ĐƯỢC GHI NHẬN",
         greeting: `Xin chào <b>${order.customer_name}</b>,`,
         thanks: `Cảm ơn bạn đã đặt hàng tại BROWN. Đơn hàng <b>${order.code || order.id}</b> của bạn đã được khởi tạo.`,
+        shippingTitle: "Thông tin giao hàng:", // [BỔ SUNG]
+        customerNameLabel: "Họ và tên:", // [BỔ SUNG]
+        phoneLabel: "Số điện thoại:", // [BỔ SUNG]
+        addressLabel: "Địa chỉ:", // [BỔ SUNG]
         detailsTitle: "Chi tiết đơn hàng:",
+        subtotalLabel: "Tạm tính:", // [BỔ SUNG]
+        shippingLabel: "Phí giao hàng:", // [BỔ SUNG]
+        discountLabel: "Giảm giá:", // [BỔ SUNG]
         totalLabel: "Tổng thanh toán:",
         methodLabel: "Hình thức:",
         methodValue: isPaid ? "PayPal / Thẻ quốc tế" : "Chuyển khoản ngân hàng (QR)",
@@ -136,7 +156,7 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
                 <li>Ngân hàng: <b>ACB - PGD TAN SON NHI</b></li>
                 <li>Số TK: <b>49060577</b></li>
                 <li>Chủ TK: <b>HO KINH DOANH BROWNVN</b></li>
-                <li>Nội dung: SĐT của bạn + <b> ${order.customer_name}</b></li>
+                <li>Nội dung: <b>${order.customer_phone} + ${order.customer_name}</b></li>
             `,
         processingNote: isPaid 
             ? "Chúng tôi đang chuẩn bị hàng và sẽ sớm giao cho đơn vị vận chuyển." 
@@ -153,15 +173,34 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
                 <p>${t.greeting}</p>
                 <p>${t.thanks}</p>
                 
+                <div style="margin: 20px 0; background: #fafaf9; padding: 15px; border-radius: 5px; border: 1px solid #e7e5e4;">
+                    <p style="font-weight:bold; border-bottom: 1px solid #d6d3d1; padding-bottom: 5px; margin-top: 0;">${t.shippingTitle}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>${t.customerNameLabel}</strong> ${order.customer_name}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>${t.phoneLabel}</strong> ${customerPhone}</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>${t.addressLabel}</strong> ${customerAddress}</p>
+                </div>
+
                 <div style="margin: 20px 0;">
                     <p style="font-weight:bold; border-bottom: 2px solid #1c1917; padding-bottom: 5px;">${t.detailsTitle}</p>
                     <table style="width: 100%; border-collapse: collapse;">
                         ${productRows}
                     </table>
                 </div>
+                
                 <div style="background: #f5f5f4; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #1c1917;">
-                    <p style="margin: 5px 0;"><strong>${t.totalLabel}</strong> ${formattedPrice}</p>
-                    <p style="margin: 5px 0;"><strong>${t.methodLabel}</strong> ${t.methodValue}</p>
+                    <table style="width: 100%; font-size: 13px;">
+                        <tr><td style="padding: 3px 0;">${t.subtotalLabel}</td><td style="text-align: right;">${subtotal}</td></tr>
+                        <tr><td style="padding: 3px 0;">${t.shippingLabel}</td><td style="text-align: right;">${shippingFee}</td></tr>
+                        ${order.discount_amount > 0 ? `<tr><td style="padding: 3px 0; color: #16a34a;">${t.discountLabel}</td><td style="text-align: right; color: #16a34a;">-${discountAmount}</td></tr>` : ''}
+                        <tr><td colspan="2"><hr style="border: 0; border-top: 1px solid #d6d3d1; margin: 8px 0;" /></td></tr>
+                        <tr>
+                            <td style="padding: 3px 0; font-size: 16px; font-weight: bold;">${t.totalLabel}</td>
+                            <td style="text-align: right; font-size: 16px; font-weight: bold; color: #b91c1c;">${formattedPrice}</td>
+                        </tr>
+                    </table>
+                    <p style="margin: 15px 0 0 0; border-top: 1px dashed #ccc; padding-top: 10px;">
+                        <strong>${t.methodLabel}</strong> ${t.methodValue}
+                    </p>
                 </div>
 
                 <div style="margin-bottom: 20px;">
@@ -181,6 +220,7 @@ const sendOrderConfirmation = async (order, customerEmail, lang = 'vi') => {
 
     return await sendViaResend(customerEmail, t.subject, htmlContent);
 };
+
 // 3. GỬI THÔNG BÁO VẬN CHUYỂN (Giữ nguyên HTML cũ)
 const sendShippingConfirmation = async (order, trackingCode, isSPX = false) => {
     const email = order.customer_info?.email || order.customer_email; 
@@ -243,22 +283,31 @@ const sendNewOrderNotifyToAdmin = async (orderData) => {
 
     const subject = `🔔 Đơn mới #${orderData.id} - ${formattedPrice}`;
     
-    // GIỮ NGUYÊN HTML CŨ & CHÈN THÊM BẢNG
+    // GIỮ NGUYÊN HTML CŨ & CHÈN THÊM BẢNG VÀ THÔNG TIN MỚI
     const htmlContent = `
         <div style="font-family: Arial, sans-serif;">
             <h3>Bạn có đơn hàng mới!</h3>
             <p>Mã đơn: <strong>${orderData.id}</strong></p>
             <p>Khách hàng: ${orderData.customer_name}</p>
-            <p>SĐT: ${orderData.phone}</p>
+            <p>SĐT: ${orderData.phone || 'Trống'}</p>
+            <p>Địa chỉ: ${orderData.address || 'Trống'}</p>
+            <p>Ghi chú: ${orderData.note || 'Không có'}</p>
             
             <table style="width: 100%; border-collapse: collapse; margin: 15px 0; border: 1px solid #ddd;">
                 <tr style="background:#f9f9f9; font-weight:bold;">
                     <td style="padding:8px; border:1px solid #ddd;">Sản phẩm</td>
-                    <td style="padding:8px; border:1px solid #ddd;">SL</td>
-                    <td style="padding:8px; border:1px solid #ddd;">Giá</td>
+                    <td style="padding:8px; border:1px solid #ddd; text-align:center;">SL</td>
+                    <td style="padding:8px; border:1px solid #ddd; text-align:right;">Giá</td>
                 </tr>
                 ${productRows}
             </table>
+            
+            <table style="width: 100%; font-size: 13px;">
+                <tr><td style="padding: 3px 0;">Tạm tính:</td><td style="text-align: right;">${formatMoney(orderData.subtotal || 0)}</td></tr>
+                <tr><td style="padding: 3px 0;">Phí vận chuyển:</td><td style="text-align: right;">${formatMoney(orderData.shipping_fee || 0)}</td></tr>
+                ${orderData.discount_amount > 0 ? `<tr><td style="padding: 3px 0; color: #16a34a;">Giảm giá:</td><td style="text-align: right; color: #16a34a;">-${formatMoney(orderData.discount_amount || 0)}</td></tr>` : ''}
+            </table>
+            
             <p>Tổng tiền: <span style="color:red; font-weight:bold">${formattedPrice}</span></p>
             <p>Thanh toán: ${orderData.payment_method}</p>
         </div>

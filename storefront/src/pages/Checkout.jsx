@@ -505,8 +505,8 @@ const Checkout = () => {
                                         <div className="mt-2 text-right">
                                             <p className="text-[11px] text-stone-500 italic leading-relaxed">
                                                 {lang === 'en' 
-                                                    ? '* The shipping fee (20.000đ) will be paid directly to the courier upon delivery. If you prefer to pay the full amount upfront, please contact us via Instagram/Zalo.' 
-                                                    : '* Phí vận chuyển (20.000đ) vui lòng thanh toán cho shipper khi nhận hàng. Nếu bạn muốn thanh toán toàn bộ, vui lòng liên hệ IG/Zalo.'}
+                                                    ? '* The shipping fee (20.000đ) will be paid directly to the courier upon delivery. BROWN does not accept cash on delivery payments through the business payment account.' 
+                                                    : '* Phí vận chuyển (20.000đ) vui lòng thanh toán cho shipper khi nhận hàng. BROWN không nhận thu hộ phí vận chuyển qua Tài khoản thanh toán doanh nghiệp.'}
                                             </p>
                                         </div>
                                     )}

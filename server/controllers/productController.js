@@ -4,6 +4,8 @@ const translate = require('translate-google');
 
 const autoTranslate = async (text) => {
     if (!text || text.trim() === '') return '';
+    // Đảm bảo text là string trước khi gọi .trim() để tránh crash app
+    if (!text || typeof text !== 'string' || text.trim() === '') return '';
     try {
         const res = await translate(text, { from: 'vi', to: 'en' });
         return res;
@@ -125,18 +127,19 @@ exports.createProduct = async (req, res) => {
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
         
-        if (variants && Array.isArray(variants)) {
-            for (let i = 0; i < variants.length; i++) {
-                if (variants[i].color) {
-                    variants[i].color_en = await autoTranslate(variants[i].color);
-                }
-            }
-        }
+        // Đã tắt tự động dịch màu sắc sang tiếng Anh
+        // if (variants && Array.isArray(variants)) {
+        //     for (let i = 0; i < variants.length; i++) {
+        //         if (variants[i].color) {
+        //             variants[i].color_en = await autoTranslate(variants[i].color);
+        //         }
+        //     }
+        // }
         
         const { data: newProduct, error: prodError } = await supabase
             .from('products')
             .insert([{
-                name, slug, base_price, description, category_id, images, 
+                name, slug, base_price, description, category_id: category_id || null, images, 
                 size_chart_url: size_chart_url || null,  
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
@@ -148,7 +151,7 @@ exports.createProduct = async (req, res) => {
 
         if (prodError) throw prodError;
 
-        if (variants && variants.length > 0) {
+        if (variants && Array.isArray(variants) && variants.length > 0) {
             const variantData = variants.map(v => ({
                 product_id: newProduct.id,
                 size: v.size,
@@ -162,18 +165,20 @@ exports.createProduct = async (req, res) => {
             if (varError) throw varError;
         }
 
-        if (collection_ids && collection_ids.length > 0) {
+        if (collection_ids && Array.isArray(collection_ids) && collection_ids.length > 0) {
             const collectionData = collection_ids.map(catId => ({
                 product_id: newProduct.id,
                 category_id: catId
             }));
-            await supabase.from('product_collections').insert(collectionData);
+            const { error: colError } = await supabase.from('product_collections').insert(collectionData);
+            if (colError) throw colError;
         }
 
         res.json({ success: true, message: 'Tạo sản phẩm thành công', data: newProduct });
 
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Create Product Error:", error); // <-- In lỗi ra Terminal để biết nguyên nhân
+        res.status(500).json({ success: false, message: error.message || 'Lỗi server khi tạo sản phẩm' });
     }
 };
 
@@ -186,19 +191,20 @@ exports.updateProduct = async (req, res) => {
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
 
-        if (variants && Array.isArray(variants)) {
-            for (let i = 0; i < variants.length; i++) {
-                if (variants[i].color) {
-                    variants[i].color_en = await autoTranslate(variants[i].color);
-                }
-            }
-        }
+        // Đã tắt tự động dịch màu sắc sang tiếng Anh
+        // if (variants && Array.isArray(variants)) {
+        //     for (let i = 0; i < variants.length; i++) {
+        //         if (variants[i].color) {
+        //             variants[i].color_en = await autoTranslate(variants[i].color);
+        //         }
+        //     }
+        // }
         
         // 1. Update thông tin chung
         const { error: updateError } = await supabase
             .from('products')
             .update({ 
-                name, slug, base_price, description, category_id, images, 
+                name, slug, base_price, description, category_id: category_id || null, images, 
                 size_chart_url: size_chart_url || null, 
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,

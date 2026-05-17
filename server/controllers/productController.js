@@ -26,7 +26,7 @@ exports.getProducts = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, color_en, sku, image_url,
+                    id, size, color, color_en, sku, image_url, is_deleted,
                     inventory_batches ( quantity_remaining ) 
                 ),
                 categories!fk_products_main_category (id, name, slug),
@@ -64,7 +64,8 @@ exports.getProducts = async (req, res) => {
         if (error) throw error;
 
         const productsWithStock = data.map(product => {
-            const variantsWithStock = product.variants.map(v => {
+            const validVariants = product.variants ? product.variants.filter(v => v.is_deleted === false) : [];
+            const variantsWithStock = validVariants.map(v => {
                 const totalStock = v.inventory_batches 
                     ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
                     : 0;
@@ -95,7 +96,7 @@ exports.getProductBySlug = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, color_en, sku, image_url,
+                    id, size, color, color_en, sku, image_url, is_deleted,
                     inventory_batches ( quantity_remaining )
                 ),
                 categories (id, name, slug)
@@ -105,7 +106,8 @@ exports.getProductBySlug = async (req, res) => {
 
         if (error) throw error;
 
-        const variantsWithStock = data.variants.map(v => {
+        const validVariants = data.variants ? data.variants.filter(v => v.is_deleted === false) : [];
+        const variantsWithStock = validVariants.map(v => {
             const totalStock = v.inventory_batches 
                 ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
                 : 0;
@@ -158,7 +160,8 @@ exports.createProduct = async (req, res) => {
                 color: v.color,
                 color_en: v.color_en || null, 
                 sku: v.sku,
-                image_url: v.image_url || null 
+                image_url: v.image_url || null,
+                is_deleted: v.is_deleted || false
             }));
 
             const { error: varError } = await supabase.from('variants').insert(variantData);
@@ -224,7 +227,7 @@ exports.updateProduct = async (req, res) => {
 
         // 3. Xử lý Variants [ĐÃ SỬA LỖI TẠI ĐÂY]
         // Lấy full thông tin size và color của các biến thể cũ để đối chiếu
-        const { data: oldVariants } = await supabase.from('variants').select('id, size, color').eq('product_id', id);
+        const { data: oldVariants } = await supabase.from('variants').select('id, size, color, is_deleted').eq('product_id', id);
         const oldVariantIds = oldVariants.map(v => v.id);
         
         let hasHistory = false;
@@ -248,7 +251,8 @@ exports.updateProduct = async (req, res) => {
                             .update({ 
                                 image_url: v.image_url || null, 
                                 sku: v.sku,
-                                color_en: v.color_en || null 
+                                color_en: v.color_en || null,
+                                is_deleted: v.is_deleted || false
                             })
                             .eq('id', existingVariant.id);
                     } else {
@@ -259,7 +263,8 @@ exports.updateProduct = async (req, res) => {
                             color: v.color,
                             color_en: v.color_en || null, 
                             sku: v.sku,
-                            image_url: v.image_url || null 
+                            image_url: v.image_url || null,
+                            is_deleted: v.is_deleted || false
                         }]);
                     }
                 }
@@ -281,7 +286,8 @@ exports.updateProduct = async (req, res) => {
                     color: v.color,
                     color_en: v.color_en || null, 
                     sku: v.sku,
-                    image_url: v.image_url || null 
+                    image_url: v.image_url || null,
+                    is_deleted: v.is_deleted || false
                 }));
                 await supabase.from('variants').insert(variantData);
             }
@@ -338,7 +344,7 @@ exports.exportProductsToSapoExcel = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, sku, image_url, current_price,
+                    id, size, color, sku, image_url, current_price, is_deleted,
                     inventory_batches ( quantity_remaining, cost_price, created_at ) 
                 ),
                 categories!fk_products_main_category (name)
@@ -402,8 +408,9 @@ exports.exportProductsToSapoExcel = async (req, res) => {
             // Xóa HTML tags trong mô tả (Sapo nhận text trơn hoặc HTML)
             let description = product.description || '';
 
-            if (product.variants && product.variants.length > 0) {
-                product.variants.forEach((variant, index) => {
+            const validVariants = product.variants ? product.variants.filter(v => v.is_deleted === false) : [];
+            if (validVariants && validVariants.length > 0) {
+                validVariants.forEach((variant, index) => {
                     const isFirst = index === 0; // Đánh dấu dòng biến thể đầu tiên của sản phẩm
 
                     // Tính tồn kho

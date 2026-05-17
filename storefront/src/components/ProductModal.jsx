@@ -33,7 +33,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
   // [BỔ SUNG color_en]
-  const [currentVariant, setCurrentVariant] = useState({ size: '', color: '', color_en: '', sku: '', image_url: '' });
+  const [currentVariant, setCurrentVariant] = useState({ id: null, size: '', color: '', color_en: '', sku: '', image_url: '', is_deleted: false });
   const fileInputRef = useRef(null);
 
   const formatCurrencyInput = (value) => {
@@ -79,11 +79,13 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
         const safeVariants = productToEdit.variants || [];
         setVariants(safeVariants.map(v => ({
+            id: v.id,
             size: v.size || '',
             color: v.color || '',
             color_en: v.color_en || '', // [BỔ SUNG map color_en]
             sku: v.sku || '',
-            image_url: v.image_url || ''
+            image_url: v.image_url || '',
+            is_deleted: v.is_deleted || false
         })));
 
       } else {
@@ -93,7 +95,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         setSizeChart('');
       }
       // [BỔ SUNG reset color_en]
-      setCurrentVariant({ size: '', color: '', color_en: '', sku: '', image_url: '' });
+      setCurrentVariant({ id: null, size: '', color: '', color_en: '', sku: '', image_url: '', is_deleted: false });
     }
   }, [isOpen, productToEdit]);
 
@@ -189,13 +191,15 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       if(!currentVariant.size || !currentVariant.color || !currentVariant.sku) {
           return toast.warn("Vui lòng nhập đủ Size, Màu, SKU");
       }
-      setVariants([...variants, { ...currentVariant, image_url: currentVariant.image_url || '' }]);
+      setVariants([...variants, { ...currentVariant, image_url: currentVariant.image_url || '', is_deleted: false }]);
       // [BỔ SUNG reset color_en]
-      setCurrentVariant({ size: '', color: '', color_en: '', sku: '', image_url: '' });
+      setCurrentVariant({ id: null, size: '', color: '', color_en: '', sku: '', image_url: '', is_deleted: false });
   };
 
   const handleRemoveVariant = (index) => {
-      setVariants(variants.filter((_, i) => i !== index));
+      const newVariants = [...variants];
+      newVariants[index].is_deleted = true;
+      setVariants(newVariants);
   };
 
   const toSlug = (str) => {
@@ -484,8 +488,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 </div>
 
                 <div className="space-y-3 max-h-[40vh] sm:max-h-60 overflow-y-auto pr-1">
-                    {variants.map((v, idx) => (
-                        <div key={idx} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white p-3 rounded border border-stone-200 shadow-sm">
+                    {variants.map((v, idx) => {
+                        if (v.is_deleted) return null;
+                        return (<div key={idx} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white p-3 rounded border border-stone-200 shadow-sm">
                             
                             <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto flex-1">
                                 <span className="font-bold min-w-[40px] text-center bg-stone-100 px-2 py-1 rounded text-sm">{v.size}</span>
@@ -543,8 +548,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                 </button>
                             </div>
                         </div>
-                    ))}
-                    {variants.length === 0 && (
+                        );
+                    })}
+                    {variants.filter(v => !v.is_deleted).length === 0 && (
                         <p className="text-sm text-stone-400 text-center py-4 italic">Chưa có phân loại nào. Hãy thêm ở bên trên.</p>
                     )}
                 </div>

@@ -16,6 +16,7 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import ReturnPolicy from './pages/policies/ReturnPolicy';
 import ShippingPolicy from './pages/policies/ShippingPolicy';
+import CareGuide from './pages/policies/CareGuide';
 import { useLanguage } from './context/LanguageContext';
 //import About from './pages/About';
 
@@ -188,6 +189,7 @@ function App() {
            <Route path="account" element={<Profile />} />
            <Route path="policy/return" element={<ReturnPolicy />} />
            <Route path="policy/shipping" element={<ShippingPolicy />} />
+           <Route path="policy/care" element={<CareGuide />} />
            {/* <Route path="/about" element={<About />} /> */}
            {/* Trang 404 cho Storefront (Tùy chọn) */}
            <Route path="*" element={<div className="p-20 text-center">404 - Page Not Found</div>} />

@@ -8,6 +8,7 @@ export const translations = {
       about: "VỀ BROWN",
       return_policy: "CHÍNH SÁCH ĐỔI HÀNG",
       shipping_policy: "CHÍNH SÁCH VẬN CHUYỂN",
+      care_guide: "HƯỚNG DẪN BẢO QUẢN",
       login: "Đăng nhập",
       account: "Tài khoản",
       logout: "Đăng xuất",
@@ -203,7 +204,24 @@ export const translations = {
       shipping_fee_title: "1. Phí vận chuyển",
       shipping_fee_desc: "BROWN áp dụng mức phí vận chuyển đồng giá: 20.000đ cho đơn hàng nội địa. Đối với đơn hàng quốc tế, vui lòng liên hệ Instagram của BROWN để biết thêm chi tiết.",
       shipping_time_title: "2. Thời gian giao hàng",
-      shipping_time_desc: "Thời gian giao hàng dự kiến từ 2-5 ngày tùy thuộc vào địa chỉ nhận hàng của quý khách. Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Instagram)."
+      shipping_time_desc: "Thời gian giao hàng dự kiến từ 2-5 ngày tùy thuộc vào địa chỉ nhận hàng của quý khách. Đơn hàng nội thành có thể nhận ngay trong ngày nếu đặt ship hỏa tốc (vui lòng inbox Instagram).",
+      care_title: "BROWN – Hướng dẫn giặt và bảo quản đồ trắng & đồ sáng màu",
+      care_col_no: "STT",
+      care_col_guide: "Hướng dẫn",
+      care_step1_bold: "Chỉ giặt tay",
+      care_step1_text: "để giữ form dáng và màu sắc sản phẩm.",
+      care_step2_bold: "Không sử dụng thuốc tẩy",
+      care_step2_text: "hoặc các hóa chất có tính tẩy mạnh.",
+      care_step3_bold: "Không đổ trực tiếp nước giặt, bột giặt hoặc chất tẩy rửa lên sản phẩm.",
+      care_step3_text: "Nên hòa tan với nước trước khi giặt.",
+      care_step4_bold: "Phơi quần áo tránh ánh nắng trực tiếp của mặt trời,",
+      care_step4_text: "đặc biệt đối với sản phẩm màu trắng, để hạn chế tình trạng ố vàng và giảm tuổi thọ vải.",
+      care_notes_title: "Lưu ý",
+      care_note1: "Giặt riêng sản phẩm với các loại quần áo màu đậm.",
+      care_note2: "Không ngâm sản phẩm quá lâu.",
+      care_note3: "Phơi ở nơi khô ráo, thoáng mát.",
+      care_note4: "Đối với những sản phẩm có tua rua, vui lòng không vò, chà hoặc vắt mạnh để tránh làm rối, gãy hoặc biến dạng chi tiết tua rua.",
+      care_quote: "Hãy nâng niu để gìn giữ vẻ đẹp và chất lượng sản phẩm của bạn."
     }
   },
   en: {
@@ -213,6 +231,7 @@ export const translations = {
       about: "ABOUT BROWN",
       return_policy: "EXCHANGE POLICY",
       shipping_policy: "SHIPPING POLICY",
+      care_guide: "CARE INSTRUCTIONS",
       login: "Login",
       account: "Account",
       logout: "Logout",
@@ -409,7 +428,24 @@ export const translations = {
       shipping_fee_title: "1. Shipping Fee",
       shipping_fee_desc: "BROWN applies a flat shipping rate of 20,000 VND for domestic orders. For international orders, please contact our Instagram for more information.",
       shipping_time_title: "2. Delivery Time",
-      shipping_time_desc: "Estimated delivery time is 2-5 days depending on your location. Same-day delivery is available for inner-city orders via express shipping (please contact our Instagram)."
+      shipping_time_desc: "Estimated delivery time is 2-5 days depending on your location. Same-day delivery is available for inner-city orders via express shipping (please contact our Instagram).",
+      care_title: "BROWN – Care Instructions for White & Light-Colored Garments",
+      care_col_no: "No.",
+      care_col_guide: "Instructions",
+      care_step1_bold: "Hand wash only",
+      care_step1_text: "to maintain the garment's shape and color.",
+      care_step2_bold: "Do not use bleach",
+      care_step2_text: "or any harsh whitening agents.",
+      care_step3_bold: "Do not apply detergent or cleaning agents directly onto the garment.",
+      care_step3_text: "Dilute with water before washing.",
+      care_step4_bold: "Dry away from direct sunlight,",
+      care_step4_text: "especially for white garments, to help prevent yellowing and preserve fabric quality.",
+      care_notes_title: "Important Notes",
+      care_note1: "Wash separately from dark-colored garments.",
+      care_note2: "Do not soak for extended periods.",
+      care_note3: "Air dry in a cool, well-ventilated area.",
+      care_note4: "For garments with fringe details, please do not rub, scrub, or wring vigorously, as this may cause the fringe to tangle, break, or lose its shape.",
+      care_quote: "Handle with care to preserve the beauty and quality of your garment."
     }
   }
 };

@@ -11,4 +11,10 @@ router.post('/banners', contentController.createBanner);
 router.put('/banners/:id', contentController.updateBanner);
 router.delete('/banners/:id', contentController.deleteBanner);
 
+// Lookbook (editorial)
+router.get('/lookbook', verifyCache(300), contentController.getLookbook);
+router.post('/lookbook', contentController.createLookbook);
+router.put('/lookbook/:id', contentController.updateLookbook);
+router.delete('/lookbook/:id', contentController.deleteLookbook);
+
 module.exports = router;

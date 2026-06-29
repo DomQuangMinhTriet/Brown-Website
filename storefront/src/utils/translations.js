@@ -28,6 +28,9 @@ export const translations = {
       no_products: "Không tìm thấy sản phẩm nào.",
       subtotal: "Tổng tiền tạm tính",
       checkout: "Thanh toán",
+      select: "Chọn",
+      pos_mode: "Chế độ bán tại quầy",
+      exit: "Thoát",
     },
     product: {
       related_products: "Sản phẩm liên quan",
@@ -191,6 +194,7 @@ export const translations = {
       desc: "Thời trang tối giản, tinh tế dành cho người hiện đại.",
       contact: "Liên hệ",
       follow: "Theo dõi chúng tôi",
+      support: "Hỗ trợ",
       rights: "Bản quyền thuộc về BROWN.",
     },
     policies: {
@@ -201,6 +205,7 @@ export const translations = {
       return_cond_3: "Sản phẩm bị lỗi do nhà sản xuất hoặc do BROWN tư vấn sai kích thước.",
       return_process_title: "2. Quy trình đổi hàng",
       return_process_desc: "Quý khách vui lòng liên hệ qua Instagram hoặc Zalo 090.695.4860 để được hướng dẫn. Sau khi xác nhận, quý khách gửi hàng về địa chỉ kho của BROWN.",
+      shipping_title: "Chính sách vận chuyển",
       shipping_fee_title: "1. Phí vận chuyển",
       shipping_fee_desc: "BROWN áp dụng mức phí vận chuyển đồng giá: 20.000đ cho đơn hàng nội địa. Đối với đơn hàng quốc tế, vui lòng liên hệ Instagram của BROWN để biết thêm chi tiết.",
       shipping_time_title: "2. Thời gian giao hàng",
@@ -251,6 +256,9 @@ export const translations = {
       no_products: "No products found.",
       subtotal: "Subtotal",
       checkout: "Checkout",
+      select: "Select",
+      pos_mode: "Point of Sale mode",
+      exit: "Exit",
     },
     product: {
       related_products: "Related Products",
@@ -414,6 +422,7 @@ export const translations = {
       desc: "Minimalist and sophisticated fashion for modern people.",
       contact: "Contact Us",
       follow: "Follow Us",
+      support: "Support",
       rights: "All rights reserved by BROWN.",
     },
     policies: {

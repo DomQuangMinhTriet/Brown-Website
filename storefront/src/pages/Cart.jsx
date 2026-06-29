@@ -1,8 +1,18 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { FaTrash, FaArrowRight } from 'react-icons/fa';
+import { FaTrash } from 'react-icons/fa';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
+import Container from '../components/ui/Container';
+import Button from '../components/ui/Button';
+
+const QtyStepper = ({ item, updateQuantity }) => (
+  <div className="flex items-center rounded-full border border-sand">
+    <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="px-3 py-1.5 text-muted transition-colors hover:text-cocoa" aria-label="Giảm">−</button>
+    <span className="w-10 text-center text-sm font-medium text-ink">{item.quantity}</span>
+    <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="px-3 py-1.5 text-muted transition-colors hover:text-cocoa" aria-label="Tăng">+</button>
+  </div>
+);
 
 const Cart = () => {
   const { cartItems, removeFromCart, updateQuantity, cartTotal } = useCart();
@@ -10,62 +20,54 @@ const Cart = () => {
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <h2 className="text-2xl font-serif text-stone-800 mb-4">{t('cart.empty_title')}</h2>
-        <p className="text-stone-500 mb-8">{t('cart.empty_desc')}</p>
-        <Link to="/" className="bg-stone-900 text-white px-8 py-3 uppercase tracking-wider text-sm hover:bg-stone-700">
-          {t('cart.shop_now')}
-        </Link>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+        <h1 className="mb-4 font-heading text-3xl text-espresso">{t('cart.empty_title')}</h1>
+        <p className="mb-8 text-muted">{t('cart.empty_desc')}</p>
+        <Button to="/" variant="solid" size="lg">{t('cart.shop_now')}</Button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10 md:py-16">
-      <h1 className="text-3xl font-serif text-stone-900 mb-10 text-center">{t('cart.title')}</h1>
+    <Container className="py-12 md:py-16">
+      <h1 className="mb-10 text-center font-heading text-4xl text-espresso">{t('cart.title')}</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
         {/* DANH SÁCH SẢN PHẨM */}
         <div className="lg:col-span-2">
-          <div className="grid grid-cols-12 gap-4 border-b border-stone-200 pb-4 text-xs font-bold text-stone-500 uppercase tracking-wider mb-6">
-            <div className="col-span-8 md:col-span-6"><p className="text-left">{t('cart.product')}</p></div>
-            <div className="col-span-4 md:col-span-3 hidden md:block"><p className="text-center">{t('cart.quantity')}</p></div>
-            <div className="col-span-4 md:col-span-3 hidden md:block"><p className="text-right">{t('cart.price')}</p></div>
+          <div className="mb-6 hidden grid-cols-12 gap-4 border-b border-sand pb-4 text-xs font-semibold uppercase tracking-wider text-muted md:grid">
+            <div className="col-span-6">{t('cart.product')}</div>
+            <div className="col-span-3 text-center">{t('cart.quantity')}</div>
+            <div className="col-span-3 text-right">{t('cart.price')}</div>
           </div>
 
           <div className="space-y-8">
             {cartItems.map((item) => (
-              <div key={item.variant_id} className="grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-12 md:col-span-6 flex items-center gap-4">
-                  <button onClick={() => removeFromCart(item.variant_id)} className="text-stone-300 hover:text-red-500 transition-colors">
+              <div key={item.variant_id} className="grid grid-cols-12 items-center gap-4 border-b border-sand/60 pb-8 md:border-0 md:pb-0">
+                <div className="col-span-12 flex items-center gap-4 md:col-span-6">
+                  <button onClick={() => removeFromCart(item.variant_id)} className="text-sand transition-colors hover:text-clay" aria-label="Xóa">
                     <FaTrash />
                   </button>
-                  <img src={item.image} alt={item.name} className="w-20 h-24 object-cover rounded bg-stone-100" />
+                  <img src={item.image} alt={item.name} className="h-24 w-20 rounded-xl bg-parchment object-cover" />
                   <div>
-                    <Link to={`/product/${item.slug}`} className="font-bold text-stone-900 hover:text-stone-600 transition-colors line-clamp-1">
+                    <Link to={`/product/${item.slug}`} className="font-heading text-lg text-espresso transition-colors hover:text-cocoa line-clamp-1">
                       {item.name}
                     </Link>
-                    <p className="text-stone-500 text-sm mb-2">Size: {item.size} | {t('product.select_color')}: {lang === 'en' && item.color_en ? item.color_en : item.color}</p>
-                    <div className="md:hidden font-bold text-stone-900 mb-2">
+                    <p className="mb-2 text-sm text-muted">Size: {item.size} | {t('product.select_color')}: {lang === 'en' && item.color_en ? item.color_en : item.color}</p>
+                    <div className="mb-2 font-medium text-cocoa md:hidden">
                       {formatPrice(item.price, lang === 'en' ? 'USD' : 'VND')}
                     </div>
-                    <div className="flex items-center border border-stone-200 rounded w-max md:hidden">
-                      <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">-</button>
-                      <span className="px-3 py-1 font-medium text-sm w-10 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">+</button>
+                    <div className="w-max md:hidden">
+                      <QtyStepper item={item} updateQuantity={updateQuantity} />
                     </div>
                   </div>
                 </div>
 
-                <div className="col-span-4 md:col-span-3 hidden md:flex justify-center">
-                   <div className="flex items-center border border-stone-200 rounded">
-                      <button onClick={() => updateQuantity(item.variant_id, item.quantity - 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">-</button>
-                      <span className="px-3 py-1 font-medium text-sm w-12 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.variant_id, item.quantity + 1)} className="px-3 py-1 text-stone-500 hover:bg-stone-50">+</button>
-                    </div>
+                <div className="col-span-4 hidden justify-center md:col-span-3 md:flex">
+                  <QtyStepper item={item} updateQuantity={updateQuantity} />
                 </div>
 
-                <div className="col-span-4 md:col-span-3 hidden md:block text-right font-bold text-stone-900">
+                <div className="col-span-4 hidden text-right font-medium text-espresso md:col-span-3 md:block">
                   {formatPrice(item.price * item.quantity, lang === 'en' ? 'USD' : 'VND')}
                 </div>
               </div>
@@ -73,34 +75,34 @@ const Cart = () => {
           </div>
         </div>
 
-        {/* TỔNG TIỀN & THANH TOÁN */}
+        {/* TỔNG TIỀN */}
         <div className="lg:col-span-1">
-          <div className="bg-stone-50 p-6 rounded-lg sticky top-24">
-            <h3 className="font-bold text-stone-900 uppercase tracking-wider mb-6">{t('cart.summary')}</h3>
-            
-            <div className="flex justify-between mb-4 text-stone-600">
+          <div className="sticky top-24 rounded-2xl border border-sand bg-surface p-6">
+            <h2 className="mb-6 font-heading text-xl text-espresso">{t('cart.summary')}</h2>
+
+            <div className="mb-4 flex justify-between text-ink/80">
               <span>{t('cart.subtotal')}</span>
               <span>{formatPrice(cartTotal, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
-            <div className="flex justify-between mb-4 text-stone-600">
+            <div className="mb-4 flex justify-between text-ink/80">
               <span>{t('cart.shipping')}</span>
               <span>{formatPrice(20000, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
-            
-            <hr className="border-stone-200 my-4" />
-            
-            <div className="flex justify-between mb-8 text-lg font-bold text-stone-900">
+
+            <hr className="my-4 border-sand" />
+
+            <div className="mb-8 flex justify-between text-lg font-semibold text-espresso">
               <span>{t('cart.total')}</span>
               <span>{formatPrice(cartTotal + 20000, lang === 'en' ? 'USD' : 'VND')}</span>
             </div>
 
-            <Link to="/checkout" className="block w-full bg-stone-900 text-white text-center py-4 uppercase tracking-widest text-sm font-bold hover:bg-stone-800 transition-colors">
+            <Button to="/checkout" variant="solid" size="lg" className="w-full">
               {t('cart.checkout')}
-            </Link>
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Container>
   );
 };
 

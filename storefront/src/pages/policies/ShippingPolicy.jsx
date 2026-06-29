@@ -4,26 +4,25 @@ import { useLanguage } from '../../context/LanguageContext';
 const ShippingPolicy = () => {
   const { t } = useLanguage();
 
-  // FIX LỖI RESPONSIVE: Ép trình duyệt cuộn lên đầu trang khi vào
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 pt-24 pb-16 text-stone-700 leading-relaxed min-h-[70vh]">
-      <h1 className="text-3xl font-serif font-bold text-stone-900 mb-8 text-center uppercase">
+    <div className="mx-auto min-h-[70vh] max-w-4xl px-6 pb-20 pt-20 leading-relaxed text-ink/80">
+      <h1 className="mb-10 text-center font-heading text-4xl text-espresso">
         {t('policies.shipping_title')}
       </h1>
-      
+
       <div className="space-y-6">
-        <section className="bg-stone-50 p-6 rounded-xl border border-stone-100">
-          <h2 className="font-bold text-lg text-stone-900 mb-4">{t('policies.shipping_fee_title')}</h2>
-          <p className="text-stone-600">{t('policies.shipping_fee_desc')}</p>
+        <section className="rounded-2xl border border-sand bg-surface p-6 md:p-8">
+          <h2 className="mb-4 font-heading text-xl text-espresso">{t('policies.shipping_fee_title')}</h2>
+          <p className="text-ink/75">{t('policies.shipping_fee_desc')}</p>
         </section>
 
-        <section className="bg-stone-50 p-6 rounded-xl border border-stone-100">
-          <h2 className="font-bold text-lg text-stone-900 mb-4">{t('policies.shipping_time_title')}</h2>
-          <p className="text-stone-600">{t('policies.shipping_time_desc')}</p>
+        <section className="rounded-2xl border border-sand bg-surface p-6 md:p-8">
+          <h2 className="mb-4 font-heading text-xl text-espresso">{t('policies.shipping_time_title')}</h2>
+          <p className="text-ink/75">{t('policies.shipping_time_desc')}</p>
         </section>
       </div>
     </div>

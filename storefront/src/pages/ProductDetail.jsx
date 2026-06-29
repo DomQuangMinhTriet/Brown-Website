@@ -3,10 +3,13 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
-import { FaStar, FaCheck, FaHistory, FaBoxOpen, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
+import { FaHistory, FaChevronRight, FaChevronLeft, FaInfoCircle, FaCheckCircle } from 'react-icons/fa';
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
+import Container from '../components/ui/Container';
+import Button from '../components/ui/Button';
+import ProductCard from '../components/ui/ProductCard';
 
 const getOptimizedImageUrl = (url, width = 800) => {
     if (!url || !url.includes('cloudinary.com')) return url;
@@ -15,49 +18,43 @@ const getOptimizedImageUrl = (url, width = 800) => {
     return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
 };
 
-const ProductCard = ({ product, lang }) => (
-    <Link to={`/product/${product.slug}`} className="group block">
-        <div className="aspect-[3/4] overflow-hidden rounded-lg mb-3 relative bg-stone-100">
-            <img 
-                src={getOptimizedImageUrl(product.images?.[0], 400)} 
-                alt={product.name} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                loading="lazy"
-                decoding="async"
-            />
-        </div>
-        <h3 className="font-medium text-stone-900 text-sm truncate group-hover:text-stone-600 transition-colors">
-            {lang === 'en' && product.name_en ? product.name_en : product.name}
-        </h3>
-        <p className="text-stone-500 font-bold mt-1 text-sm">
-            {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
-        </p>
-    </Link>
-);
-
 const ProductDetail = () => {
     const { slug } = useParams();
     const [product, setProduct] = useState(null);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const { addToCart } = useCart();
     const { t, lang } = useLanguage();
-    
+
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [viewedProducts, setViewedProducts] = useState([]);
     const [mainImage, setMainImage] = useState(null);
+    const [zoom, setZoom] = useState({ on: false, x: '50%', y: '50%' });
+
+    const onZoomMove = (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width) * 100;
+        const y = ((e.clientY - r.top) / r.height) * 100;
+        setZoom({ on: true, x: `${x}%`, y: `${y}%` });
+    };
+    const onZoomLeave = () => setZoom({ on: false, x: '50%', y: '50%' });
 
     useEffect(() => {
+        // Reset ngay khi đổi sản phẩm để không hiển thị dữ liệu cũ (URL đã đổi nhưng ảnh/chữ còn của SP trước)
+        setProduct(null);
+        setSelectedVariant(null);
+        setMainImage(null);
+
         const fetchProductData = async () => {
             try {
-                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`); 
+                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
                 if (res.data.success) {
                     const allProducts = res.data.data;
                     const found = allProducts.find(p => p.slug === slug);
-                    
+
                     if (found) {
                         setProduct(found);
-                        
-                        const related = allProducts.filter(p => 
+
+                        const related = allProducts.filter(p =>
                             p.category_id === found.category_id && p.id !== found.id
                         ).slice(0, 4);
                         setRelatedProducts(related);
@@ -67,7 +64,7 @@ const ProductDetail = () => {
                         const localHistory = JSON.parse(localStorage.getItem('viewed_products') || '[]');
                         const validHistory = localHistory
                             .map(localItem => allProducts.find(realItem => realItem.id === localItem.id))
-                            .filter(item => item !== undefined); 
+                            .filter(item => item !== undefined);
 
                         localStorage.setItem('viewed_products', JSON.stringify(validHistory));
                         setViewedProducts(validHistory.filter(p => p.id !== found.id).slice(0, 4));
@@ -79,7 +76,7 @@ const ProductDetail = () => {
         };
 
         fetchProductData();
-        window.scrollTo(0, 0); 
+        window.scrollTo(0, 0);
     }, [slug]);
 
     useEffect(() => {
@@ -88,25 +85,22 @@ const ProductDetail = () => {
         }
     }, [product?.id]);
 
-    // [MỚI] SMART PRELOAD: Chỉ tải ngầm ảnh Trái và Phải khi mainImage thay đổi
+    // SMART PRELOAD: tải ngầm ảnh trái/phải khi mainImage đổi
     useEffect(() => {
         if (!product?.images?.length || !mainImage) return;
 
         const currentIndex = product.images.indexOf(mainImage);
         if (currentIndex === -1) return;
 
-        // Tính toán vị trí của 2 ảnh lân cận
         const prevIndex = currentIndex <= 0 ? product.images.length - 1 : currentIndex - 1;
         const nextIndex = currentIndex >= product.images.length - 1 ? 0 : currentIndex + 1;
 
-        // Chỉ tạo object Image tải ngầm đúng 2 ảnh này qua bộ nén Cloudinary
-        const imgPrev = new Image(); 
+        const imgPrev = new Image();
         imgPrev.src = getOptimizedImageUrl(product.images[prevIndex], 800);
-        
-        const imgNext = new Image(); 
-        imgNext.src = getOptimizedImageUrl(product.images[nextIndex], 800);
 
-    }, [mainImage, product?.images]); // Chạy lại mỗi khi khách lướt sang ảnh mới
+        const imgNext = new Image();
+        imgNext.src = getOptimizedImageUrl(product.images[nextIndex], 800);
+    }, [mainImage, product?.images]);
 
     const saveToViewedHistory = (currentProduct) => {
         try {
@@ -140,188 +134,162 @@ const ProductDetail = () => {
         setMainImage(product.images[nextIndex]);
     };
 
-    if (!product) return <div className="min-h-screen flex justify-center items-center">{t('product.loading')}</div>;
+    if (!product) return <div className="flex min-h-screen items-center justify-center font-heading text-muted">{t('product.loading')}</div>;
 
-    // Các biến kiểm tra trạng thái hiển thị nút mua
     const isOutOfStock = getStock(selectedVariant) <= 0;
     const canBuy = selectedVariant && (product.is_preorder || !isOutOfStock);
 
     return (
-        <div className="min-h-screen pt-10 pb-20 px-4 bg-white">
-             <SEO 
-                title={lang === 'en' && product.name_en ? product.name_en : product.name} 
-                description={(lang === 'en' && product.description_en ? product.description_en : product.description)?.substring(0, 150) + "..."} 
-                image={product.images?.[0]} 
+        <div className="min-h-screen bg-cream pb-20 pt-10">
+            <SEO
+                title={lang === 'en' && product.name_en ? product.name_en : product.name}
+                description={(lang === 'en' && product.description_en ? product.description_en : product.description)?.substring(0, 150) + "..."}
+                image={product.images?.[0]}
                 url={`/product/${product.slug}`}
             />
 
-            <div className="max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20">
+            <Container className="max-w-6xl">
+                <div className="mb-20 grid grid-cols-1 gap-12 md:grid-cols-2">
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
-                        <div className="rounded-xl overflow-hidden aspect-[3/4] relative group bg-stone-50">
-                            <img 
+                        <div
+                            className="group relative aspect-[3/4] cursor-zoom-in overflow-hidden rounded-2xl bg-parchment"
+                            onMouseMove={onZoomMove}
+                            onMouseLeave={onZoomLeave}
+                        >
+                            <img
                                 key={mainImage}
-                                src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)} 
-                                alt={product.name} 
-                                className="w-full h-full object-cover transition-all animate-fade-in"
+                                src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
+                                alt={product.name}
+                                className="h-full w-full object-cover transition-transform duration-200 ease-out"
+                                style={{ transformOrigin: `${zoom.x} ${zoom.y}`, transform: zoom.on ? 'scale(1.9)' : 'scale(1)' }}
                                 fetchPriority="high"
                             />
-                            
-                            {/* Nút chuyển ảnh */}
+
                             {product.images?.length > 1 && (
                                 <>
-                                    <button 
-                                        onClick={handlePrevImage}
-                                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-stone-800 w-10 h-10 flex items-center justify-center rounded-full shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 active:scale-95"
-                                        aria-label="Ảnh trước"
-                                    >
+                                    <button onClick={handlePrevImage} aria-label="Ảnh trước"
+                                        className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-cream/85 text-cocoa shadow-lg backdrop-blur-sm transition-opacity active:scale-95 md:opacity-0 md:group-hover:opacity-100">
                                         <FaChevronLeft />
                                     </button>
-                                    <button 
-                                        onClick={handleNextImage}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-stone-800 w-10 h-10 flex items-center justify-center rounded-full shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 active:scale-95"
-                                        aria-label="Ảnh tiếp theo"
-                                    >
+                                    <button onClick={handleNextImage} aria-label="Ảnh tiếp theo"
+                                        className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-cream/85 text-cocoa shadow-lg backdrop-blur-sm transition-opacity active:scale-95 md:opacity-0 md:group-hover:opacity-100">
                                         <FaChevronRight />
                                     </button>
                                 </>
                             )}
                         </div>
-                        
-                        {/* Ảnh nhỏ (Thumbnails) */}
+
+                        {/* Thumbnails */}
                         {product.images?.length > 1 && (
                             <div className="grid grid-cols-4 gap-2">
                                 {product.images.map((img, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        onClick={() => setMainImage(img)} 
-                                        className={`
-                                            aspect-[3/4] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-all
-                                            ${mainImage === img ? 'ring-2 ring-stone-900 opacity-100' : 'border border-transparent opacity-60'}
-                                        `}
+                                    <button
+                                        key={idx}
+                                        onClick={() => setMainImage(img)}
+                                        className={`aspect-[3/4] overflow-hidden rounded-xl transition-all ${mainImage === img ? 'opacity-100 ring-2 ring-cocoa' : 'opacity-60 hover:opacity-90'}`}
                                     >
-                                        <img 
-                                            src={getOptimizedImageUrl(img, 200)} 
-                                            className="w-full h-full object-cover" 
-                                            alt="" 
-                                            loading="lazy" 
-                                            decoding="async" 
-                                        />
-                                    </div>
+                                        <img src={getOptimizedImageUrl(img, 200)} className="h-full w-full object-cover" alt="" loading="lazy" decoding="async" />
+                                    </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
                     {/* Cột Phải: Thông tin */}
-                    <div className="flex flex-col h-full">
+                    <div className="flex h-full flex-col">
                         <div className="mb-auto">
-                            <h1 className="text-3xl font-serif text-stone-900 mb-2">
+                            <h1 className="mb-3 font-heading text-3xl leading-tight text-espresso md:text-4xl">
                                 {lang === 'en' && product.name_en ? product.name_en : product.name}
                             </h1>
-                            <div className="flex items-center gap-2 mb-6">
-                            </div>
 
-                            <p className="text-2xl font-bold text-stone-800 mb-8">
+                            <p className="mb-3 text-2xl font-medium text-cocoa">
                                 {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
+                            </p>
+
+                            <p className="mb-8 flex items-center gap-2 text-sm text-sage">
+                                <FaCheckCircle className="shrink-0" />
+                                {lang === 'en' ? 'All products shown are in stock.' : 'Tất cả sản phẩm được hiển thị đều đang có sẵn.'}
                             </p>
 
                             {/* Chọn Biến thể */}
                             <div className="mb-8">
-                                <label className="text-xs font-bold uppercase text-stone-500 mb-3 block">{t('product.select_variant')}</label>
+                                <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted">{t('product.select_variant')}</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.variants?.map(variant => (
                                         <button
                                             key={variant.id}
                                             onClick={() => {
                                                 setSelectedVariant(variant);
-                                                if (variant.image_url) {
-                                                    setMainImage(variant.image_url);
-                                                }
+                                                if (variant.image_url) setMainImage(variant.image_url);
                                             }}
-                                            className={`
-                                                min-w-[80px] px-4 py-2 border rounded-lg text-sm transition-all relative overflow-hidden
-                                                ${selectedVariant?.id === variant.id 
-                                                    ? 'border-stone-900 bg-stone-900 text-white' 
-                                                    : 'border-stone-200 text-stone-600 hover:border-stone-900'}
-                                                ${!product.is_preorder && getStock(variant) <= 0 ? 'opacity-50 cursor-not-allowed bg-stone-100' : ''}
-                                            `}
+                                            className={`relative min-w-[80px] overflow-hidden rounded-full border px-5 py-2 text-sm transition-all
+                                                ${selectedVariant?.id === variant.id
+                                                    ? 'border-cocoa bg-cocoa text-cream'
+                                                    : 'border-sand text-ink hover:border-cocoa'}
+                                                ${!product.is_preorder && getStock(variant) <= 0 ? 'cursor-not-allowed bg-parchment opacity-50' : ''}`}
                                             disabled={!product.is_preorder && getStock(variant) <= 0}
                                         >
                                             {variant.size} - {lang === 'en' && variant.color_en ? variant.color_en : variant.color}
                                             {getStock(variant) > 0 && getStock(variant) < 5 && (
-                                                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                                                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-clay"></span>
                                             )}
                                         </button>
                                     ))}
                                 </div>
                                 {selectedVariant && (
-                                    <div className="mt-2 text-xs text-stone-500 font-medium">
-                                        {getStock(selectedVariant) > 0 
-                                            ? `${t('product.in_stock')} ${getStock(selectedVariant)}` 
-                                            : product.is_preorder 
-                                                ? <span className="text-blue-600 font-bold">{lang === 'en' ? 'Available for Pre-order' : 'Sản phẩm này cho phép Đặt trước (Pre-order)'}</span>
-                                                : <span className="text-red-500">{t('product.out_of_stock')}</span>}
+                                    <div className="mt-3 text-xs font-medium">
+                                        {getStock(selectedVariant) > 0
+                                            ? <span className="text-muted">{t('product.in_stock')} {getStock(selectedVariant)}</span>
+                                            : product.is_preorder
+                                                ? <span className="font-semibold text-cocoa">{lang === 'en' ? 'Available for Pre-order' : 'Sản phẩm này cho phép Đặt trước (Pre-order)'}</span>
+                                                : <span className="text-clay">{t('product.out_of_stock')}</span>}
                                     </div>
                                 )}
                             </div>
 
-                            {/* HIỂN THỊ GHI CHÚ PREORDER NẾU CÓ */}
+                            {/* Ghi chú preorder */}
                             {product.is_preorder && product.preorder_note && (
-                                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <p className="text-sm text-blue-800 flex items-start gap-2">
-                                        <span className="mt-0.5">ℹ️</span> 
+                                <div className="mb-6 rounded-xl border border-sand bg-parchment/60 p-4">
+                                    <p className="flex items-start gap-2 text-sm text-ink">
+                                        <FaInfoCircle className="mt-0.5 shrink-0 text-cocoa" />
                                         <span>{product.preorder_note}</span>
                                     </p>
                                 </div>
                             )}
 
                             {/* Nút Mua */}
-                            <button 
+                            <Button
                                 onClick={() => addToCart(product, selectedVariant, 1)}
                                 disabled={!canBuy}
-                                className={`
-                                    w-full py-4 rounded-xl font-bold text-white uppercase tracking-wider shadow-lg transition-transform active:scale-95 mb-8
-                                    ${!canBuy ? 'bg-stone-300 cursor-not-allowed shadow-none' : 'bg-red-600 hover:bg-red-700'}
-                                `}
+                                variant="clay"
+                                size="lg"
+                                className="mb-8 w-full"
                             >
-                                {!selectedVariant 
-                                    ? t('product.select_variant') 
-                                    : isOutOfStock 
-                                        ? (product.is_preorder ? (lang === 'en' ? 'PRE-ORDER NOW' : 'ĐẶT TRƯỚC SẢN PHẨM NÀY') : t('product.out_of_stock')) 
+                                {!selectedVariant
+                                    ? t('product.select_variant')
+                                    : isOutOfStock
+                                        ? (product.is_preorder ? (lang === 'en' ? 'PRE-ORDER NOW' : 'ĐẶT TRƯỚC SẢN PHẨM NÀY') : t('product.out_of_stock'))
                                         : t('product.add_to_cart')}
-                            </button>
+                            </Button>
 
-                            {/* --- MÔ TẢ & SIZE CHART --- */}
-                            <div className="border-t border-stone-100 pt-6">
-                                <h3 className="font-bold text-stone-700 mb-3 text-sm uppercase">{t('product.details')}</h3>
-                                <p className="text-stone-600 leading-relaxed text-sm whitespace-pre-line mb-6">
+                            {/* Mô tả & Size chart */}
+                            <div className="border-t border-sand pt-6">
+                                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-cocoa">{t('product.details')}</h2>
+                                <p className="mb-6 whitespace-pre-line text-sm leading-relaxed text-ink/80">
                                     {lang === 'en' && product.description_en ? product.description_en : (product.description || t('product.no_description'))}
                                 </p>
 
-                                {/* ẢNH SIZE CHART */}
                                 <div className="mt-4">
-                                    <h4 className="font-bold text-stone-700 text-xs uppercase mb-2">{t('product.size_chart')}</h4>
-                                    
+                                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-cocoa">{t('product.size_chart')}</h3>
                                     {product.size_chart_url ? (
-                                        <div className="rounded-lg overflow-hidden border border-stone-200">
-                                            <img 
-                                                src={getOptimizedImageUrl(product.size_chart_url, 600)} 
-                                                alt="Size Chart"
-                                                className="w-full h-auto object-cover"
-                                                loading="lazy"
-                                            />
+                                        <div className="overflow-hidden rounded-xl border border-sand">
+                                            <img src={getOptimizedImageUrl(product.size_chart_url, 600)} alt="Size Chart" className="h-auto w-full object-cover" loading="lazy" />
                                         </div>
                                     ) : (
-                                        <div className="rounded-lg overflow-hidden border border-stone-200">
-                                             <img 
-                                                src="https://file.hstatic.net/200000185994/file/bang_size_ao_thun_nam_ad12822a16c44284ab94132808c1650c_1024x1024.jpg" 
-                                                alt="Size Chart Default"
-                                                className="w-full h-auto object-cover opacity-50"
-                                                loading="lazy"
-                                            />
-                                            <p className="text-center text-xs text-stone-400 p-2">{t('product.no_size_chart')}</p>
+                                        <div className="overflow-hidden rounded-xl border border-sand">
+                                            <img src="https://file.hstatic.net/200000185994/file/bang_size_ao_thun_nam_ad12822a16c44284ab94132808c1650c_1024x1024.jpg" alt="Size Chart Default" className="h-auto w-full object-cover opacity-50" loading="lazy" />
+                                            <p className="p-2 text-center text-xs text-muted">{t('product.no_size_chart')}</p>
                                         </div>
                                     )}
                                 </div>
@@ -330,43 +298,32 @@ const ProductDetail = () => {
                     </div>
                 </div>
 
-                {/* --- PHẦN 2: SẢN PHẨM LIÊN QUAN --- */}
+                {/* SẢN PHẨM LIÊN QUAN */}
                 {relatedProducts.length > 0 && (
                     <div className="mb-20">
-                        <div className="flex items-center justify-between mb-6 border-b border-stone-200 pb-2">
-                            <h2 className="text-xl font-serif font-bold text-stone-900">{t('product.related_products')}</h2>
-                            <Link to="/collection" className="text-xs font-bold text-stone-500 hover:text-stone-900">{t('product.view_all')}</Link>
+                        <div className="mb-8 flex items-center justify-between border-b border-sand pb-4">
+                            <h2 className="font-heading text-2xl text-espresso md:text-3xl">{t('product.related_products')}</h2>
+                            <Link to="/collection" className="text-xs font-semibold uppercase tracking-wider text-cocoa transition-colors hover:text-clay">{t('product.view_all')}</Link>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-                            {relatedProducts.map(p => <ProductCard key={p.id} product={p} lang={lang} />)}
+                        <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-4 md:gap-x-6">
+                            {relatedProducts.map(p => <ProductCard key={p.id} product={p} />)}
                         </div>
                     </div>
                 )}
 
-                {/* --- PHẦN 3: SẢN PHẨM ĐÃ XEM --- */}
+                {/* SẢN PHẨM ĐÃ XEM */}
                 {viewedProducts.length > 0 && (
                     <div>
-                         <div className="flex items-center gap-2 mb-6 border-b border-stone-200 pb-2">
-                            <FaHistory className="text-stone-400"/>
-                            <h2 className="text-xl font-serif font-bold text-stone-900">{t('product.viewed_products')}</h2>
+                        <div className="mb-8 flex items-center gap-3 border-b border-sand pb-4">
+                            <FaHistory className="text-muted" />
+                            <h2 className="font-heading text-2xl text-espresso md:text-3xl">{t('product.viewed_products')}</h2>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-8">
-                            {viewedProducts.map(p => <ProductCard key={p.id} product={p} lang={lang} />)}
+                        <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-4 md:gap-x-6">
+                            {viewedProducts.map(p => <ProductCard key={p.id} product={p} />)}
                         </div>
                     </div>
                 )}
-            </div>
-
-            {/* [MỚI] ĐỊNH NGHĨA CSS HIỆU ỨNG FADE-IN */}
-            <style>{`
-                @keyframes fade-in-smooth {
-                    from { opacity: 0.6; }
-                    to { opacity: 1; }
-                }
-                .animate-fade-in {
-                    animation: fade-in-smooth 0.3s ease-out forwards;
-                }
-            `}</style>
+            </Container>
         </div>
     );
 };

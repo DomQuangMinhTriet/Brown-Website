@@ -17,22 +17,27 @@ exports.uploadImage = async (req, res) => {
 
         // 2. Hàm upload Stream lên Cloudinary
         // Cloudinary không hỗ trợ upload trực tiếp Buffer, nên phải dùng streamifier để chuyển đổi
+        const isVideo = file.mimetype?.startsWith('video/');
+
         const uploadToCloudinary = (buffer) => {
             return new Promise((resolve, reject) => {
-                const uploadStream = cloudinary.uploader.upload_stream(
-                    {
-                        folder: 'brown_products', // Tên thư mục chứa ảnh trên Cloudinary
-                        resource_type: 'auto',    // Tự động nhận diện (ảnh/video)
-                        format: 'webp',           // Tự động đổi sang WebP cho nhẹ web
-                        transformation: [
-                            { quality: "auto", fetch_format: "auto" } // Nén ảnh thông minh
-                        ]
-                    },
-                    (error, result) => {
-                        if (error) return reject(error);
-                        resolve(result);
-                    }
-                );
+                const options = {
+                    folder: 'brown_products', // Tên thư mục chứa file trên Cloudinary
+                    resource_type: 'auto',    // Tự động nhận diện (ảnh/video)
+                };
+                // [SỬA LỖI] Chỉ ép format webp + nén ảnh khi file là ẢNH.
+                // Ép format webp lên VIDEO sẽ làm hỏng file (webp là định dạng ảnh).
+                if (isVideo) {
+                    options.transformation = [{ quality: 'auto' }];
+                } else {
+                    options.format = 'webp';
+                    options.transformation = [{ quality: 'auto', fetch_format: 'auto' }];
+                }
+
+                const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                });
                 // Đẩy buffer vào luồng upload
                 streamifier.createReadStream(buffer).pipe(uploadStream);
             });

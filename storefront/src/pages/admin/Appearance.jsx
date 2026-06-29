@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { FaTrash, FaPlus, FaImage, FaCloudUploadAlt, FaList, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaImage, FaCloudUploadAlt, FaList, FaEye, FaEyeSlash, FaGripVertical, FaQuoteRight, FaVideo } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import LookbookBlocks from '../../components/lookbook/LookbookBlocks';
+import { toLookbookBlock, isVideoUrl } from '../../components/lookbook/blockUtils';
 
 const Appearance = () => {
   // --- STATE BANNER ---
@@ -14,6 +16,11 @@ const Appearance = () => {
   // --- [MỚI] STATE DANH MỤC ---
   const [categories, setCategories] = useState([]);
 
+  // --- STATE LOOKBOOK ---
+  const [lookbook, setLookbook] = useState([]);
+  const [lookUploading, setLookUploading] = useState(false);
+  const [dragId, setDragId] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -21,10 +28,11 @@ const Appearance = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Gọi cả 2 API cùng lúc
-      const [bannerRes, catRes] = await Promise.all([
+      // Gọi các API cùng lúc
+      const [bannerRes, catRes, lookRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/categories`)
+          axios.get(`${import.meta.env.VITE_API_URL}/api/categories`),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } }))
       ]);
 
       // Xử lý Banner
@@ -35,6 +43,11 @@ const Appearance = () => {
       // Xử lý Danh mục
       if (catRes.data && Array.isArray(catRes.data.data)) {
         setCategories(catRes.data.data);
+      }
+
+      // Xử lý Lookbook
+      if (lookRes.data && Array.isArray(lookRes.data.data)) {
+        setLookbook(lookRes.data.data);
       }
 
     } catch (error) {
@@ -101,6 +114,162 @@ const Appearance = () => {
       } catch (error) {
           toast.error("Lỗi xóa banner");
       }
+  };
+
+  // ==========================================================
+  // LOGIC LOOKBOOK
+  // ==========================================================
+  const uploadFile = async (f) => {
+    if (!f) return null;
+    const fd = new FormData();
+    fd.append('image', f);
+    const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data.url;
+  };
+
+  // Tải nhiều ảnh/video 1 lần — mỗi file thành 1 khối "Ảnh tràn viền" riêng
+  const handleBulkUpload = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setLookUploading(true);
+    try {
+      let order = lookbook.length ? Math.max(...lookbook.map(l => l.display_order || 0)) + 1 : 0;
+      const created = [];
+      for (const f of files) {
+        const image_url = await uploadFile(f);
+        if (!image_url) continue;
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/content/lookbook`, {
+          title: '', caption: '', image_url, image_url_2: null, block_type: 'full', display_order: order++,
+        });
+        if (res.data.success) created.push(res.data.data);
+      }
+      if (created.length) {
+        setLookbook(prev => [...prev, ...created]);
+        toast.success(`Đã tải lên ${created.length} ảnh/video!`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi khi tải lên");
+    } finally {
+      setLookUploading(false);
+    }
+  };
+
+  // Thêm khối "câu trích dẫn" — chỉ chữ, không cần ảnh
+  const handleAddQuote = async () => {
+    try {
+      const order = lookbook.length ? Math.max(...lookbook.map(l => l.display_order || 0)) + 1 : 0;
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/content/lookbook`, {
+        title: '', caption: 'Nhập câu trích dẫn...', block_type: 'quote', display_order: order,
+      });
+      if (res.data.success) {
+        setLookbook(prev => [...prev, res.data.data]);
+      }
+    } catch (err) {
+      toast.error("Lỗi tạo khối trích dẫn");
+    }
+  };
+
+  const handleDeleteLook = async (id) => {
+    if (!confirm("Bạn chắc chắn muốn xóa mục lookbook này?")) return;
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/content/lookbook/${id}`);
+      setLookbook(lookbook.filter(l => l.id !== id));
+      toast.success("Đã xóa mục lookbook");
+    } catch (error) {
+      toast.error("Lỗi xóa");
+    }
+  };
+
+  // Lưu thay đổi 1 mục (title/caption/block_type/ảnh 2...)
+  const handleUpdateLook = async (id, updates) => {
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/content/lookbook/${id}`, updates);
+      setLookbook(prev => prev.map(l => (l.id === id ? { ...l, ...updates } : l)));
+      toast.success("Đã lưu thay đổi");
+    } catch (error) {
+      toast.error("Lỗi lưu thay đổi");
+    }
+  };
+
+  const handleBlockTypeChange = async (item, newType) => {
+    if (newType === 'compare' && !item.image_url_2) {
+      toast.info('Hãy tải "Ảnh 2" bên dưới khối này để bật slider so sánh.');
+    }
+    if (newType !== 'compare' && item.image_url_2) {
+      await handleUpdateLook(item.id, { block_type: newType, image_url_2: null });
+      return;
+    }
+    await handleUpdateLook(item.id, { block_type: newType });
+  };
+
+  const handleSetSecondMedia = async (id, file) => {
+    const url = await uploadFile(file);
+    if (!url) return toast.error("Lỗi upload Ảnh 2");
+    await handleUpdateLook(id, { image_url_2: url, block_type: 'compare' });
+  };
+
+  // --- KÉO THẢ SẮP XẾP qua Pointer Events (gộp chuột + cảm ứng, chạy được trên mobile/tablet) ---
+  const cardRefs = useRef({}); // id -> DOM node, dùng để biết đang kéo qua vị trí thẻ nào
+  const dragRef = useRef(null); // id đang kéo (đọc được ngay trong listener, không bị stale closure)
+  const lookbookRef = useRef(lookbook); // bản mới nhất của lookbook, đọc trong handlePointerUp để tránh stale closure
+  useEffect(() => { lookbookRef.current = lookbook; }, [lookbook]);
+
+  const persistOrder = async (list) => {
+    const reordered = list.map((item, idx) => ({ ...item, display_order: idx }));
+    setLookbook(reordered);
+    try {
+      await Promise.all(reordered.map(item =>
+        axios.put(`${import.meta.env.VITE_API_URL}/api/content/lookbook/${item.id}`, { display_order: item.display_order })
+      ));
+    } catch (error) {
+      toast.error("Lỗi lưu thứ tự, vui lòng thử lại");
+    }
+  };
+
+  const handlePointerMove = (e) => {
+    const draggingId = dragRef.current;
+    if (draggingId == null) return;
+    const y = e.clientY;
+
+    // Tìm thẻ đầu tiên mà con trỏ/ngón tay đang ở phía TRÊN điểm giữa của nó
+    let targetId = null;
+    for (const [cid, node] of Object.entries(cardRefs.current)) {
+      if (!node || Number(cid) === draggingId) continue;
+      const rect = node.getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) { targetId = Number(cid); break; }
+    }
+
+    setLookbook(prev => {
+      const fromIdx = prev.findIndex(l => l.id === draggingId);
+      if (fromIdx === -1) return prev;
+      let toIdx = targetId == null ? prev.length - 1 : prev.findIndex(l => l.id === targetId);
+      if (toIdx === -1 || fromIdx === toIdx) return prev;
+      if (fromIdx < toIdx) toIdx -= 1; // bù lại vì phần tử nguồn sẽ bị rút ra trước khi chèn
+
+      const list = [...prev];
+      const [moved] = list.splice(fromIdx, 1);
+      list.splice(toIdx, 0, moved);
+      return list;
+    });
+  };
+
+  const handlePointerUp = () => {
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    dragRef.current = null;
+    setDragId(null);
+    persistOrder(lookbookRef.current); // lưu ngay (optimistic) sau khi thả
+  };
+
+  const handleGripPointerDown = (e, id) => {
+    e.preventDefault();
+    dragRef.current = id;
+    setDragId(id);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
   };
 
   // ==========================================================
@@ -270,6 +439,159 @@ const Appearance = () => {
         </div>
       </div>
 
+      <hr className="border-stone-200" />
+
+      {/* --- PHẦN 3: QUẢN LÝ LOOKBOOK --- */}
+      <div>
+        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-2 flex items-center gap-2">
+            <FaImage /> Lookbook (Tạp ảnh)
+        </h2>
+        <p className="text-stone-500 mb-6 text-sm">
+            Nội dung editorial cho trang <span className="font-mono">/lookbook</span>. Tải nhiều ảnh/video 1 lần, <b>kéo-thả</b> để sắp xếp, sửa từng khối để đổi kiểu hiển thị. Xem trước ở cột bên phải.
+        </p>
+
+        {/* Vùng tải nhiều ảnh/video 1 lần */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[260px] cursor-pointer rounded-lg border-2 border-dashed border-stone-300 p-4 text-center transition-colors hover:bg-stone-50">
+                <input type="file" accept="image/*,video/*" multiple disabled={lookUploading}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    onChange={e => { handleBulkUpload(e.target.files); e.target.value = ''; }} />
+                <div className="flex flex-col items-center justify-center text-stone-500">
+                    <FaCloudUploadAlt size={22} className="mb-1"/>
+                    <span className="text-sm font-medium">
+                        {lookUploading ? 'Đang tải lên...' : 'Chọn nhiều ảnh/video — mỗi file thành 1 khối riêng'}
+                    </span>
+                </div>
+            </div>
+            <button onClick={handleAddQuote} type="button"
+                className="flex items-center gap-2 rounded-lg border border-stone-300 px-4 py-3 text-sm font-bold text-stone-700 transition-colors hover:bg-stone-50">
+                <FaQuoteRight /> Thêm câu trích dẫn
+            </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            {/* Danh sách khối — kéo-thả để sắp xếp */}
+            <div className="space-y-3">
+                {lookbook.length === 0 ? (
+                    <div className="rounded border border-dashed bg-stone-50 py-10 text-center text-stone-400">
+                        Chưa có nội dung lookbook nào — hãy tải ảnh lên ở trên.
+                    </div>
+                ) : (
+                    lookbook.map(item => (
+                        <LookbookCard
+                            key={item.id}
+                            item={item}
+                            registerRef={(node) => { cardRefs.current[item.id] = node; }}
+                            isDragging={dragId === item.id}
+                            onGripPointerDown={(e) => handleGripPointerDown(e, item.id)}
+                            onUpdate={(updates) => handleUpdateLook(item.id, updates)}
+                            onTypeChange={(newType) => handleBlockTypeChange(item, newType)}
+                            onSetSecondMedia={(file) => handleSetSecondMedia(item.id, file)}
+                            onToggleActive={() => handleUpdateLook(item.id, { is_active: item.is_active === false })}
+                            onDelete={() => handleDeleteLook(item.id)}
+                        />
+                    ))
+                )}
+            </div>
+
+            {/* Xem trước trực tiếp — dùng đúng component hiển thị ở trang công khai */}
+            <div className="lg:sticky lg:top-6 lg:h-fit">
+                <h3 className="mb-3 flex items-center gap-2 font-bold text-stone-700">
+                    <FaEye className="text-stone-400" /> Xem trước trang Lookbook
+                </h3>
+                <div className="h-[680px] overflow-y-auto rounded-2xl border border-stone-200 bg-cream">
+                    {lookbook.length === 0 ? (
+                        <div className="flex h-full items-center justify-center text-stone-400">Chưa có gì để xem trước</div>
+                    ) : (
+                        <LookbookBlocks blocks={lookbook.filter(l => l.is_active !== false).map(toLookbookBlock)} lang="vi" fullHeight="h-[60vh]" />
+                    )}
+                </div>
+                <p className="mt-2 text-xs text-stone-400">Khung này phản ánh đúng giao diện thật trên /lookbook. Sửa chữ cần bấm "Lưu" mới cập nhật ở đây; kéo-thả thì cập nhật ngay.</p>
+            </div>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+// --- Thẻ 1 khối Lookbook: kéo-thả để sắp xếp + sửa nhanh title/caption/loại khối ---
+const LookbookCard = ({ item, registerRef, isDragging, onGripPointerDown, onUpdate, onTypeChange, onSetSecondMedia, onToggleActive, onDelete }) => {
+  const [draft, setDraft] = useState({ title: item.title || '', caption: item.caption || '' });
+  const dirty = draft.title !== (item.title || '') || draft.caption !== (item.caption || '');
+  const blockType = item.block_type || (item.image_url_2 ? 'compare' : 'full');
+  const video = isVideoUrl(item.image_url);
+
+  return (
+    <div
+      ref={registerRef}
+      className={`flex gap-3 rounded-lg border border-stone-200 bg-white p-3 shadow-sm transition-opacity ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <div
+        onPointerDown={onGripPointerDown}
+        className="flex touch-none items-center text-stone-300 active:cursor-grabbing"
+        style={{ cursor: 'grab' }}
+        title="Kéo để sắp xếp"
+      >
+        <FaGripVertical />
+      </div>
+
+      <div className="h-20 w-16 shrink-0 overflow-hidden rounded bg-stone-100">
+        {blockType === 'quote' ? (
+          <div className="flex h-full w-full items-center justify-center text-stone-400"><FaQuoteRight /></div>
+        ) : video ? (
+          <video src={item.image_url} muted className="h-full w-full object-cover" />
+        ) : item.image_url ? (
+          <img src={item.image_url} alt={item.title || ''} className="h-full w-full object-cover"
+            onError={(e) => { e.target.src = 'https://via.placeholder.com/100x120?text=Lỗi'; }} />
+        ) : null}
+      </div>
+
+      <div className="flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <select value={blockType} onChange={(e) => onTypeChange(e.target.value)}
+            className="rounded border border-stone-200 bg-white px-2 py-1 text-xs font-bold uppercase text-stone-600">
+            <option value="full">Ảnh/Video tràn viền</option>
+            <option value="compare">Slider so sánh (2 ảnh)</option>
+            <option value="quote">Câu trích dẫn</option>
+          </select>
+          {video && <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-stone-400"><FaVideo /> Video</span>}
+          <button onClick={onToggleActive}
+            className={`ml-auto transition-colors ${item.is_active === false ? 'text-stone-300 hover:text-stone-600' : 'text-stone-400 hover:text-stone-700'}`}
+            title={item.is_active === false ? 'Đang ẨN trên trang Lookbook — bấm để hiện lại' : 'Đang HIỆN trên trang Lookbook — bấm để ẩn'}>
+            {item.is_active === false ? <FaEyeSlash /> : <FaEye />}
+          </button>
+          <button onClick={onDelete} className="text-stone-400 transition-colors hover:text-red-500" title="Xóa">
+            <FaTrash />
+          </button>
+        </div>
+        {item.is_active === false && (
+          <span className="inline-block rounded bg-stone-100 px-2 py-0.5 text-[10px] font-bold uppercase text-stone-500">Đang ẩn</span>
+        )}
+
+        {blockType !== 'quote' && (
+          <input type="text" placeholder="Tiêu đề (tùy chọn)" value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            className="w-full rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-800" />
+        )}
+        <input type="text" placeholder={blockType === 'quote' ? 'Nội dung trích dẫn' : 'Mô tả ngắn (tùy chọn)'} value={draft.caption}
+          onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
+          className="w-full rounded border border-stone-200 px-2 py-1 text-sm outline-none focus:border-stone-800" />
+
+        {dirty && (
+          <button onClick={() => onUpdate(draft)} className="rounded bg-stone-900 px-3 py-1 text-xs font-bold text-white transition-colors hover:bg-black">
+            Lưu
+          </button>
+        )}
+
+        {blockType === 'compare' && (
+          <div className="relative rounded border-2 border-dashed border-stone-300 p-2 text-center text-xs text-stone-500 transition-colors hover:bg-stone-50">
+            <input type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
+              onChange={(e) => e.target.files[0] && onSetSecondMedia(e.target.files[0])} />
+            {item.image_url_2 ? 'Đổi Ảnh 2 (đang có)' : 'Tải Ảnh 2 để bật slider'}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

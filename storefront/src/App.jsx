@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 
 // ==============================
@@ -14,33 +14,35 @@ import Checkout from './pages/Checkout';
 import StoreLogin from './pages/Login'; // Đổi tên để tránh trùng
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import Lookbook from './pages/Lookbook';
 import ReturnPolicy from './pages/policies/ReturnPolicy';
 import ShippingPolicy from './pages/policies/ShippingPolicy';
 import CareGuide from './pages/policies/CareGuide';
-import { useLanguage } from './context/LanguageContext';
+import Footer from './components/Footer';
+import Preloader from './components/Preloader';
 //import About from './pages/About';
 
 // ==============================
 // 2. IMPORTS CHO ADMIN
 // ==============================
-// Lưu ý: Tôi giả định bạn đã chuyển các file Admin vào thư mục pages/admin/ hoặc đổi tên file
-// Nếu chưa, hãy sửa đường dẫn bên dưới cho đúng file của bạn
+// [Code-split] Khách hàng ở storefront không bao giờ cần tải code admin (charts, xlsx,...)
+// nên toàn bộ trang admin được lazy-load — chỉ tải khi có người thực sự vào /admin/*.
 import useRealtimeOrder from './hooks/useRealtimeOrder';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import AdminRoute from './components/AdminRoute';
-import AdminLogin from './pages/admin/Login'; // Hoặc './pages/LoginAdmin'
-import Dashboard from './pages/admin/Dashboard';
-import Products from './pages/admin/Products';
-import AdminOrders from './pages/admin/Orders'; // Đổi tên để tránh nhầm lẫn
-import Inventory from './pages/admin/Inventory';
-import Reports from './pages/admin/Reports';
-import Expenses from './pages/admin/Expenses';
-import AdminCustomers from './pages/admin/Customer';
-import Appearance from './pages/admin/Appearance';
-import Promotions from './pages/admin/Promotions';
-import CreateOrder from './pages/admin/CreateOrder';
-import DefectiveItems from './pages/admin/DefectiveItems';
+const Sidebar = lazy(() => import('./components/Sidebar'));
+const Header = lazy(() => import('./components/Header'));
+const AdminLogin = lazy(() => import('./pages/admin/Login'));
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
+const Products = lazy(() => import('./pages/admin/Products'));
+const AdminOrders = lazy(() => import('./pages/admin/Orders'));
+const Inventory = lazy(() => import('./pages/admin/Inventory'));
+const Reports = lazy(() => import('./pages/admin/Reports'));
+const Expenses = lazy(() => import('./pages/admin/Expenses'));
+const AdminCustomers = lazy(() => import('./pages/admin/Customer'));
+const Appearance = lazy(() => import('./pages/admin/Appearance'));
+const Promotions = lazy(() => import('./pages/admin/Promotions'));
+const CreateOrder = lazy(() => import('./pages/admin/CreateOrder'));
+const DefectiveItems = lazy(() => import('./pages/admin/DefectiveItems'));
 
 // --- Layout Wrapper cho Admin (Realtime & Sidebar) ---
 const AdminLayoutWrapper = () => {
@@ -82,42 +84,14 @@ const AdminLayoutWrapper = () => {
 
 // --- Layout Wrapper cho Storefront (Navbar & Footer) ---
 const StorefrontLayout = () => {
-  const { t } = useLanguage();
   return (
-    <div className="flex flex-col min-h-screen font-sans text-stone-800">
+    <div className="flex flex-col min-h-screen font-sans text-ink">
+      <Preloader />
       <Navbar />
       <main className="flex-grow">
         <Outlet /> {/* Nơi hiển thị các trang con của Storefront */}
       </main>
-      
-      {/* Footer */}
-      <footer className="bg-[#573425] text-[#f5f5f4] py-12 border-t-4 border-stone-800">
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
-             <div>
-                <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.about')}</h3>
-                {/* <p className="text-stone-400 leading-relaxed">{t('footer.desc')}</p> */}
-                <p className="text-stone-300 font-bold uppercase text-sm">Hộ Kinh Doanh BROWNVN</p>
-                    <p className="text-stone-400 text-xs mt-1">Mã số HKD: 089300017764</p>
-                    <p className="text-stone-400 text-xs">Cấp ngày: 11/03/2026</p>
-                    <p className="text-stone-400 text-xs">Nơi cấp: UBND Phường Tân Sơn Nhì</p>
-             </div>
-             <div>
-                <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.contact')}</h3>
-                <p className="text-stone-400">Hotline: 090.695.4860</p>
-                <p className="text-stone-400">Email: brownvn25@gmail.com</p>
-                <p className="text-stone-400">Add: Ho Chi Minh City, Vietnam</p>
-             </div>
-             <div>
-                <h3 className="font-serif text-lg font-bold mb-4 uppercase tracking-widest">{t('footer.follow')}</h3>
-                <div className="flex gap-4">
-                   <a href="https://instagram.com/brown.vn" target="_blank" rel="noopener noreferrer" className="text-stone-400 hover:text-white transition">Instagram</a>                   
-                </div>
-             </div>
-          </div>
-          <div className="text-center mt-12 text-[#f5f5f4] text-xs">
-             © 2026 {t('footer.rights')}
-          </div>
-       </footer>
+      <Footer />
     </div>
   );
 };
@@ -148,8 +122,9 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-stone-400">Đang tải...</div>}>
       <Routes>
-        
+
         {/* =========================================
             KHU VỰC ADMIN (Bắt đầu bằng /admin)
            ========================================= */}
@@ -181,6 +156,7 @@ function App() {
         <Route path="/" element={<StorefrontLayout />}>
            <Route index element={<Home />} />
            <Route path="collection" element={<Collection />} />
+           <Route path="lookbook" element={<Lookbook />} />
            <Route path="product/:slug" element={<ProductDetail />} />
            <Route path="cart" element={<Cart />} /> 
            <Route path="checkout" element={<Checkout />} />
@@ -196,6 +172,7 @@ function App() {
         </Route>
 
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

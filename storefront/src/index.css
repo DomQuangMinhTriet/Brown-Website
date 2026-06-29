@@ -1,29 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
 @import "tailwindcss";
 
+/* ============================================================
+   BROWNVN — WARM ORGANIC DESIGN SYSTEM
+   Display : Sugo Classic (CHỈ cho chữ "BROWN", không dấu)
+   Heading : Lora            (serif ấm, hỗ trợ tiếng Việt đầy đủ)
+   Body/UI : Be Vietnam Pro  (font thiết kế riêng cho tiếng Việt)
+   ============================================================ */
 
-/* --- 1. CẤU HÌNH FONT SUGO CLASSIC --- */
+/* --- FONT SUGO CLASSIC (logo / display thương hiệu) --- */
 @font-face {
   font-family: 'Sugo Classic';
-  /* Đảm bảo bạn đã bỏ file SugoClassic.ttf vào thư mục public/fonts/ */
-  src: url('/fonts/Sugo-Pro-Classic-Regular-trial.ttf') format('truetype'); 
+  src: url('/fonts/Sugo-Pro-Classic-Regular-trial.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
-:root {
-  font-family: 'Inter', sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  font-size: 17px; 
+/* --- DESIGN TOKENS (Tailwind v4 @theme → sinh utilities bg-/text-/border-) --- */
+@theme {
+  /* Typography roles */
+  --font-display: 'Sugo Classic', 'Lora', Georgia, serif;
+  --font-heading: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-body: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
 
-  --color-brown-dark: #292524;
-  --color-brown-main: #44403c;
-  
-  /* [ĐÃ ĐỔI] Nền website thành màu TRẮNG #FFFFFF */
-  --color-beige: #FFFFFF; 
-  
-  /* [MỚI] Màu Logo Nâu #573425 */
+  /* Warm organic palette — cocoa là nhân vật chính, sage là điểm phá */
+  --color-cream: #F4EDE1;      /* nền giấy ấm */
+  --color-parchment: #EDE4D5;  /* nền chìm / section xen kẽ */
+  --color-surface: #FBF7EF;    /* mặt card nổi */
+  --color-cocoa: #573425;      /* NÂU thương hiệu — nút, mảng tối, nhấn */
+  --color-cocoa-deep: #3F2418; /* nâu đậm hover */
+  --color-espresso: #28201C;   /* chữ đậm nhất */
+  --color-ink: #3D2E26;        /* chữ thân */
+  --color-clay: #B5623C;       /* accent đất nung — dùng tiết chế */
+  --color-sage: #7D8466;       /* xanh thực vật — màu phụ khác biệt */
+  --color-sage-soft: #A6AB91;  /* sage nhạt */
+  --color-sand: #E2D7C4;       /* viền / divider */
+  --color-muted: #8A7B6B;      /* chữ phụ / caption */
+}
+
+/* --- BASE --- */
+:root {
+  font-family: var(--font-body);
+  line-height: 1.6;
+  font-weight: 400;
+  font-size: 17px;
+
+  /* Giữ lại biến cũ để các trang chưa redesign không vỡ */
+  --color-brown-dark: #28201C;
+  --color-brown-main: #573425;
+  --color-beige: #F4EDE1;
   --color-logo-brown: #573425;
 }
 
@@ -31,21 +57,11 @@ body, #root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-beige); /* Bây giờ là màu trắng */
-  color: var(--color-brown-dark);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
-/* Class tiện ích cho font Logo */
-.font-sugo {
-  font-family: 'Sugo Classic', 'Impact', sans-serif; /* Fallback là Impact nếu chưa tải font */
-  letter-spacing: 0.05em; /* Font này thường cần giãn chữ một chút cho đẹp */
-}
-
-/* Các class cũ giữ nguyên để tương thích */
-.font-serif { font-family: 'Inter', sans-serif !important; }
-.font-sans { font-family: 'Inter', sans-serif; }
 
 #root {
   max-width: none !important;
@@ -55,4 +71,93 @@ body, #root {
   width: 100% !important;
 }
 
+/* --- LỚP GRAIN GIẤY (cố định, không ảnh hưởng scroll/perf) --- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* --- TIỆN ÍCH FONT (repoint class cũ → font mới, các trang cũ tự ấm lên) --- */
+.font-sugo   { font-family: var(--font-display); letter-spacing: 0.06em; }
+.font-serif  { font-family: var(--font-heading) !important; }
+.font-sans   { font-family: var(--font-body); }
+
+/* --- HEADINGS mặc định dùng serif ấm Spectral --- */
+h1, h2, h3 { font-family: var(--font-heading); }
+
 .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+
+/* Ẩn thanh cuộn cho dải lookbook cuộn ngang */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* --- SMOOTH SCROLL cho anchor (Mục lục → section category) --- */
+html { scroll-behavior: smooth; }
+
+/* --- ANIMATION nhẹ dùng chung --- */
+@keyframes fade-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+
+/* Marquee chữ chạy ngang (slogan) */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.animate-marquee { animation: marquee 30s linear infinite; }
+.marquee-group:hover .animate-marquee { animation-play-state: paused; }
+
+/* Ken Burns — zoom chậm cho banner hero */
+@keyframes ken-burns { from { transform: scale(1); } to { transform: scale(1.07); } }
+.animate-ken-burns { animation: ken-burns 14s ease-out forwards; }
+
+/* ===== PRELOADER: chữ BROWN từ viền (trong suốt) → tô đầy màu nâu ===== */
+@keyframes brown-fill {
+  0%   { color: transparent; letter-spacing: 0.35em; }
+  55%  { color: transparent; }
+  100% { color: var(--color-cocoa); letter-spacing: 0.12em; }
+}
+@keyframes preloader-fade { to { opacity: 0; visibility: hidden; } }
+
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cream);
+  animation: preloader-fade 0.6s ease 1.9s forwards;
+}
+.preloader-word {
+  font-family: var(--font-display);
+  color: transparent;
+  -webkit-text-stroke: 1.6px var(--color-cocoa);
+  animation: brown-fill 1.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .preloader { animation: preloader-fade 0.3s ease 0.2s forwards; }
+  .preloader-word { animation: none; color: var(--color-cocoa); }
+}
+
+/* Chữ viền (outline) — dùng cho marquee tương phản cao trên nền tối */
+.text-outline-cream {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--color-cream);
+  paint-order: stroke fill;
+}
+.text-outline-clay {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--color-clay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-marquee, .animate-ken-burns { animation: none !important; }
+}

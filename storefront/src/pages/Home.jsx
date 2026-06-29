@@ -1,167 +1,404 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { FaArrowRight } from 'react-icons/fa';
-import { formatPrice } from '../utils/currencyHelper';
 import SEO from '../components/SEO';
-import { useLanguage } from '../context/LanguageContext'; // Đa ngôn ngữ
+import Container from '../components/ui/Container';
+import Button from '../components/ui/Button';
+import ProductCard from '../components/ui/ProductCard';
+import { useLanguage } from '../context/LanguageContext';
+
+const EASE = [0.16, 1, 0.3, 1];
 
 const Home = () => {
   const { t, lang } = useLanguage();
-  const [products, setProducts] = useState([]);
+  const reduce = useReducedMotion();
+
   const [banners, setBanners] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [catProducts, setCatProducts] = useState({}); // { slug: products[] }
+  const [lookImgs, setLookImgs] = useState([]); // ảnh lookbook cho teaser
   const [loading, setLoading] = useState(true);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0); // Mục lục
+
+  // Parallax cho section đóng
+  const closeRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: closeRef, offset: ['start end', 'end start'] });
+  const parallaxY = useTransform(scrollYProgress, [0, 1], reduce ? ['0%', '0%'] : ['-12%', '12%']);
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAll = async () => {
       try {
-        const [prodRes, banRes] = await Promise.all([
-            axios.get(`${import.meta.env.VITE_API_URL}/api/products`),
-            axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`)
+        const [banRes, catRes, lookRes] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/categories`),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } })),
         ]);
-        if (prodRes.data.success) setProducts(prodRes.data.data);
         if (banRes.data.success) setBanners(banRes.data.data);
-      } catch (err) { console.error(err); } 
-      finally { setLoading(false); }
+        if (lookRes.data?.data) setLookImgs(lookRes.data.data.map((r) => r.image_url).filter(Boolean));
+
+        let visibleCats = [];
+        if (catRes.data.success) {
+          visibleCats = catRes.data.data.filter((c) => c.is_visible_on_home !== false);
+          setCategories(visibleCats);
+        }
+
+        const entries = await Promise.all(
+          visibleCats.map(async (cat) => {
+            try {
+              const r = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?category=${encodeURIComponent(cat.slug)}`);
+              return [cat.slug, r.data.success ? r.data.data : []];
+            } catch {
+              return [cat.slug, []];
+            }
+          })
+        );
+        setCatProducts(Object.fromEntries(entries));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchData();
+    fetchAll();
   }, []);
-  // 4. useEffect MỚI (Thêm vào ngay bên dưới - Để tự động chuyển)
+
   useEffect(() => {
-    if (banners.length <= 1) return; // Chỉ chạy nếu có nhiều hơn 1 banner
-
+    if (banners.length <= 1) return;
     const interval = setInterval(() => {
-        setCurrentBanner(prev => (prev === banners.length - 1 ? 0 : prev + 1));
-    }, 5000); // 5 giây đổi 1 lần
-
+      setCurrentBanner((prev) => (prev === banners.length - 1 ? 0 : prev + 1));
+    }, 6000);
     return () => clearInterval(interval);
-  }, [banners]); // Chạy lại mỗi khi danh sách banners thay đổi
-  // Logic kiểm tra xem URL là ảnh hay video
-  const isVideo = (url) => {
-    return url.match(/\.(mp4|webm|ogg)$/i);
-  };
+  }, [banners]);
+
+  const isVideo = (url) => url?.match(/\.(mp4|webm|ogg)$/i);
+  const nameOf = (c) => (lang === 'en' && c?.name_en ? c.name_en : c?.name);
+  const repImg = (slug) => catProducts[slug]?.[0]?.images?.[0];
+
+  const activeCat = categories[activeIndex] || categories[0];
+  const sloganWords = lang === 'en'
+    ? ['Luxury', 'Quality', 'Aesthetic', 'Est. 2025', 'Based in Saigon', 'Made in Vietnam']
+    : ['Sang trọng', 'Chất lượng', 'Thẩm mỹ', 'Est. 2025', 'Từ Sài Gòn', 'Made in Vietnam'];
+
+  // Ảnh cố định cho 2 dải full-bleed (đóng trang + editorial shoppable)
+  const closingImg = "/background.avif";
+  const editorialImg = "/background.avif";
+  const teaserImgs = (lookImgs.length ? lookImgs : categories.map((c) => repImg(c.slug)).filter(Boolean)).slice(0, 3);
 
   return (
     <>
       <SEO title={t('home.title')} />
-      
-      {/* 1. HERO BANNER - CLICKABLE & FIXED RATIO */}
-        {/* aspect-[3/1]: Tỷ lệ chuẩn cho banner ngang (VD: 1920x640px) */}
-        <div className="relative w-full aspect-[3/1] bg-stone-200 overflow-hidden group">
-            
-            {loading ? (
-                <div className="absolute inset-0 flex items-center justify-center text-stone-400 animate-pulse">LOADING...</div>
-            ) : banners.length > 0 ? (
-                banners.map((banner, index) => (
-                    <Link 
-                        to={banner.link_to || "/collection"} 
-                        key={banner.id}
-                        // Thay thẻ div bằng Link để click được toàn bộ banner
-                        className={`absolute inset-0 block w-full h-full transition-opacity duration-1000 ease-in-out
-                            ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}
-                        `}
-                    >
-                        {isVideo(banner.image_url) ? (
-                            <video 
-                                autoPlay loop muted playsInline 
-                                className="w-full h-full object-cover" // object-cover giúp lấp đầy khung aspect-ratio
-                            >
-                                <source src={banner.image_url} type="video/mp4" />
-                            </video>
-                        ) : (
-                            <img 
-                                src={banner.image_url} 
-                                alt={banner.title} 
-                                className="w-full h-full object-cover" 
-                            />
-                        )}
-                        
-                        {/* Đã xóa phần Text Overlay và Button ở đây */}
-                    </Link>
-                ))
-            ) : (
-                <div className="w-full h-full bg-[#292524]"></div>
-            )}
 
-            {/* NÚT CHẤM TRÒN ĐIỀU HƯỚNG (Giữ lại để khách biết có nhiều banner) */}
-            {!loading && banners.length > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-                    {banners.map((_, idx) => (
-                        <button 
-                            key={idx} 
-                            onClick={(e) => {
-                                e.preventDefault(); // Ngăn click nhầm vào Link banner
-                                setCurrentBanner(idx);
-                            }}
-                            className={`h-1.5 rounded-full transition-all duration-500 shadow-sm
-                                ${idx === currentBanner ? 'bg-white w-8' : 'bg-white/60 w-2 hover:bg-white'}
-                            `}
-                        />
-                    ))}
-                </div>
-            )}
-
-
-        {/* Overlay Text */}
-        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center text-center p-4">
-            <h2 className="text-white text-4xl md:text-6xl font-serif font-bold tracking-widest mb-6 drop-shadow-lg">
-                {banners[0]?.title || 'BROWN'}
-            </h2>
-            <Link to={banners[0]?.link_to || "/collection"} 
-                className="bg-white text-stone-900 px-8 py-3 uppercase font-bold tracking-[0.2em] hover:bg-stone-900 hover:text-white transition-all duration-300">
-                {t('home.hero_btn')}
+      {/* ============================================================
+          1. HERO — BANNER SẠCH (không chữ đè, để banner rõ ràng)
+         ============================================================ */}
+      <section className="relative w-full overflow-hidden bg-parchment min-h-[82dvh]">
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center font-sugo text-4xl tracking-[0.1em] text-muted animate-pulse">BROWN</div>
+        ) : banners.length > 0 ? (
+          banners.map((banner, index) => (
+            <Link
+              to={banner.link_to || '/collection'}
+              key={banner.id}
+              className={`absolute inset-0 block transition-opacity duration-[1200ms] ease-in-out ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            >
+              {isVideo(banner.image_url) ? (
+                <video autoPlay loop muted playsInline className="h-full w-full object-cover">
+                  <source src={banner.image_url} type="video/mp4" />
+                </video>
+              ) : (
+                <img src={banner.image_url} alt={banner.title || 'BROWN'} className="h-full w-full object-cover animate-ken-burns" />
+              )}
             </Link>
+          ))
+        ) : (
+          <div className="absolute inset-0 bg-cocoa" />
+        )}
+
+        {/* Chỉ giữ chấm điều hướng, không có chữ đè */}
+        {!loading && banners.length > 1 && (
+          <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+            {banners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.preventDefault(); setCurrentBanner(idx); }}
+                aria-label={`Banner ${idx + 1}`}
+                className={`h-1.5 rounded-full shadow-sm transition-all duration-500 ${idx === currentBanner ? 'w-8 bg-cream' : 'w-2 bg-cream/60 hover:bg-cream'}`}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ============================================================
+          2. SLOGAN — MARQUEE chữ chạy (điểm nhấn động)
+         ============================================================ */}
+      <section className="marquee-group overflow-hidden bg-cocoa py-14 md:py-20">
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map((g) => (
+            <div key={g} className="flex shrink-0 items-center" aria-hidden={g === 1}>
+              {sloganWords.map((w, i) => (
+                <span key={i} className="flex items-center">
+                  <span className={`whitespace-nowrap px-8 font-heading text-5xl italic md:text-7xl ${i % 2 === 0 ? 'text-cream' : 'text-outline-cream'}`}>{w}</span>
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-sage" />
+                </span>
+              ))}
+            </div>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* 2. SẢN PHẨM MỚI */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-         <div className="text-center mb-12">
-            <h3 className="text-2xl md:text-3xl font-serif font-bold text-[#292524] mb-2">{t('home.new_arrival')}</h3>
-            <div className="w-16 h-1 bg-stone-900 mx-auto"></div>
-         </div>
+      {!loading && (
+        <>
+          {/* ============================================================
+              3. MỤC LỤC — theo CATEGORY (hover đổi ảnh) — SIGNATURE
+             ============================================================ */}
+          {categories.length > 0 && (
+            <section className="bg-espresso text-cream">
+              <Container className="py-16 md:py-28">
+                <div className="mb-12 flex items-end justify-between">
+                  <h2 className="font-heading text-3xl text-cream md:text-5xl">
+                    {lang === 'en' ? 'Brown has:' : 'Brown có:'}
+                  </h2>
+                </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
-            {products.slice(0, 8).map(product => (
-                <Link 
-                    key={product.id} 
-                    to={`/product/${product.slug}`} 
-                    className="group block text-center"
-                >
-                    <div className="relative overflow-hidden mb-4 bg-stone-100 aspect-[3/4]">
-                        <img 
-                            src={product.images?.[0]} 
-                            alt={product.name} 
-                            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-                            // [THÊM] Lazy load
-                            loading="lazy"
-                            decoding="async"
-                        />
-                    {/* Nút xem nhanh (Desktop only) */}
-                    <div className="absolute bottom-0 left-0 w-full bg-white/90 text-center py-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 hidden md:block">
-                        <span className="text-xs font-bold uppercase tracking-wider text-stone-900">{t('home.view_detail')}</span>
+                {/* Desktop: list trái + ảnh dính phải */}
+                <div className="hidden lg:grid lg:grid-cols-12 lg:gap-14">
+                  <ul className="lg:col-span-7">
+                    {categories.map((cat, i) => {
+                      const count = catProducts[cat.slug]?.length || 0;
+                      const active = activeIndex === i;
+                      return (
+                        <li key={cat.id} onMouseEnter={() => setActiveIndex(i)}>
+                          <a href={`#cat-${cat.slug}`} className="group flex items-center gap-6 border-b border-cream/15 py-6">
+                            <span className={`font-heading text-sm tabular-nums transition-colors ${active ? 'text-clay' : 'text-cream/40'}`}>{String(i + 1).padStart(2, '0')}</span>
+                            <span className={`flex-1 font-heading text-3xl leading-tight transition-all duration-500 group-hover:translate-x-3 xl:text-5xl ${active ? 'text-clay' : 'text-cream'}`}>
+                              {nameOf(cat)}
+                            </span>
+                            <span className="text-sm tabular-nums text-cream/40">{count}</span>
+                            <FaArrowRight className={`text-clay transition-all duration-500 ${active ? 'translate-x-0 opacity-100' : '-translate-x-2 opacity-0'}`} />
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <div className="lg:col-span-5">
+                    <div className="sticky top-28 aspect-[3/4] overflow-hidden rounded-2xl bg-cocoa/40">
+                      <AnimatePresence mode="wait">
+                        {repImg(activeCat?.slug) ? (
+                          <motion.img
+                            key={activeCat?.slug}
+                            src={repImg(activeCat?.slug)}
+                            alt={nameOf(activeCat)}
+                            initial={{ opacity: 0, scale: 1.06 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.6, ease: EASE }}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div key="ph" className="absolute inset-0 flex items-center justify-center">
+                            <span className="font-heading text-7xl text-cream/15">{nameOf(activeCat)?.[0]}</span>
+                          </div>
+                        )}
+                      </AnimatePresence>
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-espresso/90 to-transparent p-6">
+                        <p className="font-heading text-2xl text-cream">{nameOf(activeCat)}</p>
+                        <p className="text-sm text-cream/65">{catProducts[activeCat?.slug]?.length || 0} {lang === 'en' ? 'items' : 'sản phẩm'}</p>
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Tên sản phẩm */}
-                    <h3 className="text-stone-900 font-medium text-sm group-hover:text-stone-600 transition-colors truncate px-1">
-                        {lang === 'en' && product.name_en ? product.name_en : product.name}
-                    </h3>
-                    
-                    {/* Giá tiền */}
-                    <p className="text-stone-500 mt-1 font-bold text-sm px-1">
-                        {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
-                    </p>
+                </div>
+
+                {/* Mobile: dòng có thumbnail */}
+                <ul className="lg:hidden">
+                  {categories.map((cat, i) => (
+                    <li key={cat.id}>
+                      <a href={`#cat-${cat.slug}`} className="flex items-center gap-4 border-b border-cream/15 py-4">
+                        <span className="font-heading text-xs tabular-nums text-cream/40">{String(i + 1).padStart(2, '0')}</span>
+                        <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-cocoa/40">
+                          {repImg(cat.slug) ? (
+                            <img src={repImg(cat.slug)} alt={nameOf(cat)} loading="lazy" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center font-heading text-2xl text-cream/20">{nameOf(cat)?.[0]}</div>
+                          )}
+                        </div>
+                        <span className="flex-1 font-heading text-xl leading-tight text-cream">{nameOf(cat)}</span>
+                        <FaArrowRight className="text-clay" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </Container>
+            </section>
+          )}
+
+          {/* ============================================================
+              4. LOOKBOOK — teaser dẫn tới trang /lookbook
+             ============================================================ */}
+          <section className="bg-cream py-16 md:py-24">
+            <Container>
+              <div className="mb-8 flex items-end justify-between">
+                <div>
+                  <h2 className="mt-2 font-heading text-3xl text-espresso md:text-5xl">Lookbook</h2>
+                </div>
+                <Link to="/lookbook" className="hidden items-center gap-2 text-sm uppercase tracking-[0.2em] text-cocoa transition-colors hover:text-clay sm:flex">
+                  {lang === 'en' ? 'View all' : 'Xem tất cả'} <FaArrowRight />
                 </Link>
-            ))}
-         </div>
-         
-         <div className="text-center mt-16">
-            <Link to="/collection" className="inline-block border border-stone-900 px-10 py-3 text-stone-900 font-bold uppercase tracking-widest hover:bg-stone-900 hover:text-white transition-all text-sm">
+              </div>
+
+              {teaserImgs.length > 0 && (
+                <Link to="/lookbook" className="group grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+                  {teaserImgs.map((src, i) => (
+                    <div key={i} className={`overflow-hidden rounded-2xl bg-parchment ${i === 0 ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/4]' : 'aspect-[3/4]'}`}>
+                      <img src={src} alt="BROWN Lookbook" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    </div>
+                  ))}
+                </Link>
+              )}
+
+              <div className="mt-10 text-center">
+                <Button to="/lookbook" variant="outline" size="lg" magnetic>
+                  {lang === 'en' ? 'Open the Lookbook' : 'Mở Lookbook'}
+                </Button>
+              </div>
+            </Container>
+          </section>
+
+          {/* ============================================================
+              EDITORIAL — ảnh lớn tràn viền + CTA mua ngay (phá nhịp lưới)
+             ============================================================ */}
+          {editorialImg && (
+            <section className="relative h-[58vh] overflow-hidden bg-cocoa md:h-[78vh]">
+              <img src={editorialImg} alt="BROWN" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-espresso/75 via-espresso/10 to-transparent" />
+              <Container className="relative z-10 flex h-full flex-col items-start justify-end pb-14 md:pb-20">
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  transition={{ duration: 0.9, ease: EASE }}
+                  className="max-w-md"
+                >
+                  <p className="font-heading text-3xl italic leading-snug text-cream md:text-5xl">
+                    {lang === 'en' ? 'Dressed for every season.' : 'Vừa vặn cho mọi mùa.'}
+                  </p>
+                  <div className="mt-7">
+                    <Button to="/collection" variant="cream" size="lg" magnetic>
+                      {lang === 'en' ? 'Shop now' : 'Mua ngay'}
+                    </Button>
+                  </div>
+                </motion.div>
+              </Container>
+            </section>
+          )}
+
+          {/* ============================================================
+              5. CÁC MỤC THEO CATEGORY (4 sản phẩm + Xem thêm)
+             ============================================================ */}
+          {categories.map((cat, ci) => {
+            const prods = (catProducts[cat.slug] || []).slice(0, 4);
+            return (
+              <section
+                key={cat.id}
+                id={`cat-${cat.slug}`}
+                className={`scroll-mt-24 ${ci % 2 === 0 ? 'bg-parchment/40' : 'bg-cream'}`}
+              >
+                <Container className="py-16 md:py-20">
+                  <div className="mb-10 flex items-end justify-between border-b border-sand pb-6">
+                    <div className="flex items-baseline gap-4">
+                      <span className="font-heading text-4xl tabular-nums text-clay md:text-5xl">{String(ci + 1).padStart(2, '0')}</span>
+                      <h2 className="font-heading text-3xl text-espresso md:text-5xl">{nameOf(cat)}</h2>
+                    </div>
+                    <Link
+                      to={`/collection?category=${cat.slug}`}
+                      className="hidden items-center gap-2 text-sm uppercase tracking-[0.2em] text-cocoa transition-colors hover:text-clay sm:flex"
+                    >
+                      {lang === 'en' ? 'See more' : 'Xem thêm'} <FaArrowRight />
+                    </Link>
+                  </div>
+
+                  {prods.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-4 md:gap-x-6">
+                      {prods.map((product, i) => (
+                        <motion.div
+                          key={product.id}
+                          initial={{ opacity: 0, y: 28 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, amount: 0.2 }}
+                          transition={{ duration: 0.6, delay: (i % 4) * 0.07, ease: EASE }}
+                        >
+                          <ProductCard product={product} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="py-8 text-center italic text-muted">
+                      {lang === 'en' ? 'Products coming soon.' : 'Sản phẩm đang cập nhật.'}
+                    </p>
+                  )}
+
+                  <div className="mt-12 text-center">
+                    <Button to={`/collection?category=${cat.slug}`} variant="outline" size="lg" magnetic>
+                      {lang === 'en' ? 'See more' : 'Xem thêm'}
+                    </Button>
+                  </div>
+                </Container>
+              </section>
+            );
+          })}
+
+          {/* ============================================================
+              6. ĐÓNG — ảnh full-bleed parallax + lời mời
+             ============================================================ */}
+          <section ref={closeRef} className="relative h-[70vh] overflow-hidden bg-cocoa">
+            {closingImg && (
+              <motion.img
+                src={closingImg}
+                alt="BROWN"
+                style={{ y: parallaxY }}
+                className="absolute inset-0 h-[124%] w-full -translate-y-[12%] object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-espresso/80 via-espresso/30 to-espresso/20" />
+            <Container className="relative z-10 flex h-full flex-col items-center justify-center gap-8 text-center">
+              <motion.h2
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 0.9, ease: EASE }}
+                className="max-w-2xl font-heading text-4xl leading-tight text-cream md:text-6xl"
+              >
+                {lang === 'en' ? (
+                  <>Find what stays with you.</>
+                ) : (
+                  <>Tìm món đồ ở lại cùng bạn.</>
+                )}
+              </motion.h2>
+              <Button to="/collection" variant="cream" size="lg" magnetic>
                 {t('home.view_all')}
-            </Link>
-         </div>
-      </section>
+              </Button>
+            </Container>
+          </section>
+        </>
+      )}
+
+      {/* Skeleton khi đang tải phần dưới */}
+      {loading && (
+        <Container className="py-20">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] rounded-2xl bg-sand/60" />
+                <div className="mt-4 h-4 w-3/4 rounded bg-sand/60" />
+              </div>
+            ))}
+          </div>
+        </Container>
+      )}
     </>
   );
 };

@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient'; 
+import { supabase } from '../supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import Button from '../components/ui/Button';
+
+const inputCls =
+  'w-full mt-2 rounded-xl border border-sand bg-cream px-4 py-3 text-ink outline-none transition-colors focus:border-cocoa placeholder:text-muted/60';
 
 const Register = () => {
   const [formData, setFormData] = useState({ fullName: '', phone: '', email: '', password: '' });
@@ -14,22 +18,21 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName, 
-            phone: formData.phone         
-          }
-        }
+            full_name: formData.fullName,
+            phone: formData.phone,
+          },
+        },
       });
 
       if (error) throw error;
 
       alert(t('auth.toast_register_success'));
-      navigate('/'); 
-
+      navigate('/');
     } catch (error) {
       alert(t('auth.toast_error') + error.message);
     } finally {
@@ -38,51 +41,42 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-stone-50 py-12 px-4">
-      <div className="bg-white p-8 rounded shadow-sm w-full max-w-md border border-stone-100">
-        <h2 className="text-2xl font-bold mb-6 text-center text-stone-800 font-serif">{t('auth.register_title')}</h2>
-        
-        <form onSubmit={handleRegister} className="space-y-4">
+    <div className="flex min-h-[80vh] items-center justify-center bg-cream px-4 py-16">
+      <div className="w-full max-w-md rounded-2xl border border-sand bg-surface p-8 shadow-[0_30px_70px_-40px_rgba(87,52,37,0.4)] md:p-10">
+        <div className="mb-8 text-center">
+          <Link to="/" className="font-sugo text-3xl uppercase tracking-[0.1em] text-cocoa">BROWN</Link>
+          <h1 className="mt-3 font-heading text-2xl text-espresso">{t('auth.register_title')}</h1>
+        </div>
+
+        <form onSubmit={handleRegister} className="space-y-5">
           <div>
-            <label className="text-xs uppercase font-bold text-stone-500">{t('auth.fullname')}</label>
-            <input 
-              type="text" className="w-full p-3 border border-stone-200 rounded mt-1 focus:border-stone-900 outline-none"
-              value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} required
-            />
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('auth.fullname')}</label>
+            <input type="text" className={inputCls} value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} required autoComplete="name" />
           </div>
 
           <div>
-            <label className="text-xs uppercase font-bold text-stone-500">{t('auth.phone')}</label>
-            <input 
-              type="tel" className="w-full p-3 border border-stone-200 rounded mt-1 focus:border-stone-900 outline-none"
-              value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required
-            />
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('auth.phone')}</label>
+            <input type="tel" className={inputCls} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required autoComplete="tel" />
           </div>
 
           <div>
-            <label className="text-xs uppercase font-bold text-stone-500">{t('auth.email')}</label>
-            <input 
-              type="email" className="w-full p-3 border border-stone-200 rounded mt-1 focus:border-stone-900 outline-none"
-              value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required
-            />
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('auth.email')}</label>
+            <input type="email" className={inputCls} value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required autoComplete="email" />
           </div>
 
           <div>
-            <label className="text-xs uppercase font-bold text-stone-500">{t('auth.password')}</label>
-            <input 
-              type="password" className="w-full p-3 border border-stone-200 rounded mt-1 focus:border-stone-900 outline-none"
-              value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required
-              placeholder={t('auth.password_min')}
-            />
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('auth.password')}</label>
+            <input type="password" className={inputCls} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required autoComplete="new-password" placeholder={t('auth.password_min')} />
           </div>
 
-          <button disabled={loading} className="w-full bg-stone-900 text-white py-4 font-bold uppercase tracking-widest hover:bg-stone-800 transition-all mt-4">
+          <Button type="submit" variant="solid" size="lg" disabled={loading} className="w-full">
             {loading ? t('auth.processing') : t('auth.register_btn')}
-          </button>
+          </Button>
         </form>
-        
-        <p className="mt-6 text-center text-sm text-stone-500">
-          {t('auth.have_account')} <Link to="/login" className="font-bold text-stone-900 hover:underline">{t('auth.login_now')}</Link>
+
+        <p className="mt-7 text-center text-sm text-muted">
+          {t('auth.have_account')}{' '}
+          <Link to="/login" className="font-medium text-cocoa transition-colors hover:text-clay">{t('auth.login_now')}</Link>
         </p>
       </div>
     </div>

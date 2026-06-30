@@ -234,24 +234,38 @@ const Appearance = () => {
     if (draggingId == null) return;
     const y = e.clientY;
 
-    // Tìm thẻ đầu tiên mà con trỏ/ngón tay đang ở phía TRÊN điểm giữa của nó
-    let targetId = null;
-    for (const [cid, node] of Object.entries(cardRefs.current)) {
-      if (!node || Number(cid) === draggingId) continue;
-      const rect = node.getBoundingClientRect();
-      if (y < rect.top + rect.height / 2) { targetId = Number(cid); break; }
+    // Fix: sắp xếp thẻ theo vị trí Y THỰC TẾ trên màn hình (không phải theo ID),
+    // tránh lỗi Object.entries duyệt theo ID tăng dần thay vì thứ tự visual.
+    const sorted = Object.entries(cardRefs.current)
+      .filter(([cid, node]) => node && Number(cid) !== draggingId)
+      .map(([cid, node]) => {
+        const rect = node.getBoundingClientRect();
+        return { id: Number(cid), mid: rect.top + rect.height / 2 };
+      })
+      .sort((a, b) => a.mid - b.mid);
+
+    // Thẻ đầu tiên (tính từ trên xuống) mà cursor đang ở TRÊN điểm giữa → chèn TRƯỚC nó.
+    // Nếu cursor dưới tất cả thẻ → insertBeforeId = null = chèn vào CUỐI.
+    let insertBeforeId = null;
+    for (const card of sorted) {
+      if (y < card.mid) { insertBeforeId = card.id; break; }
     }
 
     setLookbook(prev => {
       const fromIdx = prev.findIndex(l => l.id === draggingId);
       if (fromIdx === -1) return prev;
-      let toIdx = targetId == null ? prev.length - 1 : prev.findIndex(l => l.id === targetId);
-      if (toIdx === -1 || fromIdx === toIdx) return prev;
-      if (fromIdx < toIdx) toIdx -= 1; // bù lại vì phần tử nguồn sẽ bị rút ra trước khi chèn
 
       const list = [...prev];
-      const [moved] = list.splice(fromIdx, 1);
-      list.splice(toIdx, 0, moved);
+      const [moved] = list.splice(fromIdx, 1); // rút ra trước
+
+      if (insertBeforeId == null) {
+        list.push(moved); // Fix: cursor dưới tất cả → chèn đúng vào CUỐI
+      } else {
+        // Tìm vị trí trong list ĐÃ RÚT — không cần bù thêm, index đã chính xác
+        const insertIdx = list.findIndex(l => l.id === insertBeforeId);
+        list.splice(insertIdx === -1 ? list.length : insertIdx, 0, moved);
+      }
+
       return list;
     });
   };

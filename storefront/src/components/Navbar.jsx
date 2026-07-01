@@ -200,7 +200,7 @@ const Navbar = () => {
                     </div>
 
                     <Link to="/lookbook" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-sand py-3 font-heading text-lg text-espresso">
-                        Lookbook
+                         LOOKBOOK
                     </Link>
                     <Link to="/policy/return" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-sand py-3 font-heading text-lg text-espresso">
                         {t('nav.return_policy')}

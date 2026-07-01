@@ -78,7 +78,7 @@ const Home = () => {
   const repImg = (slug) => catProducts[slug]?.[0]?.images?.[0];
 
   const activeCat = categories[activeIndex] || categories[0];
-  const sloganWords = ['Brown', 'Made in Vietnam'];
+  const sloganWords = ['Brown', 'Made in Vietnam', 'Brown', 'Made in Vietnam'];
 
   // Ảnh cố định cho 2 dải full-bleed (đóng trang + editorial shoppable)
   const closingImg = "/background.avif";
@@ -279,10 +279,10 @@ const Home = () => {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.4 }}
                   transition={{ duration: 0.9, ease: EASE }}
-                  className="max-w-md"
+                  className="max-w-xl"
                 >
                   <p className="font-heading text-3xl italic leading-snug text-cream md:text-5xl">
-                    {lang === 'en' ? 'Dressed for every season.' : 'Vừa vặn cho mọi mùa.'}
+                    {lang === 'en' ? 'Dressed for every season.' : 'Thích hợp cho mọi mùa.'}
                   </p>
                   <div className="mt-7">
                     <Button to="/collection" variant="cream" size="lg" magnetic>

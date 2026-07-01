@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { FaPlus, FaTrash, FaTicketAlt, FaTimes, FaTags, FaSearch } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -127,6 +127,7 @@ const Promotions = () => {
 
   const promoProducts = products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()));
   const discountProducts = products.filter(p => p.name.toLowerCase().includes(discountSearch.toLowerCase()));
+  const productNameById = useMemo(() => Object.fromEntries(products.map(p => [p.id, p.name])), [products]);
 
   return (
     <div className="p-6 space-y-10">
@@ -154,7 +155,9 @@ const Promotions = () => {
                     <p className="text-xs text-stone-500">Đơn tối thiểu: {money(promo.min_order_value)}đ</p>
                     <p className="text-xs text-stone-500 mt-1">HSD: {formatDate(promo.end_date)}</p>
                     {Array.isArray(promo.applicable_product_ids) && promo.applicable_product_ids.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1 font-medium">Chỉ áp dụng cho {promo.applicable_product_ids.length} sản phẩm</p>
+                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                        Chỉ áp dụng cho: {promo.applicable_product_ids.map(id => productNameById[id] || `#${id}`).join(', ')}
+                      </p>
                     )}
                   </div>
                   <div className="text-right">

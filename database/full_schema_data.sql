@@ -47,7 +47,6 @@ DECLARE
     v_variant_id BIGINT;
     v_buy_qty INT;
     v_real_price NUMERIC;
-    v_total_stock INT;
     v_promotion_id BIGINT;
     v_needed_qty INT;
     v_batch RECORD;
@@ -60,13 +59,15 @@ BEGIN
         SELECT id INTO v_promotion_id FROM promotions WHERE code = p_voucher_code LIMIT 1;
     END IF;
 
+    -- [FIX] Dùng ĐÚNG đơn giá (unit_price) mà orderController.js đã tính sẵn
+    -- (đã trừ giảm giá trực tiếp của sản phẩm nếu đang bật). KHÔNG tự
+    -- SELECT lại current_price/base_price trong SQL nữa — trước đây làm vậy
+    -- khiến giá giảm bị bỏ qua, order_items luôn ghi giá gốc.
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
-        v_variant_id := CAST(v_item->>'variant_id' AS BIGINT);
         v_buy_qty := CAST(v_item->>'quantity' AS INT);
-        SELECT COALESCE(v.current_price, p.base_price) INTO v_real_price
-        FROM variants v JOIN products p ON v.product_id = p.id WHERE v.id = v_variant_id;
-        IF v_real_price IS NULL THEN RAISE EXCEPTION 'Sản phẩm % không tồn tại', v_variant_id; END IF;
+        v_real_price := CAST(v_item->>'unit_price' AS NUMERIC);
+        IF v_real_price IS NULL THEN RAISE EXCEPTION 'Thiếu đơn giá (unit_price) cho sản phẩm trong đơn hàng'; END IF;
         v_subtotal := v_subtotal + (v_buy_qty * v_real_price);
     END LOOP;
 
@@ -75,18 +76,18 @@ BEGIN
 
     -- [ĐOẠN QUAN TRỌNG NHẤT: INSERT ID QUẬN/HUYỆN]
     INSERT INTO orders (
-        code, customer_id, 
+        code, customer_id,
         customer_name, customer_phone, customer_email, customer_address,
         customer_district_id,       -- Cột này phải có dữ liệu
         customer_ward_code,         -- Cột này phải có dữ liệu
         payment_method, status, payment_status,
-        subtotal, discount_amount, shipping_fee, total_amount, 
+        subtotal, discount_amount, shipping_fee, total_amount,
         promotion_id, shipping_tracking_code, created_at
     ) VALUES (
         v_order_code, p_customer_id,
-        p_customer_info->>'name', 
-        p_customer_info->>'phone', 
-        p_customer_info->>'email', 
+        p_customer_info->>'name',
+        p_customer_info->>'phone',
+        p_customer_info->>'email',
         p_customer_info->>'address',
         CAST(p_customer_info->>'district_id' AS INT), -- Lấy từ JSON Frontend gửi
         p_customer_info->>'ward_code',                -- Lấy từ JSON Frontend gửi
@@ -95,18 +96,17 @@ BEGIN
         v_promotion_id, NULL, NOW()
     ) RETURNING id INTO v_order_id;
 
-    -- Xử lý kho (giữ nguyên logic của bạn)
+    -- Xử lý kho (giữ nguyên logic FIFO cũ; chỉ đổi nguồn lấy v_real_price)
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
         v_variant_id := CAST(v_item->>'variant_id' AS BIGINT);
         v_buy_qty := CAST(v_item->>'quantity' AS INT);
-        SELECT COALESCE(v.current_price, p.base_price) INTO v_real_price
-        FROM variants v JOIN products p ON v.product_id = p.id WHERE v.id = v_variant_id;
-        
+        v_real_price := CAST(v_item->>'unit_price' AS NUMERIC);
+
         v_needed_qty := v_buy_qty;
         v_item_cogs := 0;
-        
-        FOR v_batch IN SELECT * FROM inventory_batches WHERE variant_id = v_variant_id AND quantity_remaining > 0 ORDER BY created_at ASC FOR UPDATE 
+
+        FOR v_batch IN SELECT * FROM inventory_batches WHERE variant_id = v_variant_id AND quantity_remaining > 0 ORDER BY created_at ASC FOR UPDATE
         LOOP
             IF v_needed_qty > 0 THEN
                 IF v_batch.quantity_remaining >= v_needed_qty THEN v_take_qty := v_needed_qty;
@@ -116,8 +116,8 @@ BEGIN
                 v_needed_qty := v_needed_qty - v_take_qty;
             END IF;
         END LOOP;
-        
-        INSERT INTO order_items (order_id, variant_id, quantity, price_at_purchase, cogs_total) 
+
+        INSERT INTO order_items (order_id, variant_id, quantity, price_at_purchase, cogs_total)
         VALUES (v_order_id, v_variant_id, v_buy_qty, v_real_price, v_item_cogs);
     END LOOP;
 

@@ -56,6 +56,8 @@ stores ──< expenses >── expense_categories
 2. **Bán hàng**: khi tạo `order_items`, hệ thống trừ dần `quantity_remaining` từ **lô cũ nhất** (sắp xếp theo `created_at ASC`) và cộng dồn vào `cogs_total` của dòng đơn → giá vốn chính xác theo nguyên tắc nhập trước–xuất trước.
 3. **Index** `idx_inventory_fifo (store_id, variant_id, created_at ASC)` đảm bảo truy vấn lô theo thứ tự FIFO nhanh.
 
+> **Đơn giá do Node.js quyết định, SQL chỉ tin tưởng và ghi lại.** `create_order_transaction` nhận đơn giá qua trường `unit_price` trong `p_items` (được `orderController.js` tính sẵn — đã áp giảm giá trực tiếp của sản phẩm nếu có) và ghi thẳng vào `order_items.price_at_purchase`, **không tự `SELECT` lại `base_price`/`current_price` trong SQL nữa**. Trước đây hàm tự tính lại giá nên bỏ sót giảm giá; nếu sau này thêm cơ chế tính giá mới (khuyến mãi theo bậc số lượng, giá theo khách hàng…), nhớ tính ở Node.js và truyền qua `unit_price`, đừng thêm logic tính giá vào lại trong hàm SQL.
+
 ### Vì sao quan trọng
 Cho phép tính **lợi nhuận thực** (doanh thu − COGS) chính xác ngay cả khi giá vốn thay đổi giữa các lần nhập — phục vụ báo cáo tài chính (`/api/reports/financial`).
 

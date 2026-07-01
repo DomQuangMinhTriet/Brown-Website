@@ -49,6 +49,102 @@ ALTER TABLE public.promotions ALTER COLUMN usage_limit DROP NOT NULL;
 -- start_date, end_date vốn đã nullable.
 
 -- ------------------------------------------------------------------
--- 4) Buộc PostgREST nạp lại schema cache để nhận cột mới ngay
+-- 4) [FIX QUAN TRỌNG] Hàm create_order_transaction đang TỰ TÍNH LẠI giá
+--    (COALESCE(current_price, base_price)) trong SQL, hoàn toàn không biết
+--    tới discount_amount/is_discount_active mới thêm ở bước (2) — nên đơn
+--    hàng khách đặt online (qua Checkout) luôn ghi GIÁ GỐC vào order_items,
+--    dù backend Node.js đã tính đúng giá giảm. Hạ tầng lộ ra ở trang Đơn
+--    hàng admin: vẫn thấy giá cũ dù sản phẩm đang giảm giá.
+--
+--    Sửa: hàm SQL giờ dùng ĐÚNG unit_price mà orderController.js đã tính
+--    sẵn (đã trừ giảm giá), không tự SELECT lại giá trong SQL nữa.
+-- ------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_order_transaction(p_customer_id bigint, p_customer_info jsonb, p_payment_method text, p_shipping_fee numeric, p_discount_amount numeric, p_voucher_code text, p_items jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    v_order_id BIGINT;
+    v_order_code TEXT;
+    v_subtotal NUMERIC := 0;
+    v_total_amount NUMERIC;
+    v_item JSONB;
+    v_variant_id BIGINT;
+    v_buy_qty INT;
+    v_real_price NUMERIC;
+    v_promotion_id BIGINT;
+    v_needed_qty INT;
+    v_batch RECORD;
+    v_take_qty INT;
+    v_item_cogs NUMERIC;
+BEGIN
+    v_order_code := 'ORD-' || FLOOR(RANDOM() * 8999 + 1000) || CAST(EXTRACT(EPOCH FROM NOW()) AS BIGINT);
+
+    IF p_voucher_code IS NOT NULL AND p_voucher_code <> '' THEN
+        SELECT id INTO v_promotion_id FROM promotions WHERE code = p_voucher_code LIMIT 1;
+    END IF;
+
+    FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+    LOOP
+        v_buy_qty := CAST(v_item->>'quantity' AS INT);
+        v_real_price := CAST(v_item->>'unit_price' AS NUMERIC);
+        IF v_real_price IS NULL THEN RAISE EXCEPTION 'Thiếu đơn giá (unit_price) cho sản phẩm trong đơn hàng'; END IF;
+        v_subtotal := v_subtotal + (v_buy_qty * v_real_price);
+    END LOOP;
+
+    v_total_amount := v_subtotal + p_shipping_fee - p_discount_amount;
+    IF v_total_amount < 0 THEN v_total_amount := 0; END IF;
+
+    INSERT INTO orders (
+        code, customer_id,
+        customer_name, customer_phone, customer_email, customer_address,
+        customer_district_id,
+        customer_ward_code,
+        payment_method, status, payment_status,
+        subtotal, discount_amount, shipping_fee, total_amount,
+        promotion_id, shipping_tracking_code, created_at
+    ) VALUES (
+        v_order_code, p_customer_id,
+        p_customer_info->>'name',
+        p_customer_info->>'phone',
+        p_customer_info->>'email',
+        p_customer_info->>'address',
+        CAST(p_customer_info->>'district_id' AS INT),
+        p_customer_info->>'ward_code',
+        p_payment_method, 'pending', 'unpaid',
+        v_subtotal, p_discount_amount, p_shipping_fee, v_total_amount,
+        v_promotion_id, NULL, NOW()
+    ) RETURNING id INTO v_order_id;
+
+    FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+    LOOP
+        v_variant_id := CAST(v_item->>'variant_id' AS BIGINT);
+        v_buy_qty := CAST(v_item->>'quantity' AS INT);
+        v_real_price := CAST(v_item->>'unit_price' AS NUMERIC);
+
+        v_needed_qty := v_buy_qty;
+        v_item_cogs := 0;
+
+        FOR v_batch IN SELECT * FROM inventory_batches WHERE variant_id = v_variant_id AND quantity_remaining > 0 ORDER BY created_at ASC FOR UPDATE
+        LOOP
+            IF v_needed_qty > 0 THEN
+                IF v_batch.quantity_remaining >= v_needed_qty THEN v_take_qty := v_needed_qty;
+                ELSE v_take_qty := v_batch.quantity_remaining; END IF;
+                UPDATE inventory_batches SET quantity_remaining = quantity_remaining - v_take_qty WHERE id = v_batch.id;
+                v_item_cogs := v_item_cogs + (v_take_qty * v_batch.cost_price);
+                v_needed_qty := v_needed_qty - v_take_qty;
+            END IF;
+        END LOOP;
+
+        INSERT INTO order_items (order_id, variant_id, quantity, price_at_purchase, cogs_total)
+        VALUES (v_order_id, v_variant_id, v_buy_qty, v_real_price, v_item_cogs);
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'order_id', v_order_id, 'order_code', v_order_code);
+END;
+$$;
+
+-- ------------------------------------------------------------------
+-- 5) Buộc PostgREST nạp lại schema cache để nhận cột mới ngay
 -- ------------------------------------------------------------------
 NOTIFY pgrst, 'reload schema';

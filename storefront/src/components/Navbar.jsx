@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import { FaSearch, FaShoppingBag, FaUser, FaBars, FaTimes, FaGlobe, FaChevronDown } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +19,16 @@ const Navbar = () => {
 
   // State cho dropdown Menu (Sản phẩm)
   const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
+
+  // Ẩn navbar khi lướt xuống, hiện lại khi vuốt lên — chỉ áp dụng trên mobile (< 768px)
+  const [hidden, setHidden] = useState(false);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, 'change', (latest) => {
+    if (window.innerWidth >= 768) { setHidden(false); return; }
+    const previous = scrollY.getPrevious() ?? 0;
+    const scrolledPastTop = latest > 80; // không ẩn khi mới lướt nhẹ ở đầu trang
+    setHidden(latest > previous && scrolledPastTop);
+  });
 
   const navigate = useNavigate();
 
@@ -57,7 +68,11 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-sand/70 bg-cream/85 backdrop-blur-md">
+      <motion.nav
+        animate={{ y: hidden ? '-100%' : '0%' }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        className="sticky top-0 z-50 border-b border-sand/70 bg-cream/85 backdrop-blur-md pt-[env(safe-area-inset-top)]"
+      >
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 h-20 grid grid-cols-[auto_1fr_auto] items-center gap-3">
 
           {/* CỘT 1: Mobile Menu Button + Logo (luôn render để giữ đúng cột lưới) */}
@@ -160,7 +175,7 @@ const Navbar = () => {
                 </form>
             </div>
         )}
-      </nav>
+      </motion.nav>
 
       {/* MOBILE MENU */}
       {isMobileMenuOpen && (

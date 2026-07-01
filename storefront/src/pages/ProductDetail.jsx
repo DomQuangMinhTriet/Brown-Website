@@ -10,6 +10,7 @@ import { formatPrice, getEffectivePrice } from '../utils/currencyHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
+import ZoomableProductImage from '../components/ui/ZoomableProductImage';
 
 const getOptimizedImageUrl = (url, width = 800) => {
     if (!url || !url.includes('cloudinary.com')) return url;
@@ -28,15 +29,6 @@ const ProductDetail = () => {
     const [relatedProducts, setRelatedProducts] = useState([]);
     const [viewedProducts, setViewedProducts] = useState([]);
     const [mainImage, setMainImage] = useState(null);
-    const [zoom, setZoom] = useState({ on: false, x: '50%', y: '50%' });
-
-    const onZoomMove = (e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        const x = ((e.clientX - r.left) / r.width) * 100;
-        const y = ((e.clientY - r.top) / r.height) * 100;
-        setZoom({ on: true, x: `${x}%`, y: `${y}%` });
-    };
-    const onZoomLeave = () => setZoom({ on: false, x: '50%', y: '50%' });
 
     useEffect(() => {
         // Reset ngay khi đổi sản phẩm để không hiển thị dữ liệu cũ (URL đã đổi nhưng ảnh/chữ còn của SP trước)
@@ -152,18 +144,11 @@ const ProductDetail = () => {
                 <div className="mb-20 grid grid-cols-1 gap-12 md:grid-cols-2">
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
-                        <div
-                            className="group relative aspect-[3/4] cursor-zoom-in overflow-hidden rounded-2xl bg-parchment"
-                            onMouseMove={onZoomMove}
-                            onMouseLeave={onZoomLeave}
-                        >
-                            <img
-                                key={mainImage}
+                        <div className="group relative aspect-[3/4] overflow-hidden rounded-2xl bg-parchment">
+                            <ZoomableProductImage
                                 src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
                                 alt={product.name}
-                                className="h-full w-full object-cover transition-transform duration-200 ease-out"
-                                style={{ transformOrigin: `${zoom.x} ${zoom.y}`, transform: zoom.on ? 'scale(1.9)' : 'scale(1)' }}
-                                fetchPriority="high"
+                                className="h-full w-full"
                             />
 
                             {product.images?.length > 1 && (

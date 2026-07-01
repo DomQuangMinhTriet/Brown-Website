@@ -48,8 +48,8 @@ const ImageCompareSlider = ({ before, after, beforeLabel, afterLabel, className 
       onPointerDown={onPointerDown}
       className={`relative select-none overflow-hidden rounded-2xl bg-parchment touch-pan-y ${className}`}
     >
-      {/* Ảnh nền (sau) */}
-      <img src={before} alt={beforeLabel || ''} className="block h-full w-full object-cover" draggable={false} />
+      {/* Ảnh nền (sau) — object-contain để không cắt xén nội dung ảnh gốc */}
+      <img src={before} alt={beforeLabel || ''} className="block h-full w-full object-contain" draggable={false} />
       {beforeLabel && (
         <span className="absolute bottom-4 left-4 rounded-full bg-espresso/55 px-3 py-1 text-xs uppercase tracking-wider text-cream backdrop-blur-sm">
           {beforeLabel}
@@ -58,7 +58,7 @@ const ImageCompareSlider = ({ before, after, beforeLabel, afterLabel, className 
 
       {/* Ảnh phủ (trước) — clip theo vị trí slider */}
       <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
-        <img src={after} alt={afterLabel || ''} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+        <img src={after} alt={afterLabel || ''} className="absolute inset-0 h-full w-full object-contain" draggable={false} />
         {afterLabel && (
           <span className="absolute bottom-4 right-4 rounded-full bg-espresso/55 px-3 py-1 text-xs uppercase tracking-wider text-cream backdrop-blur-sm">
             {afterLabel}

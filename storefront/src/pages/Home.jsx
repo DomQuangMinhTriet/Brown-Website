@@ -7,6 +7,7 @@ import SEO from '../components/SEO';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
+import { isVideoUrl } from '../components/lookbook/blockUtils';
 import { useLanguage } from '../context/LanguageContext';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -37,7 +38,13 @@ const Home = () => {
           axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } })),
         ]);
         if (banRes.data.success) setBanners(banRes.data.data);
-        if (lookRes.data?.data) setLookImgs(lookRes.data.data.map((r) => r.image_url).filter(Boolean));
+        if (lookRes.data?.data) {
+          // Teaser trên Home chỉ lấy ẢNH — bỏ qua mọi mục là video
+          const imgOnly = lookRes.data.data
+            .map((r) => r.image_url)
+            .filter((url) => url && !isVideoUrl(url));
+          setLookImgs(imgOnly);
+        }
 
         let visibleCats = [];
         if (catRes.data.success) {

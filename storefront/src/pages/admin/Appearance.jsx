@@ -517,7 +517,7 @@ const Appearance = () => {
                     {lookbook.length === 0 ? (
                         <div className="flex h-full items-center justify-center text-stone-400">Chưa có gì để xem trước</div>
                     ) : (
-                        <LookbookBlocks blocks={lookbook.filter(l => l.is_active !== false).map(toLookbookBlock)} lang="vi" fullHeight="h-[60vh]" />
+                        <LookbookBlocks blocks={lookbook.filter(l => l.is_active !== false).map(toLookbookBlock)} lang="vi" />
                     )}
                 </div>
                 <p className="mt-2 text-xs text-stone-400">Khung này phản ánh đúng giao diện thật trên /lookbook. Sửa chữ cần bấm "Lưu" mới cập nhật ở đây; kéo-thả thì cập nhật ngay.</p>

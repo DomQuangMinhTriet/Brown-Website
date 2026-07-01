@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useContext, useMemo } from 'react';
 import { toast } from 'react-toastify';
+import { getEffectivePrice } from '../utils/currencyHelper';
 const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
@@ -46,16 +47,19 @@ export const CartProvider = ({ children }) => {
                       : item
               );
           } else {
+              const eff = getEffectivePrice(product); // [MỚI] Áp giảm giá trực tiếp (nếu có)
               return [...prev, {
-                  product_id: product.id, 
+                  product_id: product.id,
                   variant_id: variant.id,
-                  name: product.name, 
-                  slug: product.slug, 
-                  image: product.images?.[0] || '', 
-                  color: variant.color, 
+                  name: product.name,
+                  slug: product.slug,
+                  image: product.images?.[0] || '',
+                  color: variant.color,
                   color_en: variant.color_en,
-                  size: variant.size, 
-                  price: Number(product.base_price),
+                  size: variant.size,
+                  price: Number(eff.price),               // giá đã giảm (khách phải trả)
+                  original_price: Number(eff.original),   // giá gốc để gạch ngang nếu đang giảm
+                  is_discounted: eff.isDiscounted,
                   quantity: Number(quantity), // FIX: Ép kiểu số
                   max_stock: Number(variant.quantity_remaining || 0),
                   is_preorder: product.is_preorder || false // [MỚI] Lưu cờ preorder

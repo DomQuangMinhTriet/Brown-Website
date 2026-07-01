@@ -24,3 +24,18 @@ export const formatPrice = (amount, currency = 'VND') => {
     currency: 'VND',
   }).format(numericAmount);
 };
+
+/**
+ * Tính giá bán thực tế của 1 sản phẩm, có xét GIẢM GIÁ TRỰC TIẾP (giảm theo số tiền).
+ * Trả về { price, original, isDiscounted }:
+ *  - price: giá cuối cùng khách phải trả
+ *  - original: giá gốc (base_price) để gạch ngang nếu đang giảm
+ *  - isDiscounted: có đang giảm giá không
+ */
+export const getEffectivePrice = (product) => {
+  const base = Number(product?.base_price) || 0;
+  const off = Number(product?.discount_amount) || 0;
+  const active = !!product?.is_discount_active && off > 0;
+  if (!active) return { price: base, original: base, isDiscounted: false };
+  return { price: Math.max(0, base - off), original: base, isDiscounted: true };
+};

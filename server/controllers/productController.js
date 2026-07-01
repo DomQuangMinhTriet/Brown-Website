@@ -124,11 +124,11 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
-        
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
-        
+
         // Đã tắt tự động dịch màu sắc sang tiếng Anh
         // if (variants && Array.isArray(variants)) {
         //     for (let i = 0; i < variants.length; i++) {
@@ -137,16 +137,18 @@ exports.createProduct = async (req, res) => {
         //         }
         //     }
         // }
-        
+
         const { data: newProduct, error: prodError } = await supabase
             .from('products')
             .insert([{
-                name, slug, base_price, description, category_id: category_id || null, images, 
-                size_chart_url: size_chart_url || null,  
+                name, slug, base_price, description, category_id: category_id || null, images,
+                size_chart_url: size_chart_url || null,
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
-                is_preorder: is_preorder || false, 
-                preorder_note: preorder_note || null 
+                is_preorder: is_preorder || false,
+                preorder_note: preorder_note || null,
+                discount_amount: Number(discount_amount) || 0,
+                is_discount_active: is_discount_active || false
             }])
             .select()
             .single();
@@ -189,8 +191,8 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
-        
+        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
 
@@ -202,18 +204,23 @@ exports.updateProduct = async (req, res) => {
         //         }
         //     }
         // }
-        
+
         // 1. Update thông tin chung
+        const generalUpdate = {
+            name, slug, base_price, description, category_id: category_id || null, images,
+            size_chart_url: size_chart_url || null,
+            name_en, description_en,
+            is_active: is_active !== undefined ? is_active : true,
+            is_preorder: is_preorder || false,
+            preorder_note: preorder_note || null
+        };
+        // Chỉ cập nhật trường giảm giá nếu client có gửi (tránh ghi đè khi các form khác không gửi)
+        if (discount_amount !== undefined) generalUpdate.discount_amount = Number(discount_amount) || 0;
+        if (is_discount_active !== undefined) generalUpdate.is_discount_active = !!is_discount_active;
+
         const { error: updateError } = await supabase
             .from('products')
-            .update({ 
-                name, slug, base_price, description, category_id: category_id || null, images, 
-                size_chart_url: size_chart_url || null, 
-                name_en, description_en,
-                is_active: is_active !== undefined ? is_active : true,
-                is_preorder: is_preorder || false, 
-                preorder_note: preorder_note || null 
-            })
+            .update(generalUpdate)
             .eq('id', id);
 
         if (updateError) throw updateError;
@@ -331,6 +338,31 @@ exports.deleteProduct = async (req, res) => {
 
     } catch (error) {
         console.error("Delete Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// [MỚI] CẬP NHẬT GIẢM GIÁ TRỰC TIẾP CHO 1 SẢN PHẨM (bật/tắt + số tiền giảm)
+exports.updateProductDiscount = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { discount_amount, is_discount_active } = req.body;
+
+        const updates = {};
+        if (discount_amount !== undefined) updates.discount_amount = Number(discount_amount) || 0;
+        if (is_discount_active !== undefined) updates.is_discount_active = !!is_discount_active;
+
+        const { data, error } = await supabase
+            .from('products')
+            .update(updates)
+            .eq('id', id)
+            .select('id, name, base_price, discount_amount, is_discount_active')
+            .single();
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error("Update Product Discount Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -17,8 +17,9 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 |--------|----------|-------|
 | GET | `/api/products` | Danh sách sản phẩm |
 | GET | `/api/products/:slug` | Chi tiết sản phẩm theo slug |
-| POST | `/api/products` | Tạo sản phẩm mới |
+| POST | `/api/products` | Tạo sản phẩm mới (nhận `discount_amount`, `is_discount_active`) |
 | PUT | `/api/products/:id` | Cập nhật sản phẩm |
+| PUT | `/api/products/:id/discount` | Bật/tắt & set **giảm giá trực tiếp** cho sản phẩm |
 | DELETE | `/api/products/:id` | Xóa sản phẩm |
 | GET | `/api/products/export/sapo` | Xuất danh sách sản phẩm định dạng Sapo |
 
@@ -85,9 +86,9 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
 | GET | `/api/promotions` | Danh sách khuyến mãi |
-| POST | `/api/promotions` | Tạo voucher |
+| POST | `/api/promotions` | Tạo voucher (nhận `applicable_product_ids`; `usage_limit`/`end_date` để trống = không giới hạn) |
 | DELETE | `/api/promotions/:id` | Xóa voucher |
-| POST | `/api/promotions/check` | Kiểm tra & áp dụng mã giảm giá |
+| POST | `/api/promotions/check` | Kiểm tra & áp mã. Body `{ code, items: [{product_id, quantity}] }` — server tự tính giảm **chỉ trên các SP được áp mã** và **loại SP đang giảm giá trực tiếp** |
 
 ## Expenses — `/api/expenses`
 
@@ -121,6 +122,10 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 | POST | `/api/content/banners` | Thêm banner |
 | PUT | `/api/content/banners/:id` | Cập nhật banner |
 | DELETE | `/api/content/banners/:id` | Xóa banner |
+| GET | `/api/content/lookbook` | Danh sách nội dung Lookbook (cache 5 phút) |
+| POST | `/api/content/lookbook` | Thêm mục Lookbook (`block_type`, `image_url`, `image_url_2`…) |
+| PUT | `/api/content/lookbook/:id` | Cập nhật mục (sửa nội dung, thứ tự, ẩn/hiện) |
+| DELETE | `/api/content/lookbook/:id` | Xóa mục Lookbook |
 
 ## Upload — `/api/upload`
 

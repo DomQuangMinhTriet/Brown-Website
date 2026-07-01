@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import { FaHistory, FaChevronRight, FaChevronLeft, FaInfoCircle, FaCheckCircle } from 'react-icons/fa';
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
-import { formatPrice } from '../utils/currencyHelper';
+import { formatPrice, getEffectivePrice } from '../utils/currencyHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
@@ -203,11 +203,21 @@ const ProductDetail = () => {
                                 {lang === 'en' && product.name_en ? product.name_en : product.name}
                             </h1>
 
-                            <p className="mb-3 text-2xl font-medium text-cocoa">
-                                {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
-                            </p>
+                            {(() => {
+                                const eff = getEffectivePrice(product);
+                                const cur = lang === 'en' ? 'USD' : 'VND';
+                                return eff.isDiscounted ? (
+                                    <p className="mb-3 flex flex-wrap items-baseline gap-3">
+                                        <span className="text-2xl font-semibold text-clay">{formatPrice(eff.price, cur)}</span>
+                                        <span className="text-lg text-muted line-through">{formatPrice(eff.original, cur)}</span>
+                                        <span className="rounded-full bg-clay/15 px-2 py-0.5 text-xs font-semibold uppercase text-clay">{lang === 'en' ? 'Sale' : 'Giảm giá'}</span>
+                                    </p>
+                                ) : (
+                                    <p className="mb-3 text-2xl font-medium text-cocoa">{formatPrice(eff.price, cur)}</p>
+                                );
+                            })()}
 
-                            <p className="mb-8 flex items-center gap-2 text-sm text-sage">
+                            <p className="mb-8 flex items-center gap-2 text-sm text-clay">
                                 <FaCheckCircle className="shrink-0" />
                                 {lang === 'en' ? 'All products shown are in stock.' : 'Tất cả sản phẩm được hiển thị đều đang có sẵn.'}
                             </p>

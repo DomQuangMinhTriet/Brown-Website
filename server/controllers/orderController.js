@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { evaluateVoucher } = require('./promotionController');
 const { sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdmin } = require('../services/emailService');
 const { calculateShippingFee, createGHNOrder } = require('../services/shippingService'); // <--- IMPORT HELPER
 const { z } = require('zod');
@@ -108,8 +109,9 @@ exports.createOrder = async (req, res) => {
         // C. CHUẨN BỊ DỮ LIỆU & BẢO MẬT GIÁ + KIỂM TRA TỒN KHO THỰC TẾ
         const cleanItems = [];
         let subtotal_check = 0;
-        const itemsToNegative = []; 
+        const itemsToNegative = [];
         const mailItems = []; // [BỔ SUNG] Mảng chứa dữ liệu chi tiết cho Email
+        const voucherLineItems = []; // Dùng để tính voucher theo từng SP
 
         const variantIds = items.map(i => i.variant_id);
         
@@ -117,11 +119,11 @@ exports.createOrder = async (req, res) => {
         const { data: variantsDB, error: varError } = await supabase
             .from('variants')
             .select(`
-                id, 
-                size, color, color_en, 
-                current_price, 
-                products(name, base_price, is_preorder),
-                inventory_batches(quantity_remaining) 
+                id,
+                size, color, color_en,
+                current_price,
+                products(id, name, base_price, is_preorder, discount_amount, is_discount_active),
+                inventory_batches(quantity_remaining)
             `)
             .in('id', variantIds);
 
@@ -153,8 +155,22 @@ exports.createOrder = async (req, res) => {
                 });
             }
 
-            const realPrice = variant.current_price || variant.products.base_price;
-            
+            // [MỚI] Áp GIẢM GIÁ TRỰC TIẾP của sản phẩm (nếu đang bật)
+            const prod = variant.products;
+            const onDiscount = prod?.is_discount_active && Number(prod?.discount_amount) > 0;
+            let realPrice = variant.current_price || prod.base_price;
+            if (onDiscount) {
+                realPrice = Math.max(0, realPrice - Number(prod.discount_amount));
+            }
+
+            // Gom dữ liệu để tính voucher theo từng SP (SP đang giảm giá trực tiếp sẽ bị loại khỏi phần tính voucher)
+            voucherLineItems.push({
+                product_id: prod?.id,
+                quantity: item.quantity,
+                unit_price: realPrice,
+                on_discount: onDiscount
+            });
+
             const { data: latestBatch } = await supabase
                 .from('inventory_batches')
                 .select('cost_price')
@@ -188,26 +204,15 @@ exports.createOrder = async (req, res) => {
             subtotal_check += realPrice * item.quantity;
         }
 
-        // D. XỬ LÝ VOUCHER (Server tính toán)
+        // D. XỬ LÝ VOUCHER (Server tính toán — dùng chung helper evaluateVoucher,
+        //    voucher chỉ giảm trên SP được chọn & không cộng dồn với SP đang giảm giá trực tiếp)
         let discount_amount = 0;
         if (voucher_code) {
-             const { data: promo } = await supabase
-                .from('promotions')
-                .select('*')
-                .eq('code', voucher_code)
-                .single();
-            
-            if (promo && promo.is_active) {
-                const now = new Date();
-                if (new Date(promo.start_date) <= now && new Date(promo.end_date) >= now) {
-                     if (promo.discount_type === 'percent') {
-                        discount_amount = subtotal_check * (promo.discount_value / 100);
-                        if (promo.max_discount_amount) discount_amount = Math.min(discount_amount, promo.max_discount_amount);
-                    } else {
-                        discount_amount = promo.discount_value;
-                    }
-                    await supabase.from('promotions').update({ used_count: promo.used_count + 1 }).eq('id', promo.id);
-                }
+            const result = await evaluateVoucher(voucher_code, voucherLineItems);
+            if (result.ok) {
+                discount_amount = result.discountAmount;
+                const newUsed = (result.promo.used_count || 0) + 1;
+                await supabase.from('promotions').update({ used_count: newUsed }).eq('id', result.promo.id);
             }
         }
 
@@ -460,7 +465,8 @@ exports.updateOrderStatus = async (req, res) => {
 
 exports.createAdminOrder = async (req, res) => {
     try {
-        const { customer, items, payment_method, note, shipping_fee, is_paid } = req.body;
+        const { customer, items, payment_method, note, shipping_fee, is_paid, voucher_code, discount_amount } = req.body;
+        const discountAmt = Number(discount_amount) || 0;
 
         let customerId = null;
         const { data: existingCus } = await supabase
@@ -497,16 +503,25 @@ exports.createAdminOrder = async (req, res) => {
             finalNote += " [ĐÃ THANH TOÁN]";
         }
 
+        // Tra promotion_id từ mã voucher (bảng orders lưu promotion_id, không lưu voucher_code)
+        let promotionId = null;
+        let promoRow = null;
+        if (voucher_code && discountAmt > 0) {
+            const { data: promo } = await supabase.from('promotions').select('id, used_count').eq('code', voucher_code.toUpperCase().trim()).maybeSingle();
+            if (promo) { promotionId = promo.id; promoRow = promo; }
+        }
+
         const orderPayload = {
             code: orderCode,
             customer_id: customerId,
             customer_name: customer.fullName,
             customer_phone: customer.phone,
-            customer_address: customer.address || "Tại quầy", 
-            subtotal: itemTotal,      
-            total_amount: itemTotal + finalShippingFee,  
-            shipping_fee: finalShippingFee,          
-            discount_amount: 0,       
+            customer_address: customer.address || "Tại quầy",
+            subtotal: itemTotal,
+            total_amount: Math.max(0, itemTotal + finalShippingFee - discountAmt),
+            shipping_fee: finalShippingFee,
+            discount_amount: discountAmt,
+            promotion_id: promotionId,
             payment_method: payment_method || 'cod',
             status: 'pending',
             note: finalNote.trim()
@@ -519,6 +534,11 @@ exports.createAdminOrder = async (req, res) => {
             .single();
 
         if (orderError) throw orderError;
+
+        // Tăng lượt dùng voucher (nếu có áp mã)
+        if (promoRow) {
+            await supabase.from('promotions').update({ used_count: (promoRow.used_count || 0) + 1 }).eq('id', promoRow.id);
+        }
 
         const orderItemsData = [];
 

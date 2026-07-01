@@ -9,20 +9,21 @@ Cơ sở dữ liệu PostgreSQL (Supabase). Toàn bộ schema, stored function v
 | Danh mục | `stores` | Chi nhánh / kho hàng |
 | | `categories` | Danh mục sản phẩm (hỗ trợ cha–con qua `parent_id`) |
 | | `suppliers` | Nhà cung cấp |
-| Sản phẩm | `products` | Sản phẩm (thông tin chung, `base_price`, mảng `images`) |
+| Sản phẩm | `products` | Sản phẩm (thông tin chung, `base_price`, mảng `images`, **giảm giá trực tiếp** `discount_amount`/`is_discount_active`) |
 | | `product_categories` | Bảng trung gian sản phẩm ↔ danh mục (n–n) |
 | | `variants` | Biến thể/SKU (size, màu, giá, ảnh riêng) |
 | Kho FIFO | `purchase_orders` | Phiếu nhập kho |
 | | `purchase_items` | Chi tiết phiếu nhập (giá vốn lúc nhập) |
 | | `inventory_batches` | **Lô tồn kho** — cốt lõi tính FIFO |
 | Khách & KM | `customers` | Khách hàng (liên kết Supabase Auth qua `user_id`) |
-| | `promotions` | Voucher giảm giá |
+| | `promotions` | Voucher giảm giá (áp cho SP cụ thể qua `applicable_product_ids`; `usage_limit`/`end_date` = NULL là không giới hạn) |
 | | `carts` / `cart_items` | Giỏ hàng (khách đã đăng nhập) |
 | Bán hàng | `orders` | Đơn hàng |
 | | `order_items` | Chi tiết đơn (giá bán + `cogs_total` theo FIFO) |
 | Tài chính | `expense_categories` | Danh mục chi phí |
 | | `expenses` | Phiếu chi |
 | Nội dung | `banners` / `content_banners` | Banner hiển thị trang chủ |
+| | `content_lookbook` | Nội dung trang Lookbook editorial (`block_type`: full/compare/quote, `image_url_2` cho slider) |
 | | `product_collections` | Bộ sưu tập / nhóm sản phẩm |
 
 ## 2. Sơ đồ quan hệ chính
@@ -69,6 +70,9 @@ Cho phép tính **lợi nhuận thực** (doanh thu − COGS) chính xác ngay c
 | `orders.customer_*` | Lưu thông tin người nhận cho **đơn khách vãng lai** |
 | `order_items.cogs_total` | Giá vốn dòng hàng, tính bằng logic FIFO sau khi bán |
 | `promotions.discount_type` | `percent` hoặc `fixed` |
+| `promotions.applicable_product_ids` | `jsonb` mảng id SP được áp mã; `[]` = áp cho **mọi** SP. Voucher chỉ giảm trên tiền các SP này, và **không cộng dồn** với SP đang giảm giá trực tiếp |
+| `products.discount_amount` / `is_discount_active` | Giảm giá trực tiếp theo **số tiền**; giá bán = `base_price − discount_amount` khi bật. Giá gốc vẫn lưu ở `base_price` |
+| `content_lookbook.block_type` | `full` (ảnh/video tràn viền) · `compare` (slider 2 ảnh, cần `image_url_2`) · `quote` (câu trích dẫn, không cần ảnh) |
 | `customers.user_id` | `UUID` liên kết Supabase Auth; `NULL` nếu khách vãng lai |
 
 ## 5. Stored functions
@@ -83,4 +87,6 @@ File dump bao gồm các function PL/pgSQL chạy trực tiếp trong database, 
 
 ## 7. File dữ liệu
 
-`database/full_schema_data.sql` là **file tổng duy nhất**: bản `pg_dump` đầy đủ gồm schema (19 bảng), stored function, index, phân quyền và toàn bộ dữ liệu (dạng `COPY`). Dùng file này để khôi phục hoặc khởi tạo lại database. Certificate `database/prod-ca-2021.crt` dùng cho kết nối SSL tới Supabase.
+`database/full_schema_data.sql` là **file tổng duy nhất**: bản `pg_dump` đầy đủ gồm schema, stored function, index, phân quyền và toàn bộ dữ liệu (dạng `COPY`). Dùng file này để khôi phục hoặc khởi tạo lại database. Certificate `database/prod-ca-2021.crt` dùng cho kết nối SSL tới Supabase.
+
+`database/migrations_2026_promotions_lookbook.sql` là **file migration tăng dần** (idempotent) cho các nâng cấp 2026: bảng `content_lookbook`, giảm giá trực tiếp sản phẩm, và voucher theo sản phẩm. Chạy file này trong Supabase SQL Editor để cập nhật một database đang chạy mà không cần khôi phục toàn bộ.

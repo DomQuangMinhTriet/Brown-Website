@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaCheck } from 'react-icons/fa';
-import { formatPrice } from '../../utils/currencyHelper';
+import { formatPrice, getEffectivePrice } from '../../utils/currencyHelper';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
 
@@ -25,6 +25,8 @@ const ProductCard = ({ product, posMode = false }) => {
   const { t, lang } = useLanguage();
   const { addToCart } = useCart();
   const name = lang === 'en' && product.name_en ? product.name_en : product.name;
+  const eff = getEffectivePrice(product);
+  const cur = lang === 'en' ? 'USD' : 'VND';
 
   const colors = useMemo(() => {
     const seen = new Set();
@@ -148,6 +150,13 @@ const ProductCard = ({ product, posMode = false }) => {
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-espresso/30 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
+          {/* Nhãn giảm giá */}
+          {eff.isDiscounted && (
+            <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-clay px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-cream shadow">
+              {lang === 'en' ? 'Sale' : 'Giảm giá'}
+            </span>
+          )}
+
           {/* Chấm chỉ số ảnh — chỉ khi chưa chọn màu và có nhiều ảnh */}
           {!activeColor && currentImages.length > 1 && (
             <div className="absolute inset-x-0 top-2.5 z-10 flex justify-center gap-1">
@@ -232,9 +241,14 @@ const ProductCard = ({ product, posMode = false }) => {
         <h3 className="font-heading text-[17px] leading-snug text-espresso transition-colors group-hover:text-cocoa line-clamp-1">
           {name}
         </h3>
-        <p className="mt-1 text-sm text-muted">
-          {formatPrice(product.base_price, lang === 'en' ? 'USD' : 'VND')}
-        </p>
+        {eff.isDiscounted ? (
+          <p className="mt-1 flex items-center gap-2 text-sm">
+            <span className="font-medium text-clay">{formatPrice(eff.price, cur)}</span>
+            <span className="text-muted line-through">{formatPrice(eff.original, cur)}</span>
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-muted">{formatPrice(eff.price, cur)}</p>
+        )}
       </Link>
     </div>
   );

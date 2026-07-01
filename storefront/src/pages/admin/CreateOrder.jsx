@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen } from 'react-icons/fa';
+import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen, FaTag, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { getEffectivePrice } from '../../utils/currencyHelper';
 
 
 // [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
@@ -29,6 +30,11 @@ const CreateOrder = () => {
     
     // Thêm state quản lý phí ship, mặc định là 20.000đ
     const [shippingFee, setShippingFee] = useState(0);
+
+    // Voucher
+    const [voucherCode, setVoucherCode] = useState('');
+    const [appliedVoucher, setAppliedVoucher] = useState(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
 
     // Load sản phẩm khi vào trang
     useEffect(() => {
@@ -72,16 +78,19 @@ const CreateOrder = () => {
                 }
                 return prev.map(item => item.variant_id === variant.id ? { ...item, quantity: item.quantity + 1 } : item);
             }
+            const eff = getEffectivePrice(product); // Áp giảm giá trực tiếp nếu SP đang bật
             return [...prev, {
                 product_id: product.id,
                 variant_id: variant.id,
                 name: product.name,
                 size: variant.size || '',
                 color: variant.color || '',
-                price: product.base_price || 0,
+                price: eff.price || 0,
+                original_price: eff.original || 0,
+                is_discounted: eff.isDiscounted,
                 quantity: 1,
                 // [ĐÃ SỬA] Set tồn kho ảo vô hạn cho phụ kiện
-                max_stock: isAccessory ? 999999 : variant.quantity_remaining, 
+                max_stock: isAccessory ? 999999 : variant.quantity_remaining,
                 image: product.images?.[0]
             }];
         });
@@ -111,9 +120,32 @@ const CreateOrder = () => {
         }));
     };
 
+    // Voucher: kiểm tra qua đúng endpoint (server tự tính giảm theo SP, không tin giá client)
+    const handleApplyVoucher = async () => {
+        if (!voucherCode) return toast.warning("Nhập mã giảm giá!");
+        if (cart.length === 0) return toast.warning("Giỏ hàng trống!");
+        try {
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions/check`, {
+                code: voucherCode,
+                items: cart.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
+            });
+            if (res.data.success) {
+                setDiscountAmount(res.data.data.discountAmount);
+                setAppliedVoucher(res.data.data.promo);
+                toast.success(`Đã áp mã ${res.data.data.promo.code}`);
+            }
+        } catch (error) {
+            setDiscountAmount(0);
+            setAppliedVoucher(null);
+            toast.error(error.response?.data?.message || "Mã không hợp lệ");
+        }
+    };
+
+    const removeVoucher = () => { setVoucherCode(''); setAppliedVoucher(null); setDiscountAmount(0); };
+
     // Tách riêng tiền hàng và tổng tiền
     const itemsTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const totalAmount = itemsTotal + Number(shippingFee);
+    const totalAmount = Math.max(0, itemsTotal + Number(shippingFee) - Number(discountAmount || 0));
 
     // Xử lý Gửi đơn hàng
     const handleCreateOrder = async () => {
@@ -133,10 +165,12 @@ const CreateOrder = () => {
                 quantity: item.quantity,
                 price: item.price // Gửi giá trị nhập tay lên Backend
             })),
-            payment_method: paymentMethod, 
+            payment_method: paymentMethod,
             is_paid: isPaid,
             note: customerInfo.note,
-            shipping_fee: Number(shippingFee)
+            shipping_fee: Number(shippingFee),
+            voucher_code: appliedVoucher ? appliedVoucher.code : null,
+            discount_amount: Number(discountAmount) || 0
         };
 
         try {
@@ -166,6 +200,7 @@ const CreateOrder = () => {
                 setCustomerInfo({ name: '', phone: '', address: '', note: '' });
                 setSearch('');
                 setShippingFee(0);
+                setVoucherCode(''); setAppliedVoucher(null); setDiscountAmount(0);
             }
         } catch (error) {
             console.error(error);
@@ -198,7 +233,11 @@ const CreateOrder = () => {
                             <img src={p.images?.[0]} className="w-16 h-20 object-cover rounded bg-stone-100" alt=""/>
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-stone-800">{p.name}</div>
-                                <div className="text-red-600 font-bold text-sm">{new Intl.NumberFormat('vi-VN').format(p.base_price)}</div>
+                                {(() => { const eff = getEffectivePrice(p); return eff.isDiscounted ? (
+                                    <div className="text-sm"><span className="text-red-600 font-bold">{new Intl.NumberFormat('vi-VN').format(eff.price)}</span> <span className="text-stone-400 line-through text-xs">{new Intl.NumberFormat('vi-VN').format(eff.original)}</span></div>
+                                ) : (
+                                    <div className="text-red-600 font-bold text-sm">{new Intl.NumberFormat('vi-VN').format(eff.price)}</div>
+                                ); })()}
                                 <div className="flex flex-wrap gap-1 mt-2">
                                     {/* [ĐÃ SỬA] Xử lý hiển thị nút chọn cho Phụ kiện */}
                                     {p.variants?.map(v => {
@@ -291,6 +330,29 @@ const CreateOrder = () => {
                             />
                             <span className="font-bold">₫</span>
                         </div>
+                    </div>
+
+                    {/* VOUCHER */}
+                    <div className="mb-4">
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <FaTag className="absolute left-2 top-2.5 text-stone-400 text-xs" />
+                                <input type="text" value={voucherCode} onChange={e => setVoucherCode(e.target.value.toUpperCase())} placeholder="Mã giảm giá"
+                                    disabled={!!appliedVoucher}
+                                    className="w-full pl-7 p-2 text-sm border rounded uppercase outline-none focus:border-stone-900 disabled:bg-stone-100" />
+                            </div>
+                            {appliedVoucher ? (
+                                <button type="button" onClick={removeVoucher} className="bg-stone-200 text-stone-600 px-3 rounded hover:bg-stone-300"><FaTimes size={12} /></button>
+                            ) : (
+                                <button type="button" onClick={handleApplyVoucher} className="bg-stone-800 text-white px-4 rounded text-sm font-bold hover:bg-black">Áp dụng</button>
+                            )}
+                        </div>
+                        {discountAmount > 0 && (
+                            <div className="flex justify-between mt-2 text-sm text-green-600 font-bold">
+                                <span>Giảm giá ({appliedVoucher?.code}):</span>
+                                <span>- {new Intl.NumberFormat('vi-VN').format(discountAmount)} ₫</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-between mb-4 text-xl font-bold">

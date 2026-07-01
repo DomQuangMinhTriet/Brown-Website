@@ -78,9 +78,7 @@ const Home = () => {
   const repImg = (slug) => catProducts[slug]?.[0]?.images?.[0];
 
   const activeCat = categories[activeIndex] || categories[0];
-  const sloganWords = lang === 'en'
-    ? ['Luxury', 'Quality', 'Aesthetic', 'Est. 2025', 'Based in Saigon', 'Made in Vietnam']
-    : ['Sang trọng', 'Chất lượng', 'Thẩm mỹ', 'Est. 2025', 'Từ Sài Gòn', 'Made in Vietnam'];
+  const sloganWords = ['Brown', 'Made in Vietnam'];
 
   // Ảnh cố định cho 2 dải full-bleed (đóng trang + editorial shoppable)
   const closingImg = "/background.avif";
@@ -141,7 +139,7 @@ const Home = () => {
             <div key={g} className="flex shrink-0 items-center" aria-hidden={g === 1}>
               {sloganWords.map((w, i) => (
                 <span key={i} className="flex items-center">
-                  <span className={`whitespace-nowrap px-8 font-heading text-5xl italic md:text-7xl ${i % 2 === 0 ? 'text-cream' : 'text-outline-cream'}`}>{w}</span>
+                  <span className={`whitespace-nowrap px-8 font-body text-5xl font-semibold uppercase tracking-tight md:text-7xl ${i % 2 === 0 ? 'text-cream' : 'text-outline-cream'}`}>{w}</span>
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-sage" />
                 </span>
               ))}

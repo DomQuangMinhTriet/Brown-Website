@@ -11,7 +11,7 @@ router.get('/:slug', productController.getProductBySlug);
 
 // Route Ghi (Không Cache)
 router.post('/', productController.createProduct);
-// --- [MỚI] THÊM 2 ROUTE NÀY ---
+router.put('/:id/discount', productController.updateProductDiscount); // Bật/tắt & set giảm giá trực tiếp
 router.put('/:id', productController.updateProduct);   // Sửa
 router.delete('/:id', productController.deleteProduct); // Xóa
 

@@ -8,6 +8,7 @@ import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
 import { isVideoUrl } from '../components/lookbook/blockUtils';
+import { optimizeImage } from '../utils/cloudinaryHelper';
 import { useLanguage } from '../context/LanguageContext';
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -52,17 +53,16 @@ const Home = () => {
           setCategories(visibleCats);
         }
 
-        const entries = await Promise.all(
-          visibleCats.map(async (cat) => {
-            try {
-              const r = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?category=${encodeURIComponent(cat.slug)}`);
-              return [cat.slug, r.data.success ? r.data.data : []];
-            } catch {
-              return [cat.slug, []];
-            }
-          })
-        );
-        setCatProducts(Object.fromEntries(entries));
+        // Gộp thành 1 lần gọi duy nhất thay vì 1 request/danh mục (tránh N+1 truy vấn DB)
+        const allProductsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+        const allProducts = allProductsRes.data.success ? allProductsRes.data.data : [];
+        const grouped = {};
+        for (const cat of visibleCats) {
+          grouped[cat.slug] = allProducts.filter((p) =>
+            p.category_id === cat.id || (p.product_collections || []).some((pc) => pc.category_id === cat.id)
+          );
+        }
+        setCatProducts(grouped);
       } catch (err) {
         console.error(err);
       } finally {
@@ -114,7 +114,7 @@ const Home = () => {
                   <source src={banner.image_url} type="video/mp4" />
                 </video>
               ) : (
-                <img src={banner.image_url} alt={banner.title || 'BROWN'} className="h-full w-full object-cover animate-ken-burns" />
+                <img src={optimizeImage(banner.image_url, 1600)} alt={banner.title || 'BROWN'} className="h-full w-full object-cover animate-ken-burns" />
               )}
             </Link>
           ))
@@ -196,7 +196,7 @@ const Home = () => {
                         {repImg(activeCat?.slug) ? (
                           <motion.img
                             key={activeCat?.slug}
-                            src={repImg(activeCat?.slug)}
+                            src={optimizeImage(repImg(activeCat?.slug), 700)}
                             alt={nameOf(activeCat)}
                             initial={{ opacity: 0, scale: 1.06 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -226,7 +226,7 @@ const Home = () => {
                         <span className="font-heading text-xs tabular-nums text-cream/40">{String(i + 1).padStart(2, '0')}</span>
                         <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-cocoa/40">
                           {repImg(cat.slug) ? (
-                            <img src={repImg(cat.slug)} alt={nameOf(cat)} loading="lazy" className="h-full w-full object-cover" />
+                            <img src={optimizeImage(repImg(cat.slug), 150)} alt={nameOf(cat)} loading="lazy" className="h-full w-full object-cover" />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center font-heading text-2xl text-cream/20">{nameOf(cat)?.[0]}</div>
                           )}
@@ -259,7 +259,7 @@ const Home = () => {
                 <Link to="/lookbook" className="group grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
                   {teaserImgs.map((src, i) => (
                     <div key={i} className={`overflow-hidden rounded-2xl bg-parchment ${i === 0 ? 'col-span-2 aspect-[16/10] md:col-span-1 md:aspect-[3/4]' : 'aspect-[3/4]'}`}>
-                      <img src={src} alt="BROWN Lookbook" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      <img src={optimizeImage(src, i === 0 ? 900 : 500)} alt="BROWN Lookbook" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     </div>
                   ))}
                 </Link>

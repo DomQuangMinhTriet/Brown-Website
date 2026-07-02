@@ -7,20 +7,24 @@ import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 // ==============================
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-import ProductDetail from './pages/ProductDetail'; 
-import Cart from './pages/Cart';
-import Collection from './pages/Collection';
-import Checkout from './pages/Checkout';
-import StoreLogin from './pages/Login'; // Đổi tên để tránh trùng
-import Register from './pages/Register';
-import Profile from './pages/Profile';
-import Lookbook from './pages/Lookbook';
-import ReturnPolicy from './pages/policies/ReturnPolicy';
-import ShippingPolicy from './pages/policies/ShippingPolicy';
-import CareGuide from './pages/policies/CareGuide';
 import Footer from './components/Footer';
 import Preloader from './components/Preloader';
 //import About from './pages/About';
+
+// [Code-split] Trang chủ là điểm vào phổ biến nhất nên tải ngay (eager); các trang
+// còn lại của storefront chỉ tải khi khách thực sự điều hướng tới, giảm dung lượng
+// bundle chính mà mọi khách phải tải khi chỉ ghé trang chủ.
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Collection = lazy(() => import('./pages/Collection'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const StoreLogin = lazy(() => import('./pages/Login')); // Đổi tên để tránh trùng
+const Register = lazy(() => import('./pages/Register'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Lookbook = lazy(() => import('./pages/Lookbook'));
+const ReturnPolicy = lazy(() => import('./pages/policies/ReturnPolicy'));
+const ShippingPolicy = lazy(() => import('./pages/policies/ShippingPolicy'));
+const CareGuide = lazy(() => import('./pages/policies/CareGuide'));
 
 // ==============================
 // 2. IMPORTS CHO ADMIN

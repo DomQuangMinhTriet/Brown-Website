@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen, FaTag, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { getEffectivePrice } from '../../utils/currencyHelper';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 
 // [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
@@ -230,7 +231,7 @@ const CreateOrder = () => {
                 <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                     {filteredProducts.map(p => (
                         <div key={p.id} className="flex gap-3 p-2 border rounded hover:border-stone-400 transition-colors">
-                            <img src={p.images?.[0]} className="w-16 h-20 object-cover rounded bg-stone-100" alt=""/>
+                            <img src={optimizeImage(p.images?.[0], 120)} className="w-16 h-20 object-cover rounded bg-stone-100" alt="" loading="lazy"/>
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-stone-800">{p.name}</div>
                                 {(() => { const eff = getEffectivePrice(p); return eff.isDiscounted ? (

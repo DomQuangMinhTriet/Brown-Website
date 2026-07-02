@@ -4,6 +4,7 @@ import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave,
 import { toast } from 'react-toastify';
 // Import các hook của bạn (nếu file nằm ở thư mục hooks ngang cấp pages thì sửa đường dẫn)
 import { useAsync, useKeyedAsync } from '../../hooks/useAsync';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 const Inventory = () => {
   const [activeTab, setActiveTab] = useState('inbound'); 
@@ -542,7 +543,7 @@ const Inventory = () => {
                                     <td className="p-4 flex items-center gap-3">
                                         <div className="w-10 h-10 bg-stone-200 rounded overflow-hidden flex-shrink-0 border border-stone-100">
                                             {item.image ? (
-                                                <img src={item.image} className="w-full h-full object-cover"/>
+                                                <img src={optimizeImage(item.image, 60)} className="w-full h-full object-cover" loading="lazy"/>
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-xs text-stone-400">No Img</div>
                                             )}

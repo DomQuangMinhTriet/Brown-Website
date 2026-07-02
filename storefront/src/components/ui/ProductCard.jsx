@@ -2,15 +2,9 @@ import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlus, FaCheck } from 'react-icons/fa';
 import { formatPrice, getEffectivePrice } from '../../utils/currencyHelper';
+import { optimizeImage as optimize } from '../../utils/cloudinaryHelper';
 import { useLanguage } from '../../context/LanguageContext';
 import { useCart } from '../../context/CartContext';
-
-// Nén ảnh Cloudinary
-const optimize = (url, w = 500) => {
-  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-  const i = url.indexOf('upload/') + 7;
-  return url.slice(0, i) + `c_scale,w_${w},f_auto,q_auto/` + url.slice(i);
-};
 
 const SWIPE_THRESHOLD = 30;
 

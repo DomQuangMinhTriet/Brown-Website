@@ -3,6 +3,7 @@ import axios from 'axios';
 import { FaFileExcel, FaEye, FaBox, FaShippingFast, FaCheckCircle, FaTimesCircle, FaUndo, FaSearch, FaExclamationTriangle, FaMotorcycle, FaCheckSquare, FaEdit, FaSave, FaDownload } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { ORDER_STATUS_MAP } from '../../utils/translations';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -574,7 +575,7 @@ const Orders = () => {
                                 {selectedOrder.order_items?.map((item, idx) => (
                                     <div key={idx} className="flex gap-3 md:gap-4 items-center border-b border-stone-100 pb-3">
                                         <div className="w-12 h-16 md:w-16 md:h-20 bg-stone-100 rounded overflow-hidden flex-shrink-0">
-                                            <img src={item.variants?.image_url || item.product_image} alt="" className="w-full h-full object-cover"/>
+                                            <img src={optimizeImage(item.variants?.image_url || item.product_image, 150)} alt="" className="w-full h-full object-cover" loading="lazy"/>
                                         </div>
                                         <div className="flex-1">
                                             <p className="font-bold text-stone-800 text-sm md:text-base">{item.product_name || item.variants?.products?.name}</p>

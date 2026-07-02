@@ -1,9 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import imageCompression from 'browser-image-compression';
 import { FaTrash, FaPlus, FaImage, FaCloudUploadAlt, FaList, FaEye, FaEyeSlash, FaGripVertical, FaQuoteRight, FaVideo } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import LookbookBlocks from '../../components/lookbook/LookbookBlocks';
 import { toLookbookBlock, isVideoUrl } from '../../components/lookbook/blockUtils';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
+
+// [AN TOÀN] Nén ảnh (banner/lookbook) ngay trên trình duyệt trước khi upload —
+// giống cách ProductModal đã làm cho ảnh sản phẩm — để tránh 1 ảnh chụp thẳng
+// từ điện thoại (vài MB, độ phân giải rất cao) bị đẩy nguyên lên Cloudinary.
+// Bỏ qua video vì thư viện nén chỉ xử lý được ảnh.
+const compressIfImage = async (file) => {
+  if (!file || !file.type?.startsWith('image/')) return file;
+  try {
+    return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
+  } catch (err) {
+    console.error('Lỗi nén ảnh, dùng file gốc:', err);
+    return file;
+  }
+};
 
 const Appearance = () => {
   // --- STATE BANNER ---
@@ -64,7 +80,7 @@ const Appearance = () => {
   const handleUploadFile = async () => {
     if (!file) return null;
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('image', await compressIfImage(file));
     try {
       setUploading(true);
       const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formData, {
@@ -122,7 +138,7 @@ const Appearance = () => {
   const uploadFile = async (f) => {
     if (!f) return null;
     const fd = new FormData();
-    fd.append('image', f);
+    fd.append('image', await compressIfImage(f));
     const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
@@ -379,11 +395,12 @@ const Appearance = () => {
                    banners.map(banner => (
                     <div key={banner.id} className="bg-white rounded-lg shadow border overflow-hidden relative group">
                         <div className="h-40 w-full bg-stone-100 relative">
-                            <img 
-                                src={banner.image_url} 
-                                alt={banner.title} 
+                            <img
+                                src={optimizeImage(banner.image_url, 400)}
+                                alt={banner.title}
                                 className="w-full h-full object-cover"
-                                onError={(e) => {e.target.src = 'https://via.placeholder.com/400x200?text=Lỗi+Ảnh'}} 
+                                loading="lazy"
+                                onError={(e) => {e.target.src = 'https://via.placeholder.com/400x200?text=Lỗi+Ảnh'}}
                             />
                         </div>
                         <div className="p-3">
@@ -556,7 +573,7 @@ const LookbookCard = ({ item, registerRef, isDragging, onGripPointerDown, onUpda
         ) : video ? (
           <video src={item.image_url} muted className="h-full w-full object-cover" />
         ) : item.image_url ? (
-          <img src={item.image_url} alt={item.title || ''} className="h-full w-full object-cover"
+          <img src={optimizeImage(item.image_url, 150)} alt={item.title || ''} className="h-full w-full object-cover" loading="lazy"
             onError={(e) => { e.target.src = 'https://via.placeholder.com/100x120?text=Lỗi'; }} />
         ) : null}
       </div>

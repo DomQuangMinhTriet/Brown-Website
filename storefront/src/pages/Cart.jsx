@@ -3,6 +3,7 @@ import { useCart } from '../context/CartContext';
 import { FaTrash } from 'react-icons/fa';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
+import { optimizeImage } from '../utils/cloudinaryHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 
@@ -48,7 +49,7 @@ const Cart = () => {
                   <button onClick={() => removeFromCart(item.variant_id)} className="text-sand transition-colors hover:text-clay" aria-label="Xóa">
                     <FaTrash />
                   </button>
-                  <img src={item.image} alt={item.name} className="h-24 w-20 rounded-xl bg-parchment object-cover" />
+                  <img src={optimizeImage(item.image, 160)} alt={item.name} className="h-24 w-20 rounded-xl bg-parchment object-cover" loading="lazy" />
                   <div>
                     <Link to={`/product/${item.slug}`} className="font-heading text-lg text-espresso transition-colors hover:text-cocoa line-clamp-1">
                       {item.name}

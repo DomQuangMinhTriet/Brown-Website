@@ -2,15 +2,8 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FaPlus, FaSearch, FaEdit, FaTrash, FaFileExcel } from 'react-icons/fa';
 import ProductModal from '../../components/ProductModal';
-import { toast } from 'react-toastify'; 
-
-// [CHỈNH SỬA] Thêm hàm nén ảnh cho bảng Admin
-const getOptimizedImageUrl = (url, width = 100) => {
-    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-    const uploadIndex = url.indexOf('upload/') + 7;
-    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
-    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
-};
+import { toast } from 'react-toastify';
+import { optimizeImage as getOptimizedImageUrl } from '../../utils/cloudinaryHelper';
 
 const Products = () => {
   const [products, setProducts] = useState([]);

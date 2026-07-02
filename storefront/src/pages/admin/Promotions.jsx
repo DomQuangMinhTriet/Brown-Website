@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { FaPlus, FaTrash, FaTicketAlt, FaTimes, FaTags, FaSearch } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -280,7 +281,7 @@ const Promotions = () => {
                   {promoProducts.slice(0, 50).map(p => (
                     <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-stone-50 cursor-pointer">
                       <input type="checkbox" checked={formData.applicable_product_ids.includes(p.id)} onChange={() => toggleApplicable(p.id)} />
-                      <img src={p.images?.[0]} alt="" className="w-8 h-8 object-cover rounded bg-stone-100" />
+                      <img src={optimizeImage(p.images?.[0], 60)} alt="" className="w-8 h-8 object-cover rounded bg-stone-100" loading="lazy" />
                       <span className="flex-1 truncate">{p.name}</span>
                       <span className="text-xs text-stone-400">{money(p.base_price)}đ</span>
                     </label>
@@ -308,7 +309,7 @@ const DiscountRow = ({ product, onSave, money }) => {
 
   return (
     <div className="flex items-center gap-4 p-3">
-      <img src={product.images?.[0]} alt="" className="w-12 h-14 object-cover rounded bg-stone-100" />
+      <img src={optimizeImage(product.images?.[0], 100)} alt="" className="w-12 h-14 object-cover rounded bg-stone-100" loading="lazy" />
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm text-stone-800 truncate">{product.name}</p>
         <p className="text-xs text-stone-500">

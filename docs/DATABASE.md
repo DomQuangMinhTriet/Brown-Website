@@ -66,9 +66,10 @@ Cho phép tính **lợi nhuận thực** (doanh thu − COGS) chính xác ngay c
 | Bảng.Cột | Ghi chú |
 |----------|---------|
 | `products.images` | Kiểu `TEXT[]` — mảng link ảnh (Cloudinary) |
+| `products.videos` | Kiểu `TEXT[]` — mảng link video (Cloudinary), hiển thị sau cùng trong gallery, sau tất cả ảnh. Mỗi video ≤10s, ≤15MB |
 | `variants.current_price` | Nếu `NULL` thì lấy `products.base_price` |
 | `orders.status` | `pending`, `confirmed`, `shipping`, `completed`, `cancelled`, `returned` |
-| `orders.payment_method` | `cod`, `banking` (và PayPal phía frontend) |
+| `orders.payment_method` | `cod`, `banking` |
 | `orders.customer_*` | Lưu thông tin người nhận cho **đơn khách vãng lai** |
 | `order_items.cogs_total` | Giá vốn dòng hàng, tính bằng logic FIFO sau khi bán |
 | `promotions.discount_type` | `percent` hoặc `fixed` |

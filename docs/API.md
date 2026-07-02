@@ -15,10 +15,10 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| GET | `/api/products` | Danh sách sản phẩm |
+| GET | `/api/products` | Danh sách sản phẩm (`?search=&category=&limit=` — `limit` tùy chọn, không truyền thì trả về tất cả) |
 | GET | `/api/products/:slug` | Chi tiết sản phẩm theo slug |
-| POST | `/api/products` | Tạo sản phẩm mới (nhận `discount_amount`, `is_discount_active`) |
-| PUT | `/api/products/:id` | Cập nhật sản phẩm |
+| POST | `/api/products` | Tạo sản phẩm mới (nhận `discount_amount`, `is_discount_active`, `videos`) |
+| PUT | `/api/products/:id` | Cập nhật sản phẩm (nhận `videos` — mảng URL video Cloudinary, tối đa 10s/15MB mỗi video) |
 | PUT | `/api/products/:id/discount` | Bật/tắt & set **giảm giá trực tiếp** cho sản phẩm |
 | DELETE | `/api/products/:id` | Xóa sản phẩm |
 | GET | `/api/products/export/sapo` | Xuất danh sách sản phẩm định dạng Sapo |
@@ -107,6 +107,7 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 | GET | `/api/reports/dashboard` | Số liệu tổng quan dashboard |
 | GET | `/api/reports/financial` | Báo cáo tài chính (`?startDate=&endDate=`) |
 | GET | `/api/reports/monthly` | Báo cáo theo tháng |
+| GET | `/api/reports/products` | Bảng xếp hạng sản phẩm bán chạy (`?startDate=&endDate=`) — số lượng, doanh thu, giá vốn, lợi nhuận theo từng sản phẩm |
 
 ## Shipping — `/api/shipping`
 
@@ -131,7 +132,7 @@ Tài liệu các endpoint của backend (`server/`). Tất cả đều có tiề
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| POST | `/api/upload` | Upload ảnh lên Cloudinary (multipart/form-data, dùng Multer) |
+| POST | `/api/upload` | Upload ảnh/video lên Cloudinary (multipart/form-data, field `image`, dùng Multer). Giới hạn: request tối đa 25MB; ảnh tối đa 5MB; video tối đa 15MB & 10 giây (server kiểm tra lại sau khi upload, tự xóa nếu vượt thời lượng) |
 
 ---
 

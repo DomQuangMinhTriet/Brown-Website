@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const { verifyCache, clearCache } = require('../middleware/cacheMiddleware');
+const { deleteCloudinaryAssets } = require('../utils/cloudinaryCleanup');
 
 // 1. Lấy danh sách Banner (Public)
 exports.getBanners = async (req, res) => {
@@ -60,9 +61,15 @@ exports.createBanner = async (req, res) => {
 exports.deleteBanner = async (req, res) => {
     try {
         const { id } = req.params;
+
+        // [AN TOÀN] Lấy ảnh trước khi xóa DB để dọn trên Cloudinary
+        const { data: old } = await supabase.from('content_banners').select('image_url').eq('id', id).single();
+
         const { error } = await supabase.from('content_banners').delete().eq('id', id);
-        
+
         if (error) throw error;
+
+        if (old?.image_url) deleteCloudinaryAssets([old.image_url]).catch(() => {});
 
         clearCache('/api/content/banners');
         res.json({ success: true, message: 'Đã xóa banner' });
@@ -76,7 +83,15 @@ exports.updateBanner = async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body; // { is_active: false, ... }
-        
+
+        // [AN TOÀN] Nếu đổi sang ảnh khác, dọn ảnh cũ trên Cloudinary
+        if (updates.image_url) {
+            const { data: old } = await supabase.from('content_banners').select('image_url').eq('id', id).single();
+            if (old?.image_url && old.image_url !== updates.image_url) {
+                deleteCloudinaryAssets([old.image_url]).catch(() => {});
+            }
+        }
+
         const { error } = await supabase
             .from('content_banners')
             .update(updates)
@@ -151,8 +166,14 @@ exports.createLookbook = async (req, res) => {
 exports.deleteLookbook = async (req, res) => {
     try {
         const { id } = req.params;
+
+        // [AN TOÀN] Lấy ảnh/ảnh-2 trước khi xóa DB để dọn trên Cloudinary
+        const { data: old } = await supabase.from('content_lookbook').select('image_url, image_url_2').eq('id', id).single();
+
         const { error } = await supabase.from('content_lookbook').delete().eq('id', id);
         if (error) throw error;
+
+        if (old) deleteCloudinaryAssets([old.image_url, old.image_url_2]).catch(() => {});
 
         clearCache('/api/content/lookbook');
         res.json({ success: true, message: 'Đã xóa mục lookbook' });
@@ -166,6 +187,17 @@ exports.updateLookbook = async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
+
+        // [AN TOÀN] Nếu đổi ảnh/ảnh-2 sang file khác, dọn file cũ trên Cloudinary
+        if (updates.image_url !== undefined || updates.image_url_2 !== undefined) {
+            const { data: old } = await supabase.from('content_lookbook').select('image_url, image_url_2').eq('id', id).single();
+            if (old) {
+                const removed = [];
+                if (updates.image_url !== undefined && old.image_url && old.image_url !== updates.image_url) removed.push(old.image_url);
+                if (updates.image_url_2 !== undefined && old.image_url_2 && old.image_url_2 !== updates.image_url_2) removed.push(old.image_url_2);
+                if (removed.length) deleteCloudinaryAssets(removed).catch(() => {});
+            }
+        }
 
         const { error } = await supabase
             .from('content_lookbook')

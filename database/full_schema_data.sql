@@ -631,7 +631,8 @@ CREATE TABLE public.products (
     is_preorder boolean DEFAULT false,
     preorder_note text,
     discount_amount numeric(12,0) DEFAULT 0,
-    is_discount_active boolean DEFAULT false
+    is_discount_active boolean DEFAULT false,
+    videos text[] DEFAULT '{}'::text[]
 );
 
 

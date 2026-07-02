@@ -1,6 +1,7 @@
 const exceljs = require('exceljs');
 const supabase = require('../config/supabase');
 const translate = require('translate-google');
+const { deleteCloudinaryAssets, diffRemovedUrls } = require('../utils/cloudinaryCleanup');
 
 const autoTranslate = async (text) => {
     if (!text || text.trim() === '') return '';
@@ -19,7 +20,7 @@ const autoTranslate = async (text) => {
 exports.getProducts = async (req, res) => {
     try {
         // [CẬP NHẬT]: Thêm biến admin để phân biệt Khách và Admin
-        const { search, category, admin } = req.query; 
+        const { search, category, admin, limit } = req.query;
 
         let query = supabase
             .from('products')
@@ -58,6 +59,13 @@ exports.getProducts = async (req, res) => {
                     query = query.eq('category_id', targetCatId);
                 }
              }
+        }
+
+        // [HIỆU NĂNG] limit tùy chọn — không truyền thì giữ nguyên hành vi cũ (trả về tất cả).
+        // Chỉ dùng ở những nơi thật sự chỉ cần vài sản phẩm (VD: sản phẩm liên quan).
+        const limitNum = parseInt(limit, 10);
+        if (Number.isFinite(limitNum) && limitNum > 0) {
+            query = query.limit(limitNum);
         }
 
         const { data, error } = await query;
@@ -124,7 +132,7 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
 
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
@@ -142,6 +150,7 @@ exports.createProduct = async (req, res) => {
             .from('products')
             .insert([{
                 name, slug, base_price, description, category_id: category_id || null, images,
+                videos: videos || [],
                 size_chart_url: size_chart_url || null,
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
@@ -191,7 +200,15 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, base_price, description, category_id, images, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+
+        // [AN TOÀN] Lấy media CŨ trước khi ghi đè, để sau khi lưu xong biết file
+        // nào đã bị bỏ đi (đổi ảnh, xóa ảnh, đổi size chart...) mà dọn trên Cloudinary.
+        const { data: oldProduct } = await supabase
+            .from('products')
+            .select('images, videos, size_chart_url')
+            .eq('id', id)
+            .single();
 
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
@@ -214,6 +231,7 @@ exports.updateProduct = async (req, res) => {
             is_preorder: is_preorder || false,
             preorder_note: preorder_note || null
         };
+        if (videos !== undefined) generalUpdate.videos = videos;
         // Chỉ cập nhật trường giảm giá nếu client có gửi (tránh ghi đè khi các form khác không gửi)
         if (discount_amount !== undefined) generalUpdate.discount_amount = Number(discount_amount) || 0;
         if (is_discount_active !== undefined) generalUpdate.is_discount_active = !!is_discount_active;
@@ -225,6 +243,19 @@ exports.updateProduct = async (req, res) => {
 
         if (updateError) throw updateError;
 
+        // [AN TOÀN] Dọn rác Cloudinary cho ảnh/video/size-chart đã bị thay hoặc xóa
+        // (best-effort — không chặn phản hồi nếu Cloudinary lỗi tạm thời).
+        if (oldProduct) {
+            const removed = [
+                ...diffRemovedUrls(oldProduct.images, images),
+                ...diffRemovedUrls(oldProduct.videos, videos),
+            ];
+            if (oldProduct.size_chart_url && oldProduct.size_chart_url !== size_chart_url) {
+                removed.push(oldProduct.size_chart_url);
+            }
+            deleteCloudinaryAssets(removed).catch(() => {});
+        }
+
         // 2. Update Collections
         await supabase.from('product_collections').delete().eq('product_id', id);
         if (collection_ids && collection_ids.length > 0) {
@@ -234,7 +265,8 @@ exports.updateProduct = async (req, res) => {
 
         // 3. Xử lý Variants [ĐÃ SỬA LỖI TẠI ĐÂY]
         // Lấy full thông tin size và color của các biến thể cũ để đối chiếu
-        const { data: oldVariants } = await supabase.from('variants').select('id, size, color, is_deleted').eq('product_id', id);
+        // (kèm image_url để biết ảnh nào bị thay/bỏ mà dọn trên Cloudinary)
+        const { data: oldVariants } = await supabase.from('variants').select('id, size, color, is_deleted, image_url').eq('product_id', id);
         const oldVariantIds = oldVariants.map(v => v.id);
         
         let hasHistory = false;
@@ -253,10 +285,14 @@ exports.updateProduct = async (req, res) => {
                     const existingVariant = oldVariants.find(ov => ov.size === v.size && ov.color === v.color);
 
                     if (existingVariant) {
+                        // [AN TOÀN] Ảnh variant bị thay bằng ảnh khác → dọn ảnh cũ trên Cloudinary
+                        if (existingVariant.image_url && existingVariant.image_url !== (v.image_url || null)) {
+                            deleteCloudinaryAssets([existingVariant.image_url]).catch(() => {});
+                        }
                         // Đã có -> Chỉ Update (Không xóa do có lịch sử kho)
                         await supabase.from('variants')
-                            .update({ 
-                                image_url: v.image_url || null, 
+                            .update({
+                                image_url: v.image_url || null,
                                 sku: v.sku,
                                 color_en: v.color_en || null,
                                 is_deleted: v.is_deleted || false
@@ -283,9 +319,14 @@ exports.updateProduct = async (req, res) => {
             });
         } 
         else {
+            // [AN TOÀN] Ảnh variant cũ không còn được dùng lại ở danh sách mới → dọn trên Cloudinary
+            const newVariantImageUrls = (variants || []).map(v => v.image_url).filter(Boolean);
+            const removedVariantImages = oldVariants.map(v => v.image_url).filter(u => u && !newVariantImageUrls.includes(u));
+            deleteCloudinaryAssets(removedVariantImages).catch(() => {});
+
             // Nếu chưa từng nhập kho, xóa trắng đi làm lại cho sạch
             await supabase.from('variants').delete().eq('product_id', id);
-            
+
             if (variants && variants.length > 0) {
                 const variantData = variants.map(v => ({
                     product_id: id,
@@ -312,10 +353,14 @@ exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
 
+        // [AN TOÀN] Gom media TRƯỚC khi xóa DB, để dọn trên Cloudinary sau khi xóa thành công
+        const { data: productMedia } = await supabase.from('products').select('images, videos, size_chart_url').eq('id', id).single();
+        const { data: variantMedia } = await supabase.from('variants').select('image_url').eq('product_id', id);
+
         await supabase.from('product_collections').delete().eq('product_id', id);
 
         const { data: variants } = await supabase.from('variants').select('id').eq('product_id', id);
-        
+
         if (variants && variants.length > 0) {
             const variantIds = variants.map(v => v.id);
             await supabase.from('inventory_batches').delete().in('variant_id', variantIds);
@@ -325,14 +370,23 @@ exports.deleteProduct = async (req, res) => {
         const { error } = await supabase.from('products').delete().eq('id', id);
 
         if (error) {
-            if (error.code === '23503') { 
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Không thể xóa vì sản phẩm này đã có lịch sử Đơn hàng. Hãy bấm nút "Sửa" và tắt tùy chọn "Trạng thái sản phẩm" để ẩn đi thay vì xóa.' 
+            if (error.code === '23503') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Không thể xóa vì sản phẩm này đã có lịch sử Đơn hàng. Hãy bấm nút "Sửa" và tắt tùy chọn "Trạng thái sản phẩm" để ẩn đi thay vì xóa.'
                 });
             }
             throw error;
         }
+
+        // [AN TOÀN] Xóa xong DB mới dọn Cloudinary — best-effort, không chặn phản hồi
+        const mediaToDelete = [
+            ...(productMedia?.images || []),
+            ...(productMedia?.videos || []),
+            productMedia?.size_chart_url,
+            ...(variantMedia || []).map(v => v.image_url),
+        ].filter(Boolean);
+        deleteCloudinaryAssets(mediaToDelete).catch(() => {});
 
         res.json({ success: true, message: 'Đã xóa sản phẩm và dữ liệu liên quan' });
 

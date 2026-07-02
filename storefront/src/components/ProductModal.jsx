@@ -1,15 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaSpinner } from 'react-icons/fa';
+import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaSpinner, FaVideo } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import imageCompression from 'browser-image-compression';
+import { optimizeImage as getOptimizedImageUrl } from '../utils/cloudinaryHelper';
 
-const getOptimizedImageUrl = (url, width = 200) => {
-    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-    const uploadIndex = url.indexOf('upload/') + 7;
-    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
-    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
-};
+const MAX_VIDEO_BYTES = 15 * 1024 * 1024; // 15MB — khớp giới hạn phía server
+const MAX_VIDEO_SECONDS = 10;
+
+// Đọc thời lượng video ngay trên trình duyệt (chưa cần upload) để chặn sớm file quá dài
+const readVideoDuration = (file) => new Promise((resolve, reject) => {
+    const videoEl = document.createElement('video');
+    videoEl.preload = 'metadata';
+    videoEl.onloadedmetadata = () => {
+        URL.revokeObjectURL(videoEl.src);
+        resolve(videoEl.duration);
+    };
+    videoEl.onerror = () => {
+        URL.revokeObjectURL(videoEl.src);
+        reject(new Error('Không đọc được file video'));
+    };
+    videoEl.src = URL.createObjectURL(file);
+});
 
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [formData, setFormData] = useState({
@@ -25,16 +37,19 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   });
 
   const [images, setImages] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [variants, setVariants] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [categories, setCategories] = useState([]);
-  
+
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
   // [BỔ SUNG color_en]
   const [currentVariant, setCurrentVariant] = useState({ id: null, size: '', color: '', color_en: '', sku: '', image_url: '', is_deleted: false });
   const fileInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   const formatCurrencyInput = (value) => {
       if (!value) return '';
@@ -75,6 +90,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         });
 
         setImages(productToEdit.images || []);
+        setVideos(productToEdit.videos || []);
         setSizeChart(productToEdit.size_chart_url || '');
 
         const safeVariants = productToEdit.variants || [];
@@ -91,6 +107,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       } else {
         setFormData({ name: '', slug: '', base_price: 0, description: '', category_id: '', collection_ids: [], is_active: true, is_preorder: false, preorder_note: '' });
         setImages([]);
+        setVideos([]);
         setVariants([]);
         setSizeChart('');
       }
@@ -161,6 +178,51 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         } finally { 
             setUploading(false); 
             if(fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleVideoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > MAX_VIDEO_BYTES) {
+            toast.error(`Video quá lớn — tối đa ${MAX_VIDEO_BYTES / (1024 * 1024)}MB.`);
+            if (videoInputRef.current) videoInputRef.current.value = '';
+            return;
+        }
+
+        try {
+            const duration = await readVideoDuration(file);
+            if (duration > MAX_VIDEO_SECONDS) {
+                toast.error(`Video dài ${Math.round(duration)}s — tối đa ${MAX_VIDEO_SECONDS}s.`);
+                if (videoInputRef.current) videoInputRef.current.value = '';
+                return;
+            }
+        } catch (err) {
+            toast.error('Không đọc được file video, vui lòng thử file khác.');
+            if (videoInputRef.current) videoInputRef.current.value = '';
+            return;
+        }
+
+        setUploadingVideo(true);
+        try {
+            const uploadData = new FormData();
+            uploadData.append('image', file);
+
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (res.data.success) {
+                setVideos(prev => [...prev, res.data.url]);
+                toast.success('Đã tải lên video');
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Lỗi upload video: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setUploadingVideo(false);
+            if (videoInputRef.current) videoInputRef.current.value = '';
         }
     };
 
@@ -238,6 +300,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
           ...formData, 
           base_price: Number(formData.base_price),
           images,
+          videos,
           variants,
           size_chart_url: sizeChart
       };
@@ -432,6 +495,37 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         <span className="text-[10px] sm:text-xs font-bold text-center px-1">{uploading ? 'Đợi...' : 'Thêm ảnh'}</span>
                     </button>
                     <input type="file" hidden ref={fileInputRef} onChange={handleImageUpload} accept="image/*" multiple />
+                </div>
+
+                {/* VIDEO SẢN PHẨM — nằm chung nhóm với ảnh, hiển thị sau cùng */}
+                <div className="mt-3 pt-3 border-t border-dashed border-stone-200">
+                    <label className="label mb-2 flex flex-wrap justify-between gap-2">
+                        <span>Video sản phẩm (tối đa {MAX_VIDEO_SECONDS}s, {MAX_VIDEO_BYTES / (1024 * 1024)}MB)</span>
+                        {uploadingVideo && <span className="text-blue-600 text-xs animate-pulse">Đang tải video...</span>}
+                    </label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
+                        {videos.map((vid, idx) => (
+                            <div key={idx} className="relative group border border-stone-200 rounded overflow-hidden aspect-square bg-black">
+                                <video src={vid} className="w-full h-full object-cover" muted playsInline />
+                                <div className="absolute top-1 left-1 bg-black/60 text-white p-1 rounded-sm pointer-events-none">
+                                    <FaVideo size={10} />
+                                </div>
+                                <div className="absolute inset-x-0 bottom-0 bg-black/60 flex items-center justify-center px-2 py-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                    <button type="button" onClick={() => setVideos(videos.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-500 p-1 bg-black/40 rounded-sm">
+                                        <FaTrash size={10}/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+
+                        {videos.length === 0 && (
+                            <button onClick={() => videoInputRef.current.click()} disabled={uploadingVideo} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
+                                {uploadingVideo ? <FaSpinner className="animate-spin"/> : <FaVideo size={18} className="mb-1 sm:mb-2"/>}
+                                <span className="text-[10px] sm:text-xs font-bold text-center px-1">{uploadingVideo ? 'Đợi...' : 'Thêm video'}</span>
+                            </button>
+                        )}
+                        <input type="file" hidden ref={videoInputRef} onChange={handleVideoUpload} accept="video/*" />
+                    </div>
                 </div>
             </div>
 

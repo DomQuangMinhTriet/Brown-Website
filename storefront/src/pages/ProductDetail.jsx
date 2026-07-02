@@ -3,21 +3,15 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
-import { FaHistory, FaChevronRight, FaChevronLeft, FaInfoCircle, FaCheckCircle } from 'react-icons/fa';
+import { FaHistory, FaChevronRight, FaChevronLeft, FaInfoCircle, FaCheckCircle, FaPlay } from 'react-icons/fa';
 import SEO from '../components/SEO';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPrice, getEffectivePrice } from '../utils/currencyHelper';
+import { optimizeImage as getOptimizedImageUrl } from '../utils/cloudinaryHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
 import ZoomableProductImage from '../components/ui/ZoomableProductImage';
-
-const getOptimizedImageUrl = (url, width = 800) => {
-    if (!url || !url.includes('cloudinary.com')) return url;
-    const uploadIndex = url.indexOf('upload/') + 7;
-    const transformations = `c_scale,w_${width},f_auto,q_auto/`;
-    return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
-};
 
 const ProductDetail = () => {
     const { slug } = useParams();
@@ -38,30 +32,29 @@ const ProductDetail = () => {
 
         const fetchProductData = async () => {
             try {
-                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
-                if (res.data.success) {
-                    const allProducts = res.data.data;
-                    const found = allProducts.find(p => p.slug === slug);
+                // Chỉ tải đúng 1 sản phẩm theo slug, không kéo cả catalog về client
+                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${slug}`);
+                if (!res.data.success) return;
+                const found = res.data.data;
+                setProduct(found);
+                saveToViewedHistory(found);
 
-                    if (found) {
-                        setProduct(found);
-
-                        const related = allProducts.filter(p =>
-                            p.category_id === found.category_id && p.id !== found.id
-                        ).slice(0, 4);
-                        setRelatedProducts(related);
-
-                        saveToViewedHistory(found);
-
-                        const localHistory = JSON.parse(localStorage.getItem('viewed_products') || '[]');
-                        const validHistory = localHistory
-                            .map(localItem => allProducts.find(realItem => realItem.id === localItem.id))
-                            .filter(item => item !== undefined);
-
-                        localStorage.setItem('viewed_products', JSON.stringify(validHistory));
-                        setViewedProducts(validHistory.filter(p => p.id !== found.id).slice(0, 4));
-                    }
+                // Sản phẩm liên quan: chỉ gọi API cho đúng danh mục của sản phẩm này
+                const catSlug = found.categories?.slug;
+                if (catSlug) {
+                    try {
+                        const relRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?category=${encodeURIComponent(catSlug)}&limit=5`);
+                        if (relRes.data.success) {
+                            setRelatedProducts(relRes.data.data.filter(p => p.id !== found.id).slice(0, 4));
+                        }
+                    } catch (e) { console.error("Lỗi tải sản phẩm liên quan:", e); }
+                } else {
+                    setRelatedProducts([]);
                 }
+
+                // Sản phẩm đã xem: dùng luôn dữ liệu đã cache trong localStorage
+                const localHistory = JSON.parse(localStorage.getItem('viewed_products') || '[]');
+                setViewedProducts(localHistory.filter(p => p.id !== found.id).slice(0, 4));
             } catch (error) {
                 console.error("Lỗi tải sản phẩm:", error);
             }
@@ -77,9 +70,14 @@ const ProductDetail = () => {
         }
     }, [product?.id]);
 
-    // SMART PRELOAD: tải ngầm ảnh trái/phải khi mainImage đổi
+    // Video luôn hiển thị sau cùng, sau tất cả ảnh
+    const galleryMedia = [...(product?.images || []), ...(product?.videos || [])];
+    const videoUrls = new Set(product?.videos || []);
+    const isVideoMedia = (url) => videoUrls.has(url);
+
+    // SMART PRELOAD: tải ngầm ảnh trái/phải khi mainImage đổi (bỏ qua video)
     useEffect(() => {
-        if (!product?.images?.length || !mainImage) return;
+        if (!product?.images?.length || !mainImage || isVideoMedia(mainImage)) return;
 
         const currentIndex = product.images.indexOf(mainImage);
         if (currentIndex === -1) return;
@@ -113,17 +111,17 @@ const ProductDetail = () => {
     const getStock = (variant) => variant ? variant.quantity_remaining : 0;
 
     const handlePrevImage = () => {
-        if (!product?.images?.length) return;
-        const currentIndex = product.images.indexOf(mainImage);
-        const prevIndex = currentIndex <= 0 ? product.images.length - 1 : currentIndex - 1;
-        setMainImage(product.images[prevIndex]);
+        if (galleryMedia.length < 2) return;
+        const currentIndex = galleryMedia.indexOf(mainImage);
+        const prevIndex = currentIndex <= 0 ? galleryMedia.length - 1 : currentIndex - 1;
+        setMainImage(galleryMedia[prevIndex]);
     };
 
     const handleNextImage = () => {
-        if (!product?.images?.length) return;
-        const currentIndex = product.images.indexOf(mainImage);
-        const nextIndex = currentIndex >= product.images.length - 1 ? 0 : currentIndex + 1;
-        setMainImage(product.images[nextIndex]);
+        if (galleryMedia.length < 2) return;
+        const currentIndex = galleryMedia.indexOf(mainImage);
+        const nextIndex = currentIndex >= galleryMedia.length - 1 ? 0 : currentIndex + 1;
+        setMainImage(galleryMedia[nextIndex]);
     };
 
     if (!product) return <div className="flex min-h-screen items-center justify-center font-heading text-muted">{t('product.loading')}</div>;
@@ -145,13 +143,26 @@ const ProductDetail = () => {
                     {/* Cột Trái: Ảnh */}
                     <div className="space-y-4">
                         <div className="group relative aspect-[3/4] overflow-hidden rounded-2xl bg-parchment">
-                            <ZoomableProductImage
-                                src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
-                                alt={product.name}
-                                className="h-full w-full"
-                            />
+                            {isVideoMedia(mainImage) ? (
+                                <video
+                                    key={mainImage}
+                                    src={mainImage}
+                                    className="h-full w-full object-cover"
+                                    controls
+                                    autoPlay
+                                    muted
+                                    loop
+                                    playsInline
+                                />
+                            ) : (
+                                <ZoomableProductImage
+                                    src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
+                                    alt={product.name}
+                                    className="h-full w-full"
+                                />
+                            )}
 
-                            {product.images?.length > 1 && (
+                            {galleryMedia.length > 1 && (
                                 <>
                                     <button onClick={handlePrevImage} aria-label="Ảnh trước"
                                         className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-cream/85 text-cocoa shadow-lg backdrop-blur-sm transition-opacity active:scale-95 md:opacity-0 md:group-hover:opacity-100">
@@ -165,16 +176,25 @@ const ProductDetail = () => {
                             )}
                         </div>
 
-                        {/* Thumbnails */}
-                        {product.images?.length > 1 && (
+                        {/* Thumbnails: ảnh trước, video sau cùng */}
+                        {galleryMedia.length > 1 && (
                             <div className="grid grid-cols-4 gap-2">
-                                {product.images.map((img, idx) => (
+                                {galleryMedia.map((media, idx) => (
                                     <button
                                         key={idx}
-                                        onClick={() => setMainImage(img)}
-                                        className={`aspect-[3/4] overflow-hidden rounded-xl transition-all ${mainImage === img ? 'opacity-100 ring-2 ring-cocoa' : 'opacity-60 hover:opacity-90'}`}
+                                        onClick={() => setMainImage(media)}
+                                        className={`relative aspect-[3/4] overflow-hidden rounded-xl transition-all ${mainImage === media ? 'opacity-100 ring-2 ring-cocoa' : 'opacity-60 hover:opacity-90'}`}
                                     >
-                                        <img src={getOptimizedImageUrl(img, 200)} className="h-full w-full object-cover" alt="" loading="lazy" decoding="async" />
+                                        {isVideoMedia(media) ? (
+                                            <>
+                                                <video src={media} className="h-full w-full object-cover" muted playsInline />
+                                                <span className="absolute inset-0 flex items-center justify-center bg-espresso/20">
+                                                    <FaPlay className="text-cream drop-shadow" size={14} />
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <img src={getOptimizedImageUrl(media, 200)} className="h-full w-full object-cover" alt="" loading="lazy" decoding="async" />
+                                        )}
                                     </button>
                                 ))}
                             </div>

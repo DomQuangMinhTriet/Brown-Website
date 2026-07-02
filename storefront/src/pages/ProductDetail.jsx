@@ -24,6 +24,22 @@ const ProductDetail = () => {
     const [viewedProducts, setViewedProducts] = useState([]);
     const [mainImage, setMainImage] = useState(null);
 
+    const saveToViewedHistory = (currentProduct) => {
+        try {
+            const history = JSON.parse(localStorage.getItem('viewed_products') || '[]');
+            const newHistory = history.filter(item => item.id !== currentProduct.id);
+            newHistory.unshift({
+                id: currentProduct.id,
+                name: currentProduct.name,
+                slug: currentProduct.slug,
+                base_price: currentProduct.base_price,
+                images: currentProduct.images
+            });
+            const limitedHistory = newHistory.slice(0, 8);
+            localStorage.setItem('viewed_products', JSON.stringify(limitedHistory));
+        } catch (e) { console.error(e); }
+    };
+
     useEffect(() => {
         // Reset ngay khi đổi sản phẩm để không hiển thị dữ liệu cũ (URL đã đổi nhưng ảnh/chữ còn của SP trước)
         setProduct(null);
@@ -91,22 +107,6 @@ const ProductDetail = () => {
         const imgNext = new Image();
         imgNext.src = getOptimizedImageUrl(product.images[nextIndex], 800);
     }, [mainImage, product?.images]);
-
-    const saveToViewedHistory = (currentProduct) => {
-        try {
-            const history = JSON.parse(localStorage.getItem('viewed_products') || '[]');
-            const newHistory = history.filter(item => item.id !== currentProduct.id);
-            newHistory.unshift({
-                id: currentProduct.id,
-                name: currentProduct.name,
-                slug: currentProduct.slug,
-                base_price: currentProduct.base_price,
-                images: currentProduct.images
-            });
-            const limitedHistory = newHistory.slice(0, 8);
-            localStorage.setItem('viewed_products', JSON.stringify(limitedHistory));
-        } catch (e) { console.error(e); }
-    };
 
     const getStock = (variant) => variant ? variant.quantity_remaining : 0;
 

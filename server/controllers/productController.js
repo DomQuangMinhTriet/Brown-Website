@@ -107,9 +107,10 @@ exports.getProductBySlug = async (req, res) => {
                     id, size, color, color_en, sku, image_url, is_deleted,
                     inventory_batches ( quantity_remaining )
                 ),
-                categories (id, name, slug)
+                categories!fk_products_main_category (id, name, slug)
             `)
             .eq('slug', slug)
+            .eq('is_active', true)
             .single();
 
         if (error) throw error;

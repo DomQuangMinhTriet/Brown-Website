@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const { verifyCache } = require('../middleware/cacheMiddleware');
 
 // Thêm dòng này vào
 router.get('/export/sapo', productController.exportProductsToSapoExcel);

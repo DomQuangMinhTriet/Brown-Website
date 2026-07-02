@@ -177,6 +177,67 @@ exports.getFinancialReport = async (req, res) => {
     }
 };
 
+// [MỚI] BÁO CÁO SẢN PHẨM BÁN CHẠY THEO THỜI GIAN — dùng cùng bộ lọc trạng thái
+// đơn (completed/shipping) với getFinancialReport để số liệu nhất quán giữa
+// các báo cáo cùng khoảng thời gian.
+exports.getProductSalesReport = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+
+        const startISO = new Date(startDate).toISOString();
+        const endObj = new Date(endDate);
+        endObj.setHours(23, 59, 59, 999);
+        const endISO = endObj.toISOString();
+
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select(`
+                created_at, status,
+                order_items (
+                    quantity, price_at_purchase, cogs_total,
+                    variants ( product_id, products ( id, name, images ) )
+                )
+            `)
+            .in('status', ['completed', 'shipping'])
+            .gte('created_at', startISO)
+            .lte('created_at', endISO);
+
+        if (error) throw error;
+
+        // Gộp theo product_id: tổng số lượng bán, doanh thu, giá vốn
+        const map = {};
+        for (const order of orders) {
+            for (const item of order.order_items || []) {
+                const product = item.variants?.products;
+                if (!product) continue;
+
+                if (!map[product.id]) {
+                    map[product.id] = {
+                        product_id: product.id,
+                        name: product.name,
+                        image: product.images?.[0] || null,
+                        quantity: 0,
+                        revenue: 0,
+                        cogs: 0,
+                    };
+                }
+                map[product.id].quantity += item.quantity || 0;
+                map[product.id].revenue += (item.price_at_purchase || 0) * (item.quantity || 0);
+                map[product.id].cogs += Number(item.cogs_total) || 0;
+            }
+        }
+
+        const list = Object.values(map)
+            .map((p) => ({ ...p, profit: p.revenue - p.cogs }))
+            .sort((a, b) => b.revenue - a.revenue);
+
+        res.json({ success: true, data: list });
+    } catch (error) {
+        console.error("Lỗi báo cáo sản phẩm:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 exports.getMonthlyFinancialReport = async (req, res) => {
     try {
         const { month, year } = req.query;

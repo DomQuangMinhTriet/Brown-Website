@@ -8,8 +8,9 @@ import {
   Title 
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2'; 
-import { FaCalendarAlt, FaFileExcel, FaFilter } from 'react-icons/fa';
+import { FaCalendarAlt, FaFileExcel, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
+import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 // Đăng ký các thành phần biểu đồ
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
@@ -96,6 +97,73 @@ const Reports = () => {
   useEffect(() => {
     fetchReport();
   }, [reportMode, dateValue]);
+
+  // --- BẢNG XẾP HẠNG SẢN PHẨM: bộ lọc nhanh riêng, mặc định Tuần này ---
+  const [productPreset, setProductPreset] = useState('week');
+  const [productCustomStart, setProductCustomStart] = useState(toYMD(new Date()));
+  const [productCustomEnd, setProductCustomEnd] = useState(toYMD(new Date()));
+  const [productSales, setProductSales] = useState([]);
+  const [productSalesLoading, setProductSalesLoading] = useState(true);
+  const [productSort, setProductSort] = useState({ key: 'revenue', dir: 'desc' });
+
+  const getProductDateRange = () => {
+      const today = new Date();
+      if (productPreset === 'week') {
+          const day = today.getDay() || 7;
+          const monday = new Date(today);
+          monday.setDate(monday.getDate() - day + 1);
+          const sunday = new Date(monday);
+          sunday.setDate(sunday.getDate() + 6);
+          return { start: toYMD(monday), end: toYMD(sunday) };
+      }
+      if (productPreset === 'month') {
+          return {
+              start: toYMD(new Date(today.getFullYear(), today.getMonth(), 1)),
+              end: toYMD(new Date(today.getFullYear(), today.getMonth() + 1, 0))
+          };
+      }
+      if (productPreset === 'quarter') {
+          const q = Math.floor(today.getMonth() / 3);
+          return {
+              start: toYMD(new Date(today.getFullYear(), q * 3, 1)),
+              end: toYMD(new Date(today.getFullYear(), q * 3 + 3, 0))
+          };
+      }
+      return { start: productCustomStart, end: productCustomEnd };
+  };
+
+  useEffect(() => {
+      fetchProductSales();
+  }, [productPreset, productCustomStart, productCustomEnd]);
+
+  const fetchProductSales = async () => {
+      setProductSalesLoading(true);
+      try {
+          const { start, end } = getProductDateRange();
+          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/reports/products?startDate=${start}&endDate=${end}`);
+          if (res.data.success) setProductSales(res.data.data);
+      } catch (error) {
+          console.error("Lỗi tải báo cáo sản phẩm:", error);
+      } finally {
+          setProductSalesLoading(false);
+      }
+  };
+
+  const sortedProductSales = useMemo(() => {
+      const arr = [...productSales];
+      const { key, dir } = productSort;
+      arr.sort((a, b) => dir === 'asc' ? a[key] - b[key] : b[key] - a[key]);
+      return arr;
+  }, [productSales, productSort]);
+
+  const handleSortProduct = (key) => {
+      setProductSort(prev => prev.key === key ? { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' });
+  };
+
+  const SortIcon = ({ column }) => {
+      if (productSort.key !== column) return <FaSort className="text-stone-300" size={11} />;
+      return productSort.dir === 'desc' ? <FaSortDown size={11} /> : <FaSortUp size={11} />;
+  };
 
   const fetchReport = async () => {
     setLoading(true);
@@ -374,6 +442,83 @@ const Reports = () => {
             </div>
           </div>
       )}
+
+      {/* BẢNG XẾP HẠNG SẢN PHẨM BÁN CHẠY */}
+      <div className="mt-10 bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                  <h2 className="text-lg font-bold text-stone-800">Bảng xếp hạng sản phẩm</h2>
+                  <p className="text-sm text-stone-500">Số lượng bán, doanh thu, giá vốn & lợi nhuận theo từng sản phẩm</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                  {[['week', 'Tuần này'], ['month', 'Tháng này'], ['quarter', 'Quý này'], ['custom', 'Tùy chọn']].map(([val, label]) => (
+                      <button
+                          key={val}
+                          onClick={() => setProductPreset(val)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${productPreset === val ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+                      >
+                          {label}
+                      </button>
+                  ))}
+                  {productPreset === 'custom' && (
+                      <div className="flex items-center gap-1 ml-1">
+                          <input type="date" value={productCustomStart} onChange={e => setProductCustomStart(e.target.value)} className="border border-stone-200 rounded px-2 py-1.5 text-xs" />
+                          <span className="text-stone-400 text-xs">-</span>
+                          <input type="date" value={productCustomEnd} onChange={e => setProductCustomEnd(e.target.value)} className="border border-stone-200 rounded px-2 py-1.5 text-xs" />
+                      </div>
+                  )}
+              </div>
+          </div>
+
+          <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                  <thead>
+                      <tr className="text-left text-stone-500 border-b border-stone-100 bg-stone-50">
+                          <th className="p-4 font-bold">Sản phẩm</th>
+                          <th className="p-4 font-bold cursor-pointer select-none" onClick={() => handleSortProduct('quantity')}>
+                              <span className="flex items-center justify-end gap-1.5">SL bán <SortIcon column="quantity" /></span>
+                          </th>
+                          <th className="p-4 font-bold cursor-pointer select-none" onClick={() => handleSortProduct('revenue')}>
+                              <span className="flex items-center justify-end gap-1.5">Doanh thu <SortIcon column="revenue" /></span>
+                          </th>
+                          <th className="p-4 font-bold cursor-pointer select-none" onClick={() => handleSortProduct('cogs')}>
+                              <span className="flex items-center justify-end gap-1.5">Giá vốn <SortIcon column="cogs" /></span>
+                          </th>
+                          <th className="p-4 font-bold cursor-pointer select-none" onClick={() => handleSortProduct('profit')}>
+                              <span className="flex items-center justify-end gap-1.5">Lợi nhuận <SortIcon column="profit" /></span>
+                          </th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {sortedProductSales.map(p => (
+                          <tr key={p.product_id} className="border-b border-stone-50 hover:bg-stone-50 transition-colors">
+                              <td className="p-4">
+                                  <div className="flex items-center gap-3">
+                                      {p.image ? (
+                                          <img src={optimizeImage(p.image, 80)} alt="" className="w-10 h-10 rounded object-cover border border-stone-200 shrink-0" loading="lazy" />
+                                      ) : (
+                                          <div className="w-10 h-10 rounded bg-stone-100 border border-stone-200 shrink-0" />
+                                      )}
+                                      <span className="font-medium text-stone-700">{p.name}</span>
+                                  </div>
+                              </td>
+                              <td className="p-4 text-right text-stone-600">{p.quantity}</td>
+                              <td className="p-4 text-right text-stone-700 font-medium">{formatMoney(p.revenue)}</td>
+                              <td className="p-4 text-right text-stone-500">{formatMoney(p.cogs)}</td>
+                              <td className={`p-4 text-right font-bold ${p.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatMoney(p.profit)}</td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+
+              {productSalesLoading && (
+                  <div className="p-10 text-center text-stone-400">Đang tải dữ liệu...</div>
+              )}
+              {!productSalesLoading && sortedProductSales.length === 0 && (
+                  <div className="p-10 text-center text-stone-400">Không có sản phẩm nào được bán trong khoảng thời gian này.</div>
+              )}
+          </div>
+      </div>
     </div>
   );
 };

@@ -150,24 +150,25 @@ exports.checkVoucher = async (req, res) => {
         let lineItems = [];
 
         if (Array.isArray(items) && items.length > 0) {
-            // Lấy giá gốc + trạng thái giảm giá của các SP từ DB (không tin giá client gửi lên)
-            const productIds = [...new Set(items.map(i => i.product_id).filter(Boolean))];
-            const { data: products } = await supabase
-                .from('products')
-                .select('id, base_price, discount_amount, is_discount_active')
-                .in('id', productIds.length ? productIds : [-1]);
+            // Lấy giá gốc + trạng thái giảm giá của các BIẾN THỂ từ DB (không tin giá client gửi lên)
+            const variantIds = [...new Set(items.map(i => i.variant_id).filter(Boolean))];
+            const { data: variants } = await supabase
+                .from('variants')
+                .select('id, discount_amount, is_discount_active, products(id, base_price)')
+                .in('id', variantIds.length ? variantIds : [-1]);
 
-            const pmap = {};
-            (products || []).forEach(p => { pmap[p.id] = p; });
+            const vmap = {};
+            (variants || []).forEach(v => { vmap[v.id] = v; });
 
             lineItems = items.map(i => {
-                const p = pmap[i.product_id];
-                if (!p) return null;
-                const onDiscount = p.is_discount_active && Number(p.discount_amount) > 0;
+                const v = vmap[i.variant_id];
+                if (!v || !v.products) return null;
+                const basePrice = Number(v.products.base_price) || 0;
+                const onDiscount = v.is_discount_active && Number(v.discount_amount) > 0;
                 const unit = onDiscount
-                    ? Math.max(0, Number(p.base_price) - Number(p.discount_amount))
-                    : Number(p.base_price);
-                return { product_id: i.product_id, quantity: Number(i.quantity) || 1, unit_price: unit, on_discount: onDiscount };
+                    ? Math.max(0, basePrice - Number(v.discount_amount))
+                    : basePrice;
+                return { product_id: v.products.id, quantity: Number(i.quantity) || 1, unit_price: unit, on_discount: onDiscount };
             }).filter(Boolean);
         } else if (cartTotal != null) {
             // Fallback tương thích client cũ: coi cả giỏ như 1 dòng, không thuộc SP giảm giá

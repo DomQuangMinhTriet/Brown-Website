@@ -145,7 +145,7 @@ const Checkout = () => {
     try {
         const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions/check`, {
             code: voucherCode,
-            items: cartItems.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
+            items: cartItems.map(i => ({ product_id: i.product_id, variant_id: i.variant_id, quantity: i.quantity })),
             cartTotal: cartTotal
         });
         if (res.data.success) {

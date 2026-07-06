@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { FaPlus, FaTrash, FaTicketAlt, FaTimes, FaTags, FaSearch } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaTicketAlt, FaTimes, FaTags, FaSearch, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { optimizeImage } from '../../utils/cloudinaryHelper';
 
@@ -113,13 +113,17 @@ const Promotions = () => {
     }));
   };
 
-  // --- GIẢM GIÁ TRỰC TIẾP ---
-  const saveDiscount = async (product, { discount_amount, is_discount_active }) => {
+  // --- GIẢM GIÁ TRỰC TIẾP THEO BIẾN THỂ (màu/size) ---
+  const saveVariantDiscount = async (productId, variant, { discount_amount, is_discount_active }) => {
     try {
-      const res = await axios.put(`${API}/api/products/${product.id}/discount`, { discount_amount, is_discount_active });
+      const res = await axios.put(`${API}/api/products/variants/${variant.id}/discount`, { discount_amount, is_discount_active });
       if (res.data.success) {
-        setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, ...res.data.data } : p)));
-        toast.success(`Đã cập nhật giảm giá: ${product.name}`);
+        setProducts(prev => prev.map(p => (
+          p.id === productId
+            ? { ...p, variants: (p.variants || []).map(v => (v.id === variant.id ? { ...v, ...res.data.data } : v)) }
+            : p
+        )));
+        toast.success(`Đã cập nhật giảm giá: ${variant.color} - ${variant.size}`);
       }
     } catch (error) {
       toast.error("Lỗi lưu giảm giá");
@@ -178,18 +182,18 @@ const Promotions = () => {
       {/* ============ PHẦN 2: GIẢM GIÁ TRỰC TIẾP ============ */}
       <div>
         <h2 className="text-2xl font-serif font-bold text-stone-800 mb-2 flex items-center gap-2"><FaTags /> Giảm giá sản phẩm trực tiếp</h2>
-        <p className="text-stone-500 text-sm mb-4">Giảm thẳng theo số tiền trên giá bán. Bật công tắc để áp dụng ngay cho khách và khi tạo đơn. Không cộng dồn với voucher.</p>
+        <p className="text-stone-500 text-sm mb-4">Giảm thẳng theo số tiền trên giá bán, cấu hình riêng cho từng biến thể (màu/size). Bật công tắc để áp dụng ngay cho khách và khi tạo đơn. Không cộng dồn với voucher.</p>
 
         <div className="relative mb-4 max-w-md">
           <FaSearch className="absolute left-3 top-3 text-stone-400" />
           <input className="w-full pl-10 pr-4 py-2 border rounded outline-none" placeholder="Tìm sản phẩm..." value={discountSearch} onChange={e => setDiscountSearch(e.target.value)} />
         </div>
 
-        <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 max-h-[520px] overflow-y-auto">
+        <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 max-h-[620px] overflow-y-auto">
           {discountProducts.length === 0 ? (
             <p className="p-6 text-center text-stone-400">Không có sản phẩm</p>
           ) : (
-            discountProducts.map(p => <DiscountRow key={p.id} product={p} onSave={saveDiscount} money={money} />)
+            discountProducts.map(p => <ProductDiscountGroup key={p.id} product={p} onSaveVariant={saveVariantDiscount} money={money} />)
           )}
         </div>
       </div>
@@ -301,34 +305,66 @@ const Promotions = () => {
   );
 };
 
-// --- 1 dòng sản phẩm trong mục Giảm giá trực tiếp ---
-const DiscountRow = ({ product, onSave, money }) => {
-  const [amount, setAmount] = useState(product.discount_amount || 0);
-  const active = !!product.is_discount_active;
-  const finalPrice = Math.max(0, Number(product.base_price) - (Number(amount) || 0));
+// --- 1 sản phẩm trong mục Giảm giá trực tiếp: dòng cha có thể mở rộng để xem từng biến thể ---
+const ProductDiscountGroup = ({ product, onSaveVariant, money }) => {
+  const [expanded, setExpanded] = useState(false);
+  const variants = (product.variants || []).filter(v => !v.is_deleted);
+  const activeCount = variants.filter(v => v.is_discount_active && Number(v.discount_amount) > 0).length;
 
   return (
-    <div className="flex items-center gap-4 p-3">
-      <img src={optimizeImage(product.images?.[0], 100)} alt="" className="w-12 h-14 object-cover rounded bg-stone-100" loading="lazy" />
+    <div>
+      <button type="button" onClick={() => setExpanded(v => !v)} className="w-full flex items-center gap-4 p-3 text-left hover:bg-stone-50 transition-colors">
+        <img src={optimizeImage(product.images?.[0], 100)} alt="" className="w-12 h-14 object-cover rounded bg-stone-100 shrink-0" loading="lazy" />
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm text-stone-800 truncate">{product.name}</p>
+          <p className="text-xs text-stone-500">
+            Giá gốc: {money(product.base_price)}đ · {variants.length} biến thể
+            {activeCount > 0 && <span className="text-red-600 font-bold"> · {activeCount} đang giảm giá</span>}
+          </p>
+        </div>
+        {expanded ? <FaChevronUp className="text-stone-400 shrink-0" /> : <FaChevronDown className="text-stone-400 shrink-0" />}
+      </button>
+
+      {expanded && (
+        <div className="divide-y divide-stone-100 bg-stone-50/60">
+          {variants.length === 0 ? (
+            <p className="p-3 pl-16 text-xs text-stone-400">Sản phẩm chưa có biến thể (màu/size) nào.</p>
+          ) : (
+            variants.map(v => (
+              <VariantDiscountRow key={v.id} variant={v} basePrice={product.base_price}
+                onSave={(payload) => onSaveVariant(product.id, v, payload)} money={money} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 1 dòng biến thể (màu + size) trong mục Giảm giá trực tiếp ---
+const VariantDiscountRow = ({ variant, basePrice, onSave, money }) => {
+  const [amount, setAmount] = useState(variant.discount_amount || 0);
+  const active = !!variant.is_discount_active;
+  const finalPrice = Math.max(0, Number(basePrice) - (Number(amount) || 0));
+
+  return (
+    <div className="flex items-center gap-4 pl-16 pr-3 py-2.5">
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-sm text-stone-800 truncate">{product.name}</p>
-        <p className="text-xs text-stone-500">
-          Giá gốc: {money(product.base_price)}đ
-          {active && Number(amount) > 0 && <span className="text-red-600 font-bold"> → Còn {money(finalPrice)}đ</span>}
-        </p>
+        <p className="text-sm text-stone-700 truncate">{variant.color} · {variant.size} <span className="text-stone-400">({variant.sku})</span></p>
+        {active && Number(amount) > 0 && <p className="text-xs text-red-600 font-bold">→ Còn {money(finalPrice)}đ</p>}
       </div>
 
       <div className="flex items-center gap-1">
-        <input type="text" className="w-28 p-2 border rounded text-right text-sm outline-none focus:border-stone-800"
+        <input type="text" className="w-24 p-1.5 border rounded text-right text-sm outline-none focus:border-stone-800"
           value={money(amount)}
           onChange={(e) => { const raw = e.target.value.replace(/\./g, ''); if (!isNaN(raw)) setAmount(raw); }}
-          onBlur={() => { if (Number(amount) !== Number(product.discount_amount)) onSave(product, { discount_amount: Number(amount) || 0, is_discount_active: active }); }} />
+          onBlur={() => { if (Number(amount) !== Number(variant.discount_amount)) onSave({ discount_amount: Number(amount) || 0, is_discount_active: active }); }} />
         <span className="text-xs text-stone-400">đ giảm</span>
       </div>
 
       <label className="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" className="sr-only peer" checked={active}
-          onChange={() => onSave(product, { discount_amount: Number(amount) || 0, is_discount_active: !active })} />
+          onChange={() => onSave({ discount_amount: Number(amount) || 0, is_discount_active: !active })} />
         <div className="w-11 h-6 bg-stone-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
       </label>
     </div>

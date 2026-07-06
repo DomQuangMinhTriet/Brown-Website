@@ -209,7 +209,7 @@ const ProductDetail = () => {
                             </h1>
 
                             {(() => {
-                                const eff = getEffectivePrice(product);
+                                const eff = getEffectivePrice(product, selectedVariant);
                                 const cur = lang === 'en' ? 'USD' : 'VND';
                                 return eff.isDiscounted ? (
                                     <p className="mb-3 flex flex-wrap items-baseline gap-3">

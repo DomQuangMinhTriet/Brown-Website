@@ -79,7 +79,7 @@ const CreateOrder = () => {
                 }
                 return prev.map(item => item.variant_id === variant.id ? { ...item, quantity: item.quantity + 1 } : item);
             }
-            const eff = getEffectivePrice(product); // Áp giảm giá trực tiếp nếu SP đang bật
+            const eff = getEffectivePrice(product, variant); // Áp giảm giá trực tiếp theo biến thể nếu đang bật
             return [...prev, {
                 product_id: product.id,
                 variant_id: variant.id,

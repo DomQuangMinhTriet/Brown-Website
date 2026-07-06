@@ -28,10 +28,11 @@ exports.getProducts = async (req, res) => {
                 *,
                 variants (
                     id, size, color, color_en, sku, image_url, is_deleted,
-                    inventory_batches ( quantity_remaining ) 
+                    discount_amount, is_discount_active,
+                    inventory_batches ( quantity_remaining )
                 ),
                 categories!fk_products_main_category (id, name, slug),
-                product_collections ( category_id ) 
+                product_collections ( category_id )
             `)
             .order('created_at', { ascending: false });
 
@@ -105,6 +106,7 @@ exports.getProductBySlug = async (req, res) => {
                 *,
                 variants (
                     id, size, color, color_en, sku, image_url, is_deleted,
+                    discount_amount, is_discount_active,
                     inventory_batches ( quantity_remaining )
                 ),
                 categories!fk_products_main_category (id, name, slug)
@@ -133,7 +135,7 @@ exports.getProductBySlug = async (req, res) => {
 // 3. TẠO SẢN PHẨM MỚI
 exports.createProduct = async (req, res) => {
     try {
-        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
 
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
@@ -156,9 +158,7 @@ exports.createProduct = async (req, res) => {
                 name_en, description_en,
                 is_active: is_active !== undefined ? is_active : true,
                 is_preorder: is_preorder || false,
-                preorder_note: preorder_note || null,
-                discount_amount: Number(discount_amount) || 0,
-                is_discount_active: is_discount_active || false
+                preorder_note: preorder_note || null
             }])
             .select()
             .single();
@@ -201,7 +201,7 @@ exports.createProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note, discount_amount, is_discount_active } = req.body;
+        const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
 
         // [AN TOÀN] Lấy media CŨ trước khi ghi đè, để sau khi lưu xong biết file
         // nào đã bị bỏ đi (đổi ảnh, xóa ảnh, đổi size chart...) mà dọn trên Cloudinary.
@@ -233,9 +233,6 @@ exports.updateProduct = async (req, res) => {
             preorder_note: preorder_note || null
         };
         if (videos !== undefined) generalUpdate.videos = videos;
-        // Chỉ cập nhật trường giảm giá nếu client có gửi (tránh ghi đè khi các form khác không gửi)
-        if (discount_amount !== undefined) generalUpdate.discount_amount = Number(discount_amount) || 0;
-        if (is_discount_active !== undefined) generalUpdate.is_discount_active = !!is_discount_active;
 
         const { error: updateError } = await supabase
             .from('products')
@@ -397,8 +394,8 @@ exports.deleteProduct = async (req, res) => {
     }
 };
 
-// [MỚI] CẬP NHẬT GIẢM GIÁ TRỰC TIẾP CHO 1 SẢN PHẨM (bật/tắt + số tiền giảm)
-exports.updateProductDiscount = async (req, res) => {
+// [MỚI] CẬP NHẬT GIẢM GIÁ TRỰC TIẾP CHO 1 BIẾN THỂ (bật/tắt + số tiền giảm theo màu/size)
+exports.updateVariantDiscount = async (req, res) => {
     try {
         const { id } = req.params;
         const { discount_amount, is_discount_active } = req.body;
@@ -408,10 +405,10 @@ exports.updateProductDiscount = async (req, res) => {
         if (is_discount_active !== undefined) updates.is_discount_active = !!is_discount_active;
 
         const { data, error } = await supabase
-            .from('products')
+            .from('variants')
             .update(updates)
             .eq('id', id)
-            .select('id, name, base_price, discount_amount, is_discount_active')
+            .select('id, product_id, sku, size, color, discount_amount, is_discount_active')
             .single();
 
         if (error) throw error;

@@ -122,7 +122,8 @@ exports.createOrder = async (req, res) => {
                 id,
                 size, color, color_en,
                 current_price,
-                products(id, name, base_price, is_preorder, discount_amount, is_discount_active),
+                discount_amount, is_discount_active,
+                products(id, name, base_price, is_preorder),
                 inventory_batches(quantity_remaining)
             `)
             .in('id', variantIds);
@@ -155,12 +156,12 @@ exports.createOrder = async (req, res) => {
                 });
             }
 
-            // [MỚI] Áp GIẢM GIÁ TRỰC TIẾP của sản phẩm (nếu đang bật)
+            // [MỚI] Áp GIẢM GIÁ TRỰC TIẾP theo biến thể (màu/size), nếu đang bật
             const prod = variant.products;
-            const onDiscount = prod?.is_discount_active && Number(prod?.discount_amount) > 0;
+            const onDiscount = variant.is_discount_active && Number(variant.discount_amount) > 0;
             let realPrice = variant.current_price || prod.base_price;
             if (onDiscount) {
-                realPrice = Math.max(0, realPrice - Number(prod.discount_amount));
+                realPrice = Math.max(0, realPrice - Number(variant.discount_amount));
             }
 
             // Gom dữ liệu để tính voucher theo từng SP (SP đang giảm giá trực tiếp sẽ bị loại khỏi phần tính voucher)

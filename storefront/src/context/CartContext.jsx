@@ -47,7 +47,7 @@ export const CartProvider = ({ children }) => {
                       : item
               );
           } else {
-              const eff = getEffectivePrice(product); // [MỚI] Áp giảm giá trực tiếp (nếu có)
+              const eff = getEffectivePrice(product, variant); // [MỚI] Áp giảm giá trực tiếp theo biến thể (nếu có)
               return [...prev, {
                   product_id: product.id,
                   variant_id: variant.id,

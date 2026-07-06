@@ -10,7 +10,7 @@ router.get('/:slug', productController.getProductBySlug);
 
 // Route Ghi (Không Cache)
 router.post('/', productController.createProduct);
-router.put('/:id/discount', productController.updateProductDiscount); // Bật/tắt & set giảm giá trực tiếp
+router.put('/variants/:id/discount', productController.updateVariantDiscount); // Bật/tắt & set giảm giá trực tiếp theo biến thể (màu/size)
 router.put('/:id', productController.updateProduct);   // Sửa
 router.delete('/:id', productController.deleteProduct); // Xóa
 

@@ -133,15 +133,21 @@ html { scroll-behavior: smooth; }
   justify-content: center;
   background: var(--color-cream);
   animation: preloader-fade 0.6s ease 1.9s forwards;
+  animation-play-state: paused;
 }
 .preloader-word {
   font-family: var(--font-display);
   color: transparent;
   -webkit-text-stroke: 1.6px var(--color-cocoa);
   animation: brown-fill 1.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-play-state: paused;
 }
+/* JS chỉ gắn .is-armed sau khi font Sugo Classic đã tải xong (hoặc hết thời gian chờ an toàn)
+   — tránh chữ đổi hình dạng (font fallback → Sugo Classic) ngay giữa lúc đang chạy animation. */
+.preloader.is-armed { animation-play-state: running; }
+.preloader.is-armed .preloader-word { animation-play-state: running; }
 @media (prefers-reduced-motion: reduce) {
-  .preloader { animation: preloader-fade 0.3s ease 0.2s forwards; }
+  .preloader { animation: preloader-fade 0.3s ease 0.2s forwards; animation-play-state: running; }
   .preloader-word { animation: none; color: var(--color-cocoa); }
 }
 

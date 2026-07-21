@@ -53,6 +53,16 @@ exports.inboundStock = async (req, res) => {
         if (!items || items.length === 0) return res.status(400).json({ success: false, message: "Chưa chọn sản phẩm" });
         if (!store_id) return res.status(400).json({ success: false, message: "Chưa chọn Chi nhánh nhập về" });
 
+        // [MỚI] Server tự kiểm tra lại giá vốn — UI có "required" nhưng đó chỉ là JS phía
+        // client, không chặn được nếu ai đó gọi thẳng API. Chặn ở đây để không lọt lô 0đ.
+        const invalidItem = items.find(item => !(Number(item.cost_price) > 0));
+        if (invalidItem) {
+            return res.status(400).json({
+                success: false,
+                message: `Thiếu giá vốn hợp lệ cho biến thể #${invalidItem.variant_id}. Vui lòng nhập giá vốn > 0 cho tất cả sản phẩm trước khi nhập kho.`
+            });
+        }
+
         // Tính tổng tiền
         const totalCost = items.reduce((sum, item) => sum + (item.quantity * item.cost_price), 0);
 
@@ -193,7 +203,7 @@ exports.adjustStock = async (req, res) => {
   // const supabase = require('../config/supabase'); 
 
   try {
-    const { variant_id, quantity_change, store_id, reason } = req.body;
+    const { variant_id, quantity_change, store_id, reason, cost_price } = req.body;
     const changeAmount = Number(quantity_change);
 
     // 1. Validate cơ bản
@@ -247,34 +257,46 @@ exports.adjustStock = async (req, res) => {
 
     // ==================================================================
     // TRƯỜNG HỢP B: TĂNG KHO (changeAmount > 0)
-    // Sửa lỗi: Phải lấy GIÁ VỐN GẦN NHẤT thay vì để 0
+    // Sửa lỗi: Phải lấy GIÁ VỐN GẦN NHẤT thay vì để 0. Nếu không đoán được
+    // giá và client cũng không tự nhập (cost_price) thì CHẶN, không tạo lô
+    // giá 0đ — tránh làm sai "Tổng giá trị tồn kho".
     // ==================================================================
     else {
-        let estimatedCost = 0;
+        let estimatedCost = Number(cost_price) > 0 ? Number(cost_price) : 0;
 
-        // Tìm giá vốn của lô nhập gần nhất có giá > 0
-        const { data: lastBatch } = await supabase
-            .from('inventory_batches')
-            .select('cost_price')
-            .eq('variant_id', variant_id)
-            .gt('cost_price', 0)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (lastBatch) {
-            estimatedCost = lastBatch.cost_price;
-        } else {
-            // Nếu là sản phẩm mới tinh chưa từng nhập, lấy tạm giá gốc từ bảng variants
-            const { data: variantInfo } = await supabase
-                .from('variants')
-                .select('original_price, products(base_price)')
-                .eq('id', variant_id)
+        if (!estimatedCost) {
+            // Tìm giá vốn của lô nhập gần nhất có giá > 0
+            const { data: lastBatch } = await supabase
+                .from('inventory_batches')
+                .select('cost_price')
+                .eq('variant_id', variant_id)
+                .gt('cost_price', 0)
+                .order('created_at', { ascending: false })
+                .limit(1)
                 .single();
-            
-            if (variantInfo) {
-                estimatedCost = variantInfo.original_price || variantInfo.products?.base_price || 0;
+
+            if (lastBatch) {
+                estimatedCost = lastBatch.cost_price;
+            } else {
+                // Nếu là sản phẩm mới tinh chưa từng nhập, lấy tạm giá gốc từ bảng variants
+                const { data: variantInfo } = await supabase
+                    .from('variants')
+                    .select('original_price, products(base_price)')
+                    .eq('id', variant_id)
+                    .single();
+
+                if (variantInfo) {
+                    estimatedCost = variantInfo.original_price || variantInfo.products?.base_price || 0;
+                }
             }
+        }
+
+        if (!estimatedCost) {
+            return res.status(400).json({
+                success: false,
+                needsCostPrice: true,
+                message: 'Biến thể này chưa từng có giá vốn nào (chưa nhập kho lần nào và cũng chưa có giá gốc). Vui lòng nhập giá vốn thủ công để tiếp tục.'
+            });
         }
 
         // Tạo lô hàng mới với giá vốn vừa tìm được

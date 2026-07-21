@@ -356,7 +356,7 @@ exports.getAllOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, restock, skip_ghn, tracking_code } = req.body; 
+        const { status, restock, skip_ghn, tracking_code, cost_price_overrides } = req.body;
 
         console.log("-------------------------------------------------");
         console.log(`🛠 Đang update đơn #${id} sang trạng thái: ${status}`);
@@ -416,6 +416,12 @@ exports.updateOrderStatus = async (req, res) => {
                 console.log("🔄 Đang xử lý trả hàng (Code hoàn kho thủ công)...");
                 const orderItems = currentOrder.order_items;
                 if (orderItems && orderItems.length > 0) {
+                    const overrides = cost_price_overrides || {};
+
+                    // Pass 1: xác định biến thể nào CHƯA từng có lô kho nào — những biến thể
+                    // này cần giá vốn thủ công (client gửi cost_price_overrides), không tự ý để 0đ.
+                    const batchByVariant = {};
+                    const missing = [];
                     for (const item of orderItems) {
                         const { data: latestBatch } = await supabase.from('inventory_batches')
                             .select('id, quantity_remaining')
@@ -423,7 +429,31 @@ exports.updateOrderStatus = async (req, res) => {
                             .order('created_at', { ascending: false })
                             .limit(1)
                             .single();
-                        
+                        batchByVariant[item.variant_id] = latestBatch || null;
+                        if (!latestBatch && !(Number(overrides[item.variant_id]) > 0)) {
+                            missing.push(item);
+                        }
+                    }
+
+                    if (missing.length > 0) {
+                        return res.status(400).json({
+                            success: false,
+                            needsCostPrice: true,
+                            message: 'Một số biến thể trong đơn chưa từng có lô kho nào — cần nhập giá vốn thủ công trước khi hoàn kho.',
+                            missingCost: missing.map(item => ({
+                                variant_id: item.variant_id,
+                                name: item.variants?.products?.name,
+                                sku: item.variants?.sku,
+                                size: item.variants?.size,
+                                color: item.variants?.color,
+                                quantity: item.quantity
+                            }))
+                        });
+                    }
+
+                    // Pass 2: áp dụng hoàn kho thật
+                    for (const item of orderItems) {
+                        const latestBatch = batchByVariant[item.variant_id];
                         if (latestBatch) {
                             await supabase.from('inventory_batches')
                                 .update({ quantity_remaining: latestBatch.quantity_remaining + item.quantity })
@@ -433,7 +463,8 @@ exports.updateOrderStatus = async (req, res) => {
                                 variant_id: item.variant_id,
                                 original_quantity: item.quantity,
                                 quantity_remaining: item.quantity,
-                                cost_price: 0, is_adjustment: true,
+                                cost_price: Number(overrides[item.variant_id]),
+                                is_adjustment: true,
                                 notes: `Hoàn kho từ đơn trả hàng #${id}`
                             }]);
                         }
@@ -653,17 +684,23 @@ exports.bulkUpdateOrderStatus = async (req, res) => {
                 if (status === 'returned' && restock === true && currentOrder.status !== 'returned') {
                     const orderItems = currentOrder.order_items;
                     if (orderItems && orderItems.length > 0) {
+                        // Pass 1: biến thể nào chưa từng có lô kho nào thì KHÔNG được tự ý tạo lô 0đ —
+                        // fail riêng đơn này (không chặn cả loạt), admin xử lý thủ công qua trang chi tiết đơn.
+                        const batchByVariant = {};
                         for (const item of orderItems) {
                             const { data: batch } = await supabase.from('inventory_batches')
                                 .select('id, quantity_remaining')
                                 .eq('variant_id', item.variant_id)
                                 .order('created_at', { ascending: false }).limit(1).single();
-                            
-                            if (batch) {
-                                await supabase.from('inventory_batches').update({ quantity_remaining: batch.quantity_remaining + item.quantity }).eq('id', batch.id);
-                            } else {
-                                await supabase.from('inventory_batches').insert([{ variant_id: item.variant_id, original_quantity: item.quantity, quantity_remaining: item.quantity, cost_price: 0, is_adjustment: true }]);
+                            batchByVariant[item.variant_id] = batch || null;
+                            if (!batch) {
+                                throw new Error(`Biến thể #${item.variant_id} chưa từng có lô kho nào — cần nhập giá vốn thủ công qua trang chi tiết đơn hàng.`);
                             }
+                        }
+
+                        for (const item of orderItems) {
+                            const batch = batchByVariant[item.variant_id];
+                            await supabase.from('inventory_batches').update({ quantity_remaining: batch.quantity_remaining + item.quantity }).eq('id', batch.id);
                         }
                     }
                 }

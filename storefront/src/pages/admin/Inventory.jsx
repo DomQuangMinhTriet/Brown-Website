@@ -269,12 +269,13 @@ const Inventory = () => {
 
 
   // [MỚI] Tách logic điều chỉnh để dùng Hook KeyedAsync
-  const adjustStockCore = async (variantId, diff) => {
+  const adjustStockCore = async (variantId, diff, costPrice) => {
        const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/inventory/adjust`, {
            variant_id: variantId,
-           quantity_change: diff, 
-           store_id: selectedStore || stores[0]?.id, 
-           reason: "Điều chỉnh nhanh tại Admin"
+           quantity_change: diff,
+           store_id: selectedStore || stores[0]?.id,
+           reason: "Điều chỉnh nhanh tại Admin",
+           ...(costPrice ? { cost_price: costPrice } : {})
        });
 
        if (res.data.success) {
@@ -326,13 +327,32 @@ const Inventory = () => {
       try {
            // GỌI QUA HOOK: Chặn double click & hiện loading
            await adjustStockSafe(variantId, diff);
-           
+
            // Thành công -> Xóa giá trị đang gõ để hiện giá trị thật
            const newEditing = { ...editingStock };
            delete newEditing[variantId];
            setEditingStock(newEditing);
       } catch (error) {
-           toast.error(error.response?.data?.message || error.message);
+           // [MỚI] Biến thể chưa từng có giá vốn — bắt buộc nhập tay thay vì để tạo lô 0đ
+           if (error.response?.data?.needsCostPrice) {
+               const input = window.prompt(`${error.response.data.message}\n\nNhập giá vốn (đ) cho biến thể này:`);
+               const costPrice = Number((input || '').replace(/\D/g, ''));
+               if (input !== null && costPrice > 0) {
+                   try {
+                       await adjustStockSafe(variantId, diff, costPrice);
+                       const newEditing = { ...editingStock };
+                       delete newEditing[variantId];
+                       setEditingStock(newEditing);
+                       return;
+                   } catch (retryError) {
+                       toast.error(retryError.response?.data?.message || retryError.message);
+                   }
+               } else if (input !== null) {
+                   toast.error("Giá vốn không hợp lệ, đã hủy điều chỉnh.");
+               }
+           } else {
+               toast.error(error.response?.data?.message || error.message);
+           }
            const newEditing = { ...editingStock };
            delete newEditing[variantId];
            setEditingStock(newEditing);

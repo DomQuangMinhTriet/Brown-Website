@@ -119,11 +119,23 @@ const Orders = () => {
           });
 
           if (res.data.success) {
-              toast.update(toastId, { render: `Thành công: ${res.data.results.success.length} đơn`, type: "success", isLoading: false, autoClose: 2000 });
-              
-              const updatedList = orders.map(o => selectedIds.includes(o.id) ? { ...o, status: status } : o);
+              const { success: okIds, failed } = res.data.results;
+
+              if (failed.length > 0) {
+                  // [MỚI] Đơn fail (VD: biến thể chưa từng có giá vốn) sẽ không đổi trạng thái —
+                  // hiện rõ lý do để admin qua xử lý thủ công ở trang chi tiết đơn đó.
+                  toast.update(toastId, {
+                      render: `Thành công: ${okIds.length} đơn. Lỗi: ${failed.length} đơn — ${failed[0].reason}${failed.length > 1 ? ` (và ${failed.length - 1} đơn khác)` : ''}`,
+                      type: "warning", isLoading: false, autoClose: 8000
+                  });
+              } else {
+                  toast.update(toastId, { render: `Thành công: ${okIds.length} đơn`, type: "success", isLoading: false, autoClose: 2000 });
+              }
+
+              // Chỉ cập nhật local state cho đơn THỰC SỰ thành công, tránh hiện sai trạng thái cho đơn fail
+              const updatedList = orders.map(o => okIds.includes(o.id) ? { ...o, status: status } : o);
               setOrders(updatedList);
-              setSelectedIds([]); 
+              setSelectedIds([]);
           }
       } catch (error) {
           toast.update(toastId, { render: "Lỗi xử lý", type: "error", isLoading: false, autoClose: 3000 });
@@ -141,17 +153,38 @@ const Orders = () => {
       await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrder.id}/status`, {
         status: newStatus,
         restock: restock,
-        ...extraData 
+        ...extraData
       });
-      
+
       toast.success(`Đã chuyển trạng thái: ${newStatus}`);
-      
+
       const updatedList = orders.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o);
       setOrders(updatedList);
-      
-      setShowModal(false); 
+
+      setShowModal(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Lỗi cập nhật đơn hàng");
+      // [MỚI] Một số biến thể trong đơn chưa từng có lô kho nào — cần nhập giá vốn thủ công
+      // trước khi hoàn kho (tránh tạo lô 0đ làm sai "Tổng giá trị tồn kho").
+      const missingCost = error.response?.data?.missingCost;
+      if (error.response?.data?.needsCostPrice && Array.isArray(missingCost)) {
+        const overrides = {};
+        let cancelled = false;
+        for (const m of missingCost) {
+          const label = `${m.name || ''} - ${m.color || ''} ${m.size || ''} (SKU: ${m.sku || m.variant_id}), SL: ${m.quantity}`;
+          const input = window.prompt(`Biến thể chưa từng có giá vốn:\n${label}\n\nNhập giá vốn (đ):`);
+          const cost = Number((input || '').replace(/\D/g, ''));
+          if (input === null || !(cost > 0)) { cancelled = true; break; }
+          overrides[m.variant_id] = cost;
+        }
+        if (!cancelled) {
+          // await (không return thẳng) để finally bên dưới không chạy sớm khi lần gọi lại còn đang xử lý
+          await handleUpdateStatus(newStatus, restock, { ...extraData, cost_price_overrides: overrides });
+          return;
+        }
+        toast.error("Đã hủy — cần nhập đủ giá vốn cho các biến thể để hoàn kho.");
+      } else {
+        toast.error(error.response?.data?.message || "Lỗi cập nhật đơn hàng");
+      }
     } finally {
       setProcessing(false);
       fetchOrders();

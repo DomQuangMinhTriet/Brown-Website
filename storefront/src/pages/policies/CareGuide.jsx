@@ -13,6 +13,14 @@ const CareGuide = () => {
     { bold: t('policies.care_step2_bold'), text: t('policies.care_step2_text') },
     { bold: t('policies.care_step3_bold'), text: t('policies.care_step3_text') },
     { bold: t('policies.care_step4_bold'), text: t('policies.care_step4_text') },
+    {
+      bold: t('policies.care_step5_bold'),
+      items: [
+        t('policies.care_step5_item1'),
+        t('policies.care_step5_item2'),
+        t('policies.care_step5_item3'),
+      ],
+    },
   ];
 
   return (
@@ -41,8 +49,15 @@ const CareGuide = () => {
                   <tr key={index} className="border-b border-sand/60 align-top last:border-0">
                     <td className="py-4 pr-4 font-heading text-clay">{index + 1}</td>
                     <td className="py-4 text-ink/75">
-                      <span className="font-semibold text-espresso">{step.bold}</span>{' '}
-                      {step.text}
+                      <span className="font-semibold text-espresso">{step.bold}</span>
+                      {step.text && <> {step.text}</>}
+                      {step.items && (
+                        <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-clay">
+                          {step.items.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
                     </td>
                   </tr>
                 ))}

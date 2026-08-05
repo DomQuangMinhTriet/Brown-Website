@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+// eslint-disable-next-line no-unused-vars -- motion được dùng trong JSX.
+import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { FaArrowRight } from 'react-icons/fa';
 import SEO from '../components/SEO';
 import Container from '../components/ui/Container';

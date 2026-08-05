@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useScroll, useMotionValueEvent } from 'framer-motion';
+// eslint-disable-next-line no-unused-vars -- motion được dùng trong JSX (motion.nav).
+import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import { FaSearch, FaShoppingBag, FaUser, FaBars, FaTimes, FaGlobe, FaChevronDown } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';

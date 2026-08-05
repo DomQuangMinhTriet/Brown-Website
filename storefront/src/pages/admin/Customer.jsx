@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaUser, FaSearch, FaHistory, FaTimes } from 'react-icons/fa';

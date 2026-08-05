@@ -3,6 +3,58 @@ const supabase = require('../config/supabase');
 const translate = require('translate-google');
 const { deleteCloudinaryAssets, diffRemovedUrls } = require('../utils/cloudinaryCleanup');
 
+const PRODUCT_SLUG_CONSTRAINT = 'products_slug_key';
+const MAX_SLUG_ATTEMPTS = 100;
+
+const isDuplicateSlugError = (error) =>
+    error?.code === '23505' && (
+        error?.constraint === PRODUCT_SLUG_CONSTRAINT ||
+        error?.message?.includes(PRODUCT_SLUG_CONSTRAINT)
+    );
+
+const slugBase = (slug, name) => {
+    const value = String(slug || name || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+
+    return value.replace(/^-|-$/g, '');
+};
+
+const availableProductSlug = async (base, excludeId) => {
+    for (let suffix = 1; suffix <= MAX_SLUG_ATTEMPTS; suffix++) {
+        const candidate = suffix === 1 ? base : `${base}-${suffix}`;
+        let query = supabase.from('products').select('id').eq('slug', candidate).limit(1);
+        if (excludeId) query = query.neq('id', excludeId);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!data || data.length === 0) return candidate;
+    }
+
+    throw new Error('Không thể tạo slug duy nhất cho sản phẩm này. Vui lòng đổi tên sản phẩm.');
+};
+
+const sortVariantsByDisplayOrder = (variants = []) => [...variants].sort((a, b) => {
+    const first = Number.isFinite(Number(a.display_order)) ? Number(a.display_order) : Number.MAX_SAFE_INTEGER;
+    const second = Number.isFinite(Number(b.display_order)) ? Number(b.display_order) : Number.MAX_SAFE_INTEGER;
+    return first - second || Number(a.id || 0) - Number(b.id || 0);
+});
+
+const withNormalizedDisplayOrder = (variants = []) => {
+    let nextPosition = 0;
+    return variants.map((variant) => ({
+        ...variant,
+        // Các biến thể đang hiển thị luôn có thứ tự liên tục: 0, 1, 2...
+        display_order: variant.is_deleted ? -1 : nextPosition++
+    }));
+};
+
 const autoTranslate = async (text) => {
     if (!text || text.trim() === '') return '';
     // Đảm bảo text là string trước khi gọi .trim() để tránh crash app
@@ -27,7 +79,7 @@ exports.getProducts = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, color_en, sku, image_url, is_deleted,
+                    id, size, color, color_en, sku, image_url, is_deleted, display_order,
                     discount_amount, is_discount_active,
                     inventory_batches ( quantity_remaining )
                 ),
@@ -73,7 +125,7 @@ exports.getProducts = async (req, res) => {
         if (error) throw error;
 
         const productsWithStock = data.map(product => {
-            const validVariants = product.variants ? product.variants.filter(v => v.is_deleted === false) : [];
+            const validVariants = sortVariantsByDisplayOrder(product.variants ? product.variants.filter(v => v.is_deleted === false) : []);
             const variantsWithStock = validVariants.map(v => {
                 const totalStock = v.inventory_batches 
                     ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
@@ -105,7 +157,7 @@ exports.getProductBySlug = async (req, res) => {
             .select(`
                 *,
                 variants (
-                    id, size, color, color_en, sku, image_url, is_deleted,
+                    id, size, color, color_en, sku, image_url, is_deleted, display_order,
                     discount_amount, is_discount_active,
                     inventory_batches ( quantity_remaining )
                 ),
@@ -117,7 +169,7 @@ exports.getProductBySlug = async (req, res) => {
 
         if (error) throw error;
 
-        const validVariants = data.variants ? data.variants.filter(v => v.is_deleted === false) : [];
+        const validVariants = sortVariantsByDisplayOrder(data.variants ? data.variants.filter(v => v.is_deleted === false) : []);
         const variantsWithStock = validVariants.map(v => {
             const totalStock = v.inventory_batches 
                 ? v.inventory_batches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
@@ -137,6 +189,11 @@ exports.createProduct = async (req, res) => {
     try {
         const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
 
+        const baseSlug = slugBase(slug, name);
+        if (!baseSlug) {
+            return res.status(400).json({ success: false, message: 'Tên sản phẩm không hợp lệ để tạo đường dẫn (slug).' });
+        }
+
         const name_en = await autoTranslate(name);
         const description_en = await autoTranslate(description);
 
@@ -149,30 +206,48 @@ exports.createProduct = async (req, res) => {
         //     }
         // }
 
-        const { data: newProduct, error: prodError } = await supabase
-            .from('products')
-            .insert([{
-                name, slug, base_price, description, category_id: category_id || null, images,
-                videos: videos || [],
-                size_chart_url: size_chart_url || null,
-                name_en, description_en,
-                is_active: is_active !== undefined ? is_active : true,
-                is_preorder: is_preorder || false,
-                preorder_note: preorder_note || null
-            }])
-            .select()
-            .single();
+        const productData = {
+            name, base_price, description, category_id: category_id || null, images,
+            videos: videos || [],
+            size_chart_url: size_chart_url || null,
+            name_en, description_en,
+            is_active: is_active !== undefined ? is_active : true,
+            is_preorder: is_preorder || false,
+            preorder_note: preorder_note || null
+        };
 
-        if (prodError) throw prodError;
+        // PostgreSQL giữ unique constraint làm lớp bảo vệ cuối cùng. Nếu có request
+        // đồng thời chiếm slug vừa chọn, vòng lặp sẽ lấy hậu tố tiếp theo và thử lại.
+        let newProduct;
+        let finalSlug;
+        for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+            finalSlug = await availableProductSlug(baseSlug);
+            const { data, error } = await supabase
+                .from('products')
+                .insert([{ ...productData, slug: finalSlug }])
+                .select()
+                .single();
+
+            if (!error) {
+                newProduct = data;
+                break;
+            }
+            if (!isDuplicateSlugError(error)) throw error;
+        }
+
+        if (!newProduct) {
+            throw new Error('Không thể tạo slug duy nhất cho sản phẩm này. Vui lòng thử lại.');
+        }
 
         if (variants && Array.isArray(variants) && variants.length > 0) {
-            const variantData = variants.map(v => ({
+            const variantData = withNormalizedDisplayOrder(variants).map(v => ({
                 product_id: newProduct.id,
                 size: v.size,
                 color: v.color,
                 color_en: v.color_en || null, 
                 sku: v.sku,
                 image_url: v.image_url || null,
+                display_order: v.display_order,
                 is_deleted: v.is_deleted || false
             }));
 
@@ -189,10 +264,21 @@ exports.createProduct = async (req, res) => {
             if (colError) throw colError;
         }
 
-        res.json({ success: true, message: 'Tạo sản phẩm thành công', data: newProduct });
+        const slugAdjusted = finalSlug !== baseSlug;
+        res.json({
+            success: true,
+            message: slugAdjusted
+                ? `Tên sản phẩm đã có, hệ thống dùng slug "${finalSlug}" để tránh trùng.`
+                : 'Tạo sản phẩm thành công',
+            data: newProduct,
+            slugAdjusted
+        });
 
     } catch (error) {
         console.error("Create Product Error:", error); // <-- In lỗi ra Terminal để biết nguyên nhân
+        if (isDuplicateSlugError(error)) {
+            return res.status(409).json({ success: false, message: 'Slug sản phẩm đã tồn tại. Vui lòng thử lại.' });
+        }
         res.status(500).json({ success: false, message: error.message || 'Lỗi server khi tạo sản phẩm' });
     }
 };
@@ -202,6 +288,11 @@ exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, slug, base_price, description, category_id, images, videos, variants, collection_ids, size_chart_url, is_active, is_preorder, preorder_note } = req.body;
+
+        const baseSlug = slugBase(slug, name);
+        if (!baseSlug) {
+            return res.status(400).json({ success: false, message: 'Tên sản phẩm không hợp lệ để tạo đường dẫn (slug).' });
+        }
 
         // [AN TOÀN] Lấy media CŨ trước khi ghi đè, để sau khi lưu xong biết file
         // nào đã bị bỏ đi (đổi ảnh, xóa ảnh, đổi size chart...) mà dọn trên Cloudinary.
@@ -225,7 +316,7 @@ exports.updateProduct = async (req, res) => {
 
         // 1. Update thông tin chung
         const generalUpdate = {
-            name, slug, base_price, description, category_id: category_id || null, images,
+            name, base_price, description, category_id: category_id || null, images,
             size_chart_url: size_chart_url || null,
             name_en, description_en,
             is_active: is_active !== undefined ? is_active : true,
@@ -234,12 +325,22 @@ exports.updateProduct = async (req, res) => {
         };
         if (videos !== undefined) generalUpdate.videos = videos;
 
-        const { error: updateError } = await supabase
-            .from('products')
-            .update(generalUpdate)
-            .eq('id', id);
+        let finalSlug;
+        let updateError;
+        for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+            finalSlug = await availableProductSlug(baseSlug, id);
+            ({ error: updateError } = await supabase
+                .from('products')
+                .update({ ...generalUpdate, slug: finalSlug })
+                .eq('id', id));
 
-        if (updateError) throw updateError;
+            if (!updateError) break;
+            if (!isDuplicateSlugError(updateError)) throw updateError;
+        }
+
+        if (updateError) {
+            throw new Error('Không thể tạo slug duy nhất cho sản phẩm này. Vui lòng thử lại.');
+        }
 
         // [AN TOÀN] Dọn rác Cloudinary cho ảnh/video/size-chart đã bị thay hoặc xóa
         // (best-effort — không chặn phản hồi nếu Cloudinary lỗi tạm thời).
@@ -261,87 +362,55 @@ exports.updateProduct = async (req, res) => {
             await supabase.from('product_collections').insert(collectionData);
         }
 
-        // 3. Xử lý Variants [ĐÃ SỬA LỖI TẠI ĐÂY]
-        // Lấy full thông tin size và color của các biến thể cũ để đối chiếu
-        // (kèm image_url để biết ảnh nào bị thay/bỏ mà dọn trên Cloudinary)
+        // 3. Xử lý biến thể theo id: cho phép sửa trực tiếp size, màu, SKU và thứ tự.
+        // Không xóa/tạo lại biến thể cũ để không làm mất liên kết dữ liệu kho.
         const { data: oldVariants } = await supabase.from('variants').select('id, size, color, is_deleted, image_url').eq('product_id', id);
-        const oldVariantIds = oldVariants.map(v => v.id);
-        
-        let hasHistory = false;
-        if (oldVariantIds.length > 0) {
-            const { count } = await supabase
-                .from('inventory_batches')
-                .select('*', { count: 'exact', head: true })
-                .in('variant_id', oldVariantIds);
-            hasHistory = count > 0;
-        }
+        const variantsToSave = withNormalizedDisplayOrder(variants || []);
 
-        if (hasHistory) {
-            if (variants && variants.length > 0) {
-                for (const v of variants) {
-                    // Kiểm tra xem biến thể này đã có trong DB chưa
-                    const existingVariant = oldVariants.find(ov => ov.size === v.size && ov.color === v.color);
+        for (const v of variantsToSave) {
+            const existingVariant = v.id
+                ? oldVariants.find(ov => String(ov.id) === String(v.id))
+                : null;
+            const variantData = {
+                size: v.size,
+                color: v.color,
+                color_en: v.color_en || null,
+                sku: v.sku,
+                image_url: v.image_url || null,
+                display_order: v.display_order,
+                is_deleted: v.is_deleted || false
+            };
 
-                    if (existingVariant) {
-                        // [AN TOÀN] Ảnh variant bị thay bằng ảnh khác → dọn ảnh cũ trên Cloudinary
-                        if (existingVariant.image_url && existingVariant.image_url !== (v.image_url || null)) {
-                            deleteCloudinaryAssets([existingVariant.image_url]).catch(() => {});
-                        }
-                        // Đã có -> Chỉ Update (Không xóa do có lịch sử kho)
-                        await supabase.from('variants')
-                            .update({
-                                image_url: v.image_url || null,
-                                sku: v.sku,
-                                color_en: v.color_en || null,
-                                is_deleted: v.is_deleted || false
-                            })
-                            .eq('id', existingVariant.id);
-                    } else {
-                        // Chưa có -> Insert mới hoàn toàn
-                        await supabase.from('variants').insert([{
-                            product_id: id,
-                            size: v.size,
-                            color: v.color,
-                            color_en: v.color_en || null, 
-                            sku: v.sku,
-                            image_url: v.image_url || null,
-                            is_deleted: v.is_deleted || false
-                        }]);
-                    }
+            if (existingVariant) {
+                if (existingVariant.image_url && existingVariant.image_url !== variantData.image_url) {
+                    deleteCloudinaryAssets([existingVariant.image_url]).catch(() => {});
                 }
-            }
-            
-            return res.json({ 
-                success: true, 
-                message: 'Cập nhật thành công! Đã thêm biến thể mới (Các biến thể cũ được giữ nguyên do có lịch sử kho).' 
-            });
-        } 
-        else {
-            // [AN TOÀN] Ảnh variant cũ không còn được dùng lại ở danh sách mới → dọn trên Cloudinary
-            const newVariantImageUrls = (variants || []).map(v => v.image_url).filter(Boolean);
-            const removedVariantImages = oldVariants.map(v => v.image_url).filter(u => u && !newVariantImageUrls.includes(u));
-            deleteCloudinaryAssets(removedVariantImages).catch(() => {});
-
-            // Nếu chưa từng nhập kho, xóa trắng đi làm lại cho sạch
-            await supabase.from('variants').delete().eq('product_id', id);
-
-            if (variants && variants.length > 0) {
-                const variantData = variants.map(v => ({
-                    product_id: id,
-                    size: v.size,
-                    color: v.color,
-                    color_en: v.color_en || null, 
-                    sku: v.sku,
-                    image_url: v.image_url || null,
-                    is_deleted: v.is_deleted || false
-                }));
-                await supabase.from('variants').insert(variantData);
+                const { error: variantUpdateError } = await supabase
+                    .from('variants')
+                    .update(variantData)
+                    .eq('id', existingVariant.id)
+                    .eq('product_id', id);
+                if (variantUpdateError) throw variantUpdateError;
+            } else {
+                const { error: variantInsertError } = await supabase
+                    .from('variants')
+                    .insert([{ product_id: id, ...variantData }]);
+                if (variantInsertError) throw variantInsertError;
             }
         }
 
-        res.json({ success: true, message: 'Cập nhật sản phẩm thành công!' });
+        res.json({
+            success: true,
+            message: finalSlug !== baseSlug
+                ? `Cập nhật thành công. Slug đã được đổi thành "${finalSlug}" để tránh trùng.`
+                : 'Cập nhật sản phẩm thành công!',
+            slugAdjusted: finalSlug !== baseSlug
+        });
     } catch (error) {
         console.error("Update Error:", error);
+        if (isDuplicateSlugError(error)) {
+            return res.status(409).json({ success: false, message: 'Slug sản phẩm đã tồn tại. Vui lòng thử lại.' });
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 };

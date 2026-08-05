@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaSpinner, FaVideo } from 'react-icons/fa';
+import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaArrowUp, FaArrowDown, FaSpinner, FaVideo } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import imageCompression from 'browser-image-compression';
 import { optimizeImage as getOptimizedImageUrl } from '../utils/cloudinaryHelper';
@@ -41,6 +41,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [variants, setVariants] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState([]);
 
   const [isCreatingCat, setIsCreatingCat] = useState(false);
@@ -101,6 +102,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
             color_en: v.color_en || '', // [BỔ SUNG map color_en]
             sku: v.sku || '',
             image_url: v.image_url || '',
+            display_order: v.display_order ?? 0,
             is_deleted: v.is_deleted || false
         })));
 
@@ -198,7 +200,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 if (videoInputRef.current) videoInputRef.current.value = '';
                 return;
             }
-        } catch (err) {
+        } catch {
             toast.error('Không đọc được file video, vui lòng thử file khác.');
             if (videoInputRef.current) videoInputRef.current.value = '';
             return;
@@ -243,7 +245,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 setSizeChart(res.data.url);
                 toast.update(toastId, { render: "Đã tải xong!", type: "success", isLoading: false, autoClose: 2000 });
             }
-        } catch (err) {
+        } catch {
             toast.update(toastId, { render: "Lỗi upload", type: "error", isLoading: false, autoClose: 2000 });
         }
     };
@@ -264,6 +266,44 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       setVariants(newVariants);
   };
 
+  const handleVariantChange = (index, changes) => {
+      setVariants(variants.map((variant, variantIndex) =>
+          variantIndex === index ? { ...variant, ...changes } : variant
+      ));
+  };
+
+  const moveVariant = (index, direction) => {
+      const visibleIndexes = variants
+          .map((variant, variantIndex) => variant.is_deleted ? null : variantIndex)
+          .filter(variantIndex => variantIndex !== null);
+      const currentPosition = visibleIndexes.indexOf(index);
+      const targetIndex = visibleIndexes[currentPosition + direction];
+
+      if (targetIndex === undefined) return;
+      const newVariants = [...variants];
+      [newVariants[index], newVariants[targetIndex]] = [newVariants[targetIndex], newVariants[index]];
+      setVariants(newVariants);
+  };
+
+  const validateVariants = () => {
+      const activeVariants = variants.filter(variant => !variant.is_deleted);
+      const seenCombinations = new Set();
+
+      for (const variant of activeVariants) {
+          if (!variant.size?.trim() || !variant.color?.trim() || !variant.sku?.trim()) {
+              toast.warn('Mỗi biến thể cần có Size, Màu và SKU.');
+              return false;
+          }
+          const combination = `${variant.size.trim().toLowerCase()}|${variant.color.trim().toLowerCase()}`;
+          if (seenCombinations.has(combination)) {
+              toast.warn(`Biến thể ${variant.size} - ${variant.color} đang bị trùng.`);
+              return false;
+          }
+          seenCombinations.add(combination);
+      }
+      return true;
+  };
+
   const toSlug = (str) => {
       return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-');
   };
@@ -281,7 +321,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
               setNewCatName('');
               toast.success("Tạo danh mục thành công!");
           }
-      } catch (err) { toast.error("Lỗi tạo danh mục"); }
+      } catch { toast.error("Lỗi tạo danh mục"); }
   };
 
   const moveImage = (index, direction) => {
@@ -295,6 +335,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
 
   const handleSubmit = async () => {
       if(!formData.name || !formData.base_price) return toast.warn("Tên và giá là bắt buộc");
+      if (isSaving || uploading) return;
+      if (!validateVariants()) return;
 
       const payload = {
           ...formData, 
@@ -305,24 +347,35 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
           size_chart_url: sizeChart
       };
 
+      setIsSaving(true);
       try {
           if (productToEdit) {
               const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/products/${productToEdit.id}`, payload);
               if(res.data.success) {
-                  toast.success("Cập nhật thành công!");
+                  if (res.data.slugAdjusted) {
+                      toast.info(res.data.message);
+                  } else {
+                      toast.success(res.data.message || "Cập nhật thành công!");
+                  }
                   onSuccess();
                   onClose();
               }
           } else {
               const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, payload);
               if(res.data.success) {
-                  toast.success("Tạo sản phẩm thành công!");
+                  if (res.data.slugAdjusted) {
+                      toast.info(res.data.message);
+                  } else {
+                      toast.success(res.data.message || "Tạo sản phẩm thành công!");
+                  }
                   onSuccess();
                   onClose();
               }
           }
       } catch (error) {
           toast.error("Lỗi: " + (error.response?.data?.message || error.message));
+      } finally {
+          setIsSaving(false);
       }
   };
 
@@ -584,20 +637,19 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 <div className="space-y-3 max-h-[40vh] sm:max-h-60 overflow-y-auto pr-1">
                     {variants.map((v, idx) => {
                         if (v.is_deleted) return null;
-                        return (<div key={idx} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white p-3 rounded border border-stone-200 shadow-sm">
-                            
-                            <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto flex-1">
-                                <span className="font-bold min-w-[40px] text-center bg-stone-100 px-2 py-1 rounded text-sm">{v.size}</span>
-                                {/* [BỔ SUNG hiển thị color_en] */}
-                                <span className="text-stone-600 min-w-[60px] truncate text-sm font-medium">
-                                    {v.color} {v.color_en && <span className="text-xs font-normal text-stone-400">({v.color_en})</span>}
-                                </span>
-                                <span className="font-mono text-stone-500 text-xs py-1 px-2 bg-stone-50 border border-stone-100 rounded ml-auto sm:ml-0">{v.sku}</span>
+                        return (<div key={v.id || `new-${idx}`} className="flex flex-col gap-3 bg-white p-3 rounded border border-stone-200 shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="w-6 text-center text-xs font-bold text-stone-400">{variants.filter((variant, index) => !variant.is_deleted && index <= idx).length}</span>
+                                <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                                    <input aria-label="Size" className="input text-sm py-2" placeholder="Size" value={v.size} onChange={e => handleVariantChange(idx, { size: e.target.value })} />
+                                    <input aria-label="Màu tiếng Việt" className="input text-sm py-2" placeholder="Màu (VN)" value={v.color} onChange={e => handleVariantChange(idx, { color: e.target.value })} />
+                                    <input aria-label="Màu tiếng Anh" className="input text-sm py-2" placeholder="Màu (EN)" value={v.color_en} onChange={e => handleVariantChange(idx, { color_en: e.target.value })} />
+                                    <input aria-label="SKU" className="input text-sm py-2" placeholder="SKU" value={v.sku} onChange={e => handleVariantChange(idx, { sku: e.target.value })} />
+                                </div>
                             </div>
-                            
-                            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+
+                            <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2">
                                 <div className="flex items-center gap-2">
-                                    {/* HIỂN THỊ ẢNH THUMBNAIL */}
                                     {v.image_url ? (
                                         <div className="w-10 h-10 rounded border border-stone-200 overflow-hidden relative group cursor-pointer shrink-0">
                                             <img 
@@ -620,15 +672,10 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                         </div>
                                     )}
 
-                                    {/* MENU CHỌN ẢNH */}
                                     <select 
                                         className="border border-stone-300 rounded text-xs p-1.5 w-[120px] sm:max-w-[120px] focus:border-stone-800 outline-none bg-white"
                                         value={v.image_url || ""}
-                                        onChange={(e) => {
-                                            const newVars = [...variants];
-                                            newVars[idx].image_url = e.target.value;
-                                            setVariants(newVars);
-                                        }}
+                                        onChange={e => handleVariantChange(idx, { image_url: e.target.value })}
                                     >
                                         <option value="">-- Chọn ảnh --</option>
                                         {images.map((img, i) => (
@@ -636,10 +683,18 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                                         ))}
                                     </select>
                                 </div>
-                                
-                                <button onClick={() => handleRemoveVariant(idx)} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors shrink-0">
+
+                                <div className="ml-auto flex items-center gap-1">
+                                    <button type="button" onClick={() => moveVariant(idx, -1)} aria-label="Đưa biến thể lên" title="Đưa lên" className="p-2 rounded text-stone-500 hover:bg-stone-100 disabled:opacity-30" disabled={variants.findIndex(variant => !variant.is_deleted) === idx}>
+                                        <FaArrowUp size={14}/>
+                                    </button>
+                                    <button type="button" onClick={() => moveVariant(idx, 1)} aria-label="Đưa biến thể xuống" title="Đưa xuống" className="p-2 rounded text-stone-500 hover:bg-stone-100 disabled:opacity-30" disabled={[...variants].reverse().findIndex(variant => !variant.is_deleted) === variants.length - 1 - idx}>
+                                        <FaArrowDown size={14}/>
+                                    </button>
+                                    <button type="button" onClick={() => handleRemoveVariant(idx)} aria-label="Xóa biến thể" title="Xóa biến thể" className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors shrink-0">
                                     <FaTrash size={14}/>
-                                </button>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         );
@@ -655,9 +710,9 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         {/* FOOTER */}
         <div className="p-4 sm:p-6 border-t border-stone-100 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-stone-50 rounded-b-xl sticky bottom-0 shrink-0">
             <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 rounded font-bold text-stone-500 hover:bg-stone-200 transition-colors">Hủy bỏ</button>
-            <button onClick={handleSubmit} disabled={uploading} className="w-full sm:w-auto px-8 py-3 rounded font-bold text-white bg-stone-900 hover:bg-black transition-colors shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-wide">
-                {uploading && <FaSpinner className="animate-spin"/>}
-                {uploading ? 'Đang lưu...' : (productToEdit ? 'Lưu thay đổi' : 'Tạo sản phẩm')}
+            <button onClick={handleSubmit} disabled={uploading || isSaving} className="w-full sm:w-auto px-8 py-3 rounded font-bold text-white bg-stone-900 hover:bg-black transition-colors shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-wide">
+                {(uploading || isSaving) && <FaSpinner className="animate-spin"/>}
+                {(uploading || isSaving) ? 'Đang lưu...' : (productToEdit ? 'Lưu thay đổi' : 'Tạo sản phẩm')}
             </button>
         </div>
 

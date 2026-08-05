@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect, useContext, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { getEffectivePrice } from '../utils/currencyHelper';

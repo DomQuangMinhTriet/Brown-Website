@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 // client/src/context/AdminAuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 // [QUAN TRỌNG] Import client chung, KHÔNG ĐƯỢC TỰ TẠO CLIENT MỚI

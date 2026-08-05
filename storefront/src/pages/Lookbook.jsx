@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { motion } from 'framer-motion';
 import SEO from '../components/SEO';
 import Container from '../components/ui/Container';
 import LookbookBlocks from '../components/lookbook/LookbookBlocks';

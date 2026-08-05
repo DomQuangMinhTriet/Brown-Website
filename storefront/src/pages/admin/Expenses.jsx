@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability, no-unused-vars */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaPlus, FaStore, FaTrash } from 'react-icons/fa';

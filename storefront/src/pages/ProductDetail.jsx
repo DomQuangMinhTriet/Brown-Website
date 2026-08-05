@@ -11,7 +11,6 @@ import { optimizeImage as getOptimizedImageUrl } from '../utils/cloudinaryHelper
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
-import ZoomableProductImage from '../components/ui/ZoomableProductImage';
 
 const ProductDetail = () => {
     const { slug } = useParams();
@@ -41,18 +40,18 @@ const ProductDetail = () => {
     };
 
     useEffect(() => {
-        // Reset ngay khi đổi sản phẩm để không hiển thị dữ liệu cũ (URL đã đổi nhưng ảnh/chữ còn của SP trước)
-        setProduct(null);
-        setSelectedVariant(null);
-        setMainImage(null);
-
         const fetchProductData = async () => {
+            // Reset ngay khi đổi sản phẩm để không hiển thị dữ liệu cũ (URL đã đổi nhưng ảnh/chữ còn của SP trước)
+            setProduct(null);
+            setSelectedVariant(null);
+            setMainImage(null);
             try {
                 // Chỉ tải đúng 1 sản phẩm theo slug, không kéo cả catalog về client
                 const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${slug}`);
                 if (!res.data.success) return;
                 const found = res.data.data;
                 setProduct(found);
+                setMainImage(found.images?.[0] || null);
                 saveToViewedHistory(found);
 
                 // Sản phẩm liên quan: chỉ gọi API cho đúng danh mục của sản phẩm này
@@ -80,20 +79,18 @@ const ProductDetail = () => {
         window.scrollTo(0, 0);
     }, [slug]);
 
-    useEffect(() => {
-        if (product?.images?.length > 0 && !mainImage) {
-            setMainImage(product.images[0]);
-        }
-    }, [product?.id]);
-
     // Video luôn hiển thị sau cùng, sau tất cả ảnh
     const galleryMedia = [...(product?.images || []), ...(product?.videos || [])];
     const videoUrls = new Set(product?.videos || []);
     const isVideoMedia = (url) => videoUrls.has(url);
+    const orderedVariants = [...(product?.variants || [])].sort((first, second) =>
+        Number(first.display_order ?? Number.MAX_SAFE_INTEGER) - Number(second.display_order ?? Number.MAX_SAFE_INTEGER)
+        || Number(first.id) - Number(second.id)
+    );
 
     // SMART PRELOAD: tải ngầm ảnh trái/phải khi mainImage đổi (bỏ qua video)
     useEffect(() => {
-        if (!product?.images?.length || !mainImage || isVideoMedia(mainImage)) return;
+        if (!product?.images?.length || !mainImage || (product?.videos || []).includes(mainImage)) return;
 
         const currentIndex = product.images.indexOf(mainImage);
         if (currentIndex === -1) return;
@@ -106,7 +103,7 @@ const ProductDetail = () => {
 
         const imgNext = new Image();
         imgNext.src = getOptimizedImageUrl(product.images[nextIndex], 800);
-    }, [mainImage, product?.images]);
+    }, [mainImage, product?.images, product?.videos]);
 
     const getStock = (variant) => variant ? variant.quantity_remaining : 0;
 
@@ -155,10 +152,11 @@ const ProductDetail = () => {
                                     playsInline
                                 />
                             ) : (
-                                <ZoomableProductImage
+                                <img
                                     src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
                                     alt={product.name}
-                                    className="h-full w-full"
+                                    className="h-full w-full object-cover"
+                                    fetchPriority="high"
                                 />
                             )}
 
@@ -231,7 +229,7 @@ const ProductDetail = () => {
                             <div className="mb-8">
                                 <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted">{t('product.select_variant')}</label>
                                 <div className="flex flex-wrap gap-2">
-                                    {product.variants?.map(variant => (
+                                    {orderedVariants.map(variant => (
                                         <button
                                             key={variant.id}
                                             onClick={() => {

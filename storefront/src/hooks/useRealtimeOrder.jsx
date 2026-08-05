@@ -23,7 +23,7 @@ const useRealtimeOrder = () => {
           // 1. Phát âm thanh
           try {
             const audio = new Audio('/sounds/notification.mp3'); // Đảm bảo file này tồn tại trong public/sounds/
-            audio.play().catch(err => console.log('Chưa tương tác user nên browser chặn auto-play'));
+            audio.play().catch(() => console.log('Chưa tương tác user nên browser chặn auto-play'));
           } catch (e) {
             console.error("Lỗi phát âm thanh", e);
           }

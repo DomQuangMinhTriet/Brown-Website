@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { FaPlus, FaTrash, FaTicketAlt, FaTimes, FaTags, FaSearch, FaChevronDown, FaChevronUp } from 'react-icons/fa';

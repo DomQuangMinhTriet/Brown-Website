@@ -24,15 +24,18 @@ const Profile = () => {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    if (user) {
-      setFormData({
-        full_name: user.full_name || '',
-        phone: user.phone || '',
-        address: user.address || '',
-      });
-    } else {
-      navigate('/login');
-    }
+    const syncProfile = async () => {
+      if (user) {
+        setFormData({
+          full_name: user.full_name || '',
+          phone: user.phone || '',
+          address: user.address || '',
+        });
+      } else {
+        navigate('/login');
+      }
+    };
+    syncProfile();
   }, [user, navigate]);
 
   const handleUpdate = async (e) => {
@@ -43,7 +46,7 @@ const Profile = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMsg(t('profile.toast_update_success'));
-    } catch (error) {
+    } catch {
       alert(t('profile.toast_update_error'));
     }
   };

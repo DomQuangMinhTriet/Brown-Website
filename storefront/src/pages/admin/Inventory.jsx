@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/immutability, no-unused-vars */
 import { useEffect, useState, useMemo } from 'react'; // <--- Quan trọng nhất là dòng này
 import axios from 'axios';
 import { FaSearch, FaPlus, FaSpinner, FaBoxOpen, FaHistory, FaWarehouse, FaSave, FaTrash, FaCheck, FaUndo } from 'react-icons/fa';

@@ -33,6 +33,7 @@ const CareGuide = lazy(() => import('./pages/policies/CareGuide'));
 // nên toàn bộ trang admin được lazy-load — chỉ tải khi có người thực sự vào /admin/*.
 import useRealtimeOrder from './hooks/useRealtimeOrder';
 import AdminRoute from './components/AdminRoute';
+import AdminLoadingOverlay from './components/AdminLoadingOverlay';
 const Sidebar = lazy(() => import('./components/Sidebar'));
 const Header = lazy(() => import('./components/Header'));
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -55,6 +56,7 @@ const AdminLayoutWrapper = () => {
 
   return (
     <div className="flex min-h-screen bg-stone-50 text-stone-800 text-base font-sans">
+      <AdminLoadingOverlay />
       {/* 1. OVERLAY ĐEN (Chỉ hiện trên mobile khi mở menu) */}
       {isSidebarOpen && (
         <div 
@@ -109,9 +111,6 @@ function App() {
 
     if (localVersion !== APP_VERSION) {
       console.log("Phát hiện version cũ, đang dọn dẹp hệ thống...");
-      
-      // Lưu lại token đăng nhập (nếu không muốn khách bị văng ra ngoài)
-      const token = localStorage.getItem("sb-xxxx-auth-token"); // Thay bằng key supabase của bạn nếu cần, không thì bỏ qua
       
       // Quét sạch rác cũ
       localStorage.clear();

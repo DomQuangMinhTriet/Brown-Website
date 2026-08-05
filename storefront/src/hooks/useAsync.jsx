@@ -8,9 +8,7 @@ export const useAsync = (asyncFunction) => {
     if (loading) return; // Chặn nếu đang chạy
     setLoading(true);
     try {
-      await asyncFunction(...args);
-    } catch (error) {
-      throw error; // Ném lỗi ra để component xử lý tiếp nếu cần
+      return await asyncFunction(...args);
     } finally {
       setLoading(false);
     }
@@ -29,9 +27,7 @@ export const useKeyedAsync = (asyncFunction) => {
 
     setProcessingKeys(prev => ({ ...prev, [key]: true }));
     try {
-      await asyncFunction(key, ...args);
-    } catch (error) {
-      throw error;
+      return await asyncFunction(key, ...args);
     } finally {
       setProcessingKeys(prev => {
         const newState = { ...prev };

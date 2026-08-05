@@ -44,7 +44,7 @@ const Collection = () => {
         }
     };
     fetchCategoryName();
-  }, [categorySlug, searchQuery]);
+  }, [categorySlug, searchQuery, t]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -65,7 +65,7 @@ const Collection = () => {
     };
     fetchProducts();
     setVisibleCount(12);
-  }, [searchParams]);
+  }, [categorySlug, searchQuery]);
 
   return (
     <div className={isPosMode ? 'min-h-screen bg-parchment/40 pb-24' : 'bg-cream'}>

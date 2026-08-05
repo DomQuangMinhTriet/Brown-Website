@@ -75,7 +75,6 @@ const CareGuide = () => {
             <li>{t('policies.care_note1')}</li>
             <li>{t('policies.care_note2')}</li>
             <li>{t('policies.care_note3')}</li>
-            <li className="font-semibold text-espresso">{t('policies.care_note4')}</li>
           </ul>
         </section>
 

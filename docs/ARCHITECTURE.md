@@ -10,7 +10,7 @@ Hệ thống gồm 3 phần chính nằm trong cùng một repository (monorepo 
 |---------|---------|-----------|
 | `storefront/` | Ứng dụng web React (gộp cả storefront cho khách và admin dashboard) | React 19 + Vite |
 | `server/` | REST API backend | Node.js + Express 5 |
-| `database/` | Schema PostgreSQL và dữ liệu mẫu | Supabase / PostgreSQL |
+| `database/` | SQL khởi tạo cục bộ, không theo dõi bởi Git | Supabase / PostgreSQL |
 
 > **Lưu ý:** Storefront và Admin **dùng chung một codebase React**. Phần admin được phân tách bằng route `/admin/*` và bảo vệ bởi `AdminRoute` (xem [FRONTEND.md](FRONTEND.md)).
 
@@ -72,7 +72,7 @@ Mỗi lần nhập hàng tạo một **lô** (`inventory_batches`). Khi bán, h�
 
 - Danh sách `allowedOrigins` được cấu hình trong `server/server.js` (localhost + domain production).
 - Token Supabase được xác thực ở backend cho mọi thao tác ghi.
-- Khóa `anon` của Supabase chỉ có quyền `SELECT` (cấu hình `GRANT` trong `full_schema_data.sql`).
+- Khóa `anon` của Supabase chỉ có quyền đọc nội dung công khai (cấu hình RLS/GRANT trong `brownvn_complete.sql`).
 
 ## 6. Tích hợp dịch vụ ngoài
 

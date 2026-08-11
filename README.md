@@ -51,7 +51,7 @@
                                ▼
                   ┌──────────────────────────┐
                   │   Supabase / PostgreSQL  │
-                  │ (full_schema_data.sql)   │
+                  │ (brownvn_complete.sql)   │
                   └──────────────────────────┘
 
 Dịch vụ ngoài: Cloudinary (ảnh) · Resend/SMTP (email) · GHN (vận chuyển) · PayPal
@@ -89,7 +89,7 @@ Brown-Website/
 │   ├── services/           # emailService, shippingService
 │   ├── middleware/         # auth, cache, validate
 │   └── validators/         # Zod schema
-├── database/          # full_schema_data.sql (file tổng) + certificate SSL
+├── database/          # SQL khởi tạo cục bộ (bị Git ignore)
 └── docs/              # Tài liệu dự án
 ```
 

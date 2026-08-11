@@ -53,7 +53,7 @@ const Promotions = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`${API}/api/products?admin=true`);
+      const res = await axios.get(`${API}/api/products?admin=true&view=card`);
       setProducts(res.data.success ? res.data.data : []);
     } catch (error) {
       console.error("Lỗi tải sản phẩm:", error);

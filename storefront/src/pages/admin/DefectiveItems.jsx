@@ -32,7 +32,7 @@ const DefectiveItems = () => {
 
   const fetchProducts = async () => {
       try {
-          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true`);
+          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true&view=card`);
           if (res.data.success) setProducts(res.data.data);
       } catch (error) {
           console.error(error);

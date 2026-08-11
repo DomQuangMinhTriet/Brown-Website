@@ -4,9 +4,10 @@ import { FaTimes, FaUpload, FaTrash, FaPlus, FaArrowLeft, FaArrowRight, FaArrowU
 import { toast } from 'react-toastify';
 import imageCompression from 'browser-image-compression';
 import { optimizeImage as getOptimizedImageUrl } from '../utils/cloudinaryHelper';
+import { clearApiCache } from '../utils/apiCache';
 
-const MAX_VIDEO_BYTES = 15 * 1024 * 1024; // 15MB — khớp giới hạn phía server
-const MAX_VIDEO_SECONDS = 10;
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024; // 40MB — khớp giới hạn phía server
+const MAX_VIDEO_SECONDS = 30;
 
 // Đọc thời lượng video ngay trên trình duyệt (chưa cần upload) để chặn sớm file quá dài
 const readVideoDuration = (file) => new Promise((resolve, reject) => {
@@ -47,6 +48,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [sizeChart, setSizeChart] = useState('');
+  const [draggedImageIndex, setDraggedImageIndex] = useState(null);
+  const [draggedVideoIndex, setDraggedVideoIndex] = useState(null);
   // [BỔ SUNG color_en]
   const [currentVariant, setCurrentVariant] = useState({ id: null, size: '', color: '', color_en: '', sku: '', image_url: '', is_deleted: false });
   const fileInputRef = useRef(null);
@@ -147,8 +150,8 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
         const newImages = [];
 
         const options = {
-            maxSizeMB: 1,          
-            maxWidthOrHeight: 1500,  
+            maxSizeMB: 3,
+            maxWidthOrHeight: 2400,
             useWebWorker: true
         };
 
@@ -333,6 +336,16 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
       }
   };
 
+  const moveMediaByDrag = (setMedia, sourceIndex, targetIndex) => {
+      if (sourceIndex === null || sourceIndex === targetIndex) return;
+      setMedia((current) => {
+          const reordered = [...current];
+          const [moved] = reordered.splice(sourceIndex, 1);
+          reordered.splice(targetIndex, 0, moved);
+          return reordered;
+      });
+  };
+
   const handleSubmit = async () => {
       if(!formData.name || !formData.base_price) return toast.warn("Tên và giá là bắt buộc");
       if (isSaving || uploading) return;
@@ -357,6 +370,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                   } else {
                       toast.success(res.data.message || "Cập nhật thành công!");
                   }
+                  clearApiCache('/api/products');
                   onSuccess();
                   onClose();
               }
@@ -368,6 +382,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                   } else {
                       toast.success(res.data.message || "Tạo sản phẩm thành công!");
                   }
+                  clearApiCache('/api/products');
                   onSuccess();
                   onClose();
               }
@@ -522,14 +537,20 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                     {images.map((img, idx) => (
-                        <div key={idx} className="relative group border border-stone-200 rounded overflow-hidden aspect-square bg-stone-100">
+                        <div key={img} draggable
+                            onDragStart={() => setDraggedImageIndex(idx)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={() => { moveMediaByDrag(setImages, draggedImageIndex, idx); setDraggedImageIndex(null); }}
+                            onDragEnd={() => setDraggedImageIndex(null)}
+                            className={`relative group border border-stone-200 rounded-xl overflow-hidden aspect-[4/5] bg-stone-100 cursor-grab active:cursor-grabbing ${draggedImageIndex === idx ? 'opacity-40 ring-2 ring-cocoa' : ''}`}>
                             <img 
-                                src={getOptimizedImageUrl(img, 200)} 
+                                    src={getOptimizedImageUrl(img, 400)}
                                 alt="" 
                                 className="w-full h-full object-cover" 
                                 loading="lazy" 
                             />
-                            <div className="absolute inset-x-0 bottom-0 bg-black/60 flex items-center justify-between px-2 py-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                            <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-[10px] font-bold text-white">{idx + 1}</span>
+                                <div className="absolute inset-x-0 bottom-0 bg-black/60 flex items-center justify-between px-2 py-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                 <button type="button" onClick={() => moveImage(idx, -1)} className="text-white hover:text-stone-300 p-1 bg-black/40 rounded-sm">
                                     <FaArrowLeft size={10}/>
                                 </button>
@@ -543,7 +564,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         </div>
                     ))}
                     
-                    <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
+                    <button onClick={() => fileInputRef.current.click()} disabled={uploading} className="aspect-[4/5] border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
                         {uploading ? <FaSpinner className="animate-spin"/> : <FaUpload size={18} className="mb-1 sm:mb-2"/>}
                         <span className="text-[10px] sm:text-xs font-bold text-center px-1">{uploading ? 'Đợi...' : 'Thêm ảnh'}</span>
                     </button>
@@ -558,7 +579,12 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                     </label>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                         {videos.map((vid, idx) => (
-                            <div key={idx} className="relative group border border-stone-200 rounded overflow-hidden aspect-square bg-black">
+                            <div key={vid} draggable
+                                onDragStart={() => setDraggedVideoIndex(idx)}
+                                onDragOver={(event) => event.preventDefault()}
+                                onDrop={() => { moveMediaByDrag(setVideos, draggedVideoIndex, idx); setDraggedVideoIndex(null); }}
+                                onDragEnd={() => setDraggedVideoIndex(null)}
+                                className={`relative group border border-stone-200 rounded-xl overflow-hidden aspect-[4/5] bg-black cursor-grab active:cursor-grabbing ${draggedVideoIndex === idx ? 'opacity-40 ring-2 ring-cocoa' : ''}`}>
                                 <video src={vid} className="w-full h-full object-cover" muted playsInline />
                                 <div className="absolute top-1 left-1 bg-black/60 text-white p-1 rounded-sm pointer-events-none">
                                     <FaVideo size={10} />
@@ -572,7 +598,7 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                         ))}
 
                         {videos.length === 0 && (
-                            <button onClick={() => videoInputRef.current.click()} disabled={uploadingVideo} className="aspect-square border-2 border-dashed border-stone-300 rounded flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
+                        <button onClick={() => videoInputRef.current.click()} disabled={uploadingVideo} className="aspect-[4/5] border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center text-stone-400 hover:border-stone-800 transition-colors bg-white">
                                 {uploadingVideo ? <FaSpinner className="animate-spin"/> : <FaVideo size={18} className="mb-1 sm:mb-2"/>}
                                 <span className="text-[10px] sm:text-xs font-bold text-center px-1">{uploadingVideo ? 'Đợi...' : 'Thêm video'}</span>
                             </button>

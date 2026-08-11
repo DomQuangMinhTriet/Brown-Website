@@ -212,3 +212,54 @@ exports.updateLookbook = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+const POLICY_SLUGS = ['return', 'shipping', 'care'];
+const ADMIN_EMAIL = 'brownvn25@gmail.com';
+
+// Public: get content for one policy page.
+exports.getPolicy = async (req, res) => {
+    try {
+        const { slug } = req.params;
+        if (!POLICY_SLUGS.includes(slug)) {
+            return res.status(404).json({ success: false, message: 'Policy not found' });
+        }
+
+        const { data, error } = await supabase
+            .from('content_policies')
+            .select('slug, content, updated_at')
+            .eq('slug', slug)
+            .maybeSingle();
+
+        if (error) throw error;
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Admin: save both Vietnamese and English content for one policy page.
+exports.updatePolicy = async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const { content } = req.body;
+
+        if (req.user?.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền chỉnh sửa nội dung.' });
+        }
+        if (!POLICY_SLUGS.includes(slug) || !content || typeof content !== 'object') {
+            return res.status(400).json({ success: false, message: 'Dữ liệu chính sách không hợp lệ.' });
+        }
+
+        const { data, error } = await supabase
+            .from('content_policies')
+            .upsert({ slug, content, updated_at: new Date().toISOString() }, { onConflict: 'slug' })
+            .select('slug, content, updated_at')
+            .single();
+
+        if (error) throw error;
+        clearCache('/api/content/policies/');
+        res.json({ success: true, data, message: 'Đã cập nhật nội dung chính sách.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

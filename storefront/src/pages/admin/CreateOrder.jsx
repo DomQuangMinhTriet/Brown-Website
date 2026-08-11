@@ -42,7 +42,7 @@ const CreateOrder = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?view=card`);
                 let allProducts = res.data.success ? res.data.data : [];
 
                 // Kéo thêm sản phẩm "Phụ kiện BrownVN" đang bị ẩn

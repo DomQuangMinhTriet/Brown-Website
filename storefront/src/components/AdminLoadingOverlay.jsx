@@ -17,37 +17,51 @@ const messageForRequest = (config = {}) => {
 // khu vực quản trị, nên storefront của khách hàng không bị ảnh hưởng.
 const AdminLoadingOverlay = () => {
   const pendingRequests = useRef(0);
+  const showTimer = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('Đang xử lý…');
 
   useEffect(() => {
     const start = (config) => {
+      if (String(config.method || 'get').toLowerCase() === 'get') return config;
+      config.__adminLoadingTracked = true;
       pendingRequests.current += 1;
       setMessage(messageForRequest(config));
-      setIsLoading(true);
+      if (!showTimer.current) {
+        showTimer.current = setTimeout(() => {
+          showTimer.current = null;
+          if (pendingRequests.current > 0) setIsLoading(true);
+        }, 180);
+      }
       return config;
     };
 
-    const finish = () => {
+    const finish = (config) => {
+      if (!config?.__adminLoadingTracked) return;
       pendingRequests.current = Math.max(0, pendingRequests.current - 1);
-      if (pendingRequests.current === 0) setIsLoading(false);
+      if (pendingRequests.current === 0) {
+        if (showTimer.current) clearTimeout(showTimer.current);
+        showTimer.current = null;
+        setIsLoading(false);
+      }
     };
 
     const requestInterceptor = axios.interceptors.request.use(start, (error) => {
-      finish();
+      finish(error.config);
       return Promise.reject(error);
     });
     const responseInterceptor = axios.interceptors.response.use((response) => {
-      finish();
+      finish(response.config);
       return response;
     }, (error) => {
-      finish();
+      finish(error.config);
       return Promise.reject(error);
     });
 
     return () => {
       axios.interceptors.request.eject(requestInterceptor);
       axios.interceptors.response.eject(responseInterceptor);
+      if (showTimer.current) clearTimeout(showTimer.current);
     };
   }, []);
 

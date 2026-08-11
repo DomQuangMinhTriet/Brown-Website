@@ -1,6 +1,6 @@
 # Mô hình dữ liệu
 
-Cơ sở dữ liệu PostgreSQL (Supabase). Toàn bộ schema, stored function và dữ liệu nằm trong file tổng [`database/full_schema_data.sql`](../database/full_schema_data.sql) — bản `pg_dump` đầy đủ và mới nhất.
+Cơ sở dữ liệu PostgreSQL (Supabase). Schema chuẩn được giữ cục bộ trong `database/brownvn_complete.sql`; thư mục `database/` bị Git ignore để tránh đưa dump, migration nội bộ hoặc certificate lên GitHub. File này chỉ chứa schema, stored function, index và phân quyền — không chứa dữ liệu sản xuất.
 
 ## 1. Tổng quan các bảng
 
@@ -9,9 +9,9 @@ Cơ sở dữ liệu PostgreSQL (Supabase). Toàn bộ schema, stored function v
 | Danh mục | `stores` | Chi nhánh / kho hàng |
 | | `categories` | Danh mục sản phẩm (hỗ trợ cha–con qua `parent_id`) |
 | | `suppliers` | Nhà cung cấp |
-| Sản phẩm | `products` | Sản phẩm (thông tin chung, `base_price`, mảng `images`, **giảm giá trực tiếp** `discount_amount`/`is_discount_active`) |
-| | `product_categories` | Bảng trung gian sản phẩm ↔ danh mục (n–n) |
-| | `variants` | Biến thể/SKU (size, màu, giá, ảnh riêng) |
+| Sản phẩm | `products` | Sản phẩm (thông tin chung, `base_price`, mảng `images`/`videos`) |
+| | `product_collections` | Bảng trung gian sản phẩm ↔ danh mục (n–n) |
+| | `variants` | Biến thể/SKU (size, màu, giá, ảnh riêng, giảm giá theo biến thể) |
 | Kho FIFO | `purchase_orders` | Phiếu nhập kho |
 | | `purchase_items` | Chi tiết phiếu nhập (giá vốn lúc nhập) |
 | | `inventory_batches` | **Lô tồn kho** — cốt lõi tính FIFO |
@@ -22,15 +22,15 @@ Cơ sở dữ liệu PostgreSQL (Supabase). Toàn bộ schema, stored function v
 | | `order_items` | Chi tiết đơn (giá bán + `cogs_total` theo FIFO) |
 | Tài chính | `expense_categories` | Danh mục chi phí |
 | | `expenses` | Phiếu chi |
-| Nội dung | `banners` / `content_banners` | Banner hiển thị trang chủ |
+| Nội dung | `content_banners` | Banner hiển thị trang chủ |
 | | `content_lookbook` | Nội dung trang Lookbook editorial (`block_type`: full/compare/quote, `image_url_2` cho slider) |
-| | `product_collections` | Bộ sưu tập / nhóm sản phẩm |
+| | `content_policies` | Nội dung các trang chính sách, chỉnh sửa từ admin |
 
 ## 2. Sơ đồ quan hệ chính
 
 ```
 categories ──┐
-             ├─< product_categories >── products ──< variants ──┐
+             ├─< product_collections >─ products ──< variants ──┐
 suppliers ───┤                                                  │
    │         │                                                  │
    ▼         ▼                                                  ▼
@@ -74,22 +74,20 @@ Cho phép tính **lợi nhuận thực** (doanh thu − COGS) chính xác ngay c
 | `order_items.cogs_total` | Giá vốn dòng hàng, tính bằng logic FIFO sau khi bán |
 | `promotions.discount_type` | `percent` hoặc `fixed` |
 | `promotions.applicable_product_ids` | `jsonb` mảng id SP được áp mã; `[]` = áp cho **mọi** SP. Voucher chỉ giảm trên tiền các SP này, và **không cộng dồn** với SP đang giảm giá trực tiếp |
-| `products.discount_amount` / `is_discount_active` | Giảm giá trực tiếp theo **số tiền**; giá bán = `base_price − discount_amount` khi bật. Giá gốc vẫn lưu ở `base_price` |
+| `variants.discount_amount` / `is_discount_active` | Giảm giá trực tiếp theo **số tiền** ở từng biến thể; giá gốc vẫn lấy từ `current_price` hoặc `products.base_price` |
 | `content_lookbook.block_type` | `full` (ảnh/video tràn viền) · `compare` (slider 2 ảnh, cần `image_url_2`) · `quote` (câu trích dẫn, không cần ảnh) |
 | `customers.user_id` | `UUID` liên kết Supabase Auth; `NULL` nếu khách vãng lai |
 
 ## 5. Stored functions
 
-File dump bao gồm các function PL/pgSQL chạy trực tiếp trong database, đáng chú ý:
+File schema chuẩn bao gồm các function PL/pgSQL chạy trực tiếp trong database, đáng chú ý:
 - `create_order_transaction(...)` — tạo đơn hàng và trừ tồn kho theo FIFO trong một transaction.
 
 ## 6. Phân quyền (GRANT)
 
 - `service_role` & `postgres`: toàn quyền (dùng ở backend).
-- `anon` (khóa public ở frontend): chỉ `SELECT` — chỉ đọc dữ liệu công khai.
+- `anon` / `authenticated`: chỉ được đọc các bảng nội dung công khai (`content_banners`, `content_lookbook`, `content_policies`). Các bảng còn lại bị RLS chặn khi truy cập trực tiếp.
 
 ## 7. File dữ liệu
 
-`database/full_schema_data.sql` là **file tổng duy nhất**: bản `pg_dump` đầy đủ gồm schema, stored function, index, phân quyền và toàn bộ dữ liệu (dạng `COPY`). Dùng file này để khôi phục hoặc khởi tạo lại database. Certificate `database/prod-ca-2021.crt` dùng cho kết nối SSL tới Supabase.
-
-`database/migrations_2026_promotions_lookbook.sql` là **file migration tăng dần** (idempotent) cho các nâng cấp 2026: bảng `content_lookbook`, giảm giá trực tiếp sản phẩm, và voucher theo sản phẩm. Chạy file này trong Supabase SQL Editor để cập nhật một database đang chạy mà không cần khôi phục toàn bộ.
+`database/brownvn_complete.sql` là file khởi tạo chuẩn duy nhất. Chạy file này khi tạo database mới; với production đang hoạt động, cần sao lưu trước và chỉ chạy migration đã được rà soát. Không lưu dump, migration nội bộ hoặc certificate trong GitHub.

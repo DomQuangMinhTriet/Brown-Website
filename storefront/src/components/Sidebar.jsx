@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   FaHome, FaBoxOpen, FaClipboardList, FaWarehouse, FaChartBar, 
   FaMoneyBillAlt, FaSignOutAlt, FaImage, FaUsers, FaPlusCircle, 
-  FaTags, FaTimes // [MỚI] Thêm icon FaTimes
+  FaTags, FaTimes, FaFileAlt // [MỚI] Thêm icon FaTimes
 } from 'react-icons/fa';
 import { useAdminAuth } from '../context/AdminAuthContext';
 
@@ -20,6 +20,7 @@ const Sidebar = ({ onClose }) => {
     { path: '/admin/inventory', icon: <FaWarehouse />, label: 'Kho hàng' },
     { path: '/admin/promotions', icon: <FaTags />, label: 'Khuyến mãi' },
     { path: '/admin/appearance', icon: <FaImage />, label: 'Giao diện' },
+    { path: '/admin/policies', icon: <FaFileAlt />, label: 'Nội dung chính sách' },
     { path: '/admin/reports', icon: <FaChartBar />, label: 'Báo cáo' },
     { path: '/admin/expenses', icon: <FaMoneyBillAlt />, label: 'Chi phí' },
     { path: '/admin/inventory/defective', icon: <FaTimes />, label: 'Hàng lỗi' }

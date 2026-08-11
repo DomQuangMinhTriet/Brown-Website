@@ -97,11 +97,11 @@ npm run lint      # kiểm tra ESLint
 ## 5. Khởi tạo Database
 
 1. Tạo project trên [Supabase](https://supabase.com).
-2. Mở **SQL Editor**, chạy nội dung file tổng [`database/full_schema_data.sql`](../database/full_schema_data.sql).
-   - Đây là bản `pg_dump` đầy đủ: tạo toàn bộ bảng, index, stored function, cấp quyền (`GRANT`) và nạp dữ liệu (dạng `COPY`).
+2. Lấy file cục bộ `database/brownvn_complete.sql` từ người quản trị dự án (thư mục `database/` được Git ignore), sau đó mở **SQL Editor** và chạy toàn bộ nội dung file.
+   - File tạo schema hiện tại, index, stored function và phân quyền; không chứa dữ liệu sản xuất.
 3. Lấy `SUPABASE_URL`, `service_role_key` (cho backend) và `anon_key` (cho frontend) tại **Project Settings > API**.
 
-> `database/prod-ca-2021.crt` là certificate SSL dùng khi cần kết nối trực tiếp tới Supabase qua chứng chỉ.
+> Không lưu certificate, dump hoặc thông tin kết nối database trong repository. Cấu hình kết nối chỉ đặt trong biến môi trường.
 
 ## 6. Bật xác thực Supabase Auth
 

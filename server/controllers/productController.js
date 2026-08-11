@@ -72,20 +72,38 @@ const autoTranslate = async (text) => {
 exports.getProducts = async (req, res) => {
     try {
         // [CẬP NHẬT]: Thêm biến admin để phân biệt Khách và Admin
-        const { search, category, admin, limit } = req.query;
+        const { search, category, admin, limit, view } = req.query;
+
+        const selectFields = view === 'media'
+            ? 'id, images'
+            : view === 'admin-list'
+                ? 'id, name, slug, base_price, is_active, images, created_at'
+            : view === 'card'
+                ? `
+                    id, name, name_en, slug, base_price, category_id, images,
+                    is_active, is_preorder, preorder_note,
+                    variants (
+                        id, size, color, color_en, sku, image_url, is_deleted, display_order,
+                        discount_amount, is_discount_active,
+                        inventory_batches ( quantity_remaining )
+                    ),
+                    categories!fk_products_main_category (id, name, name_en, slug),
+                    product_collections ( category_id )
+                `
+                : `
+                    *,
+                    variants (
+                        id, size, color, color_en, sku, image_url, is_deleted, display_order,
+                        discount_amount, is_discount_active,
+                        inventory_batches ( quantity_remaining )
+                    ),
+                    categories!fk_products_main_category (id, name, slug),
+                    product_collections ( category_id )
+                `;
 
         let query = supabase
             .from('products')
-            .select(`
-                *,
-                variants (
-                    id, size, color, color_en, sku, image_url, is_deleted, display_order,
-                    discount_amount, is_discount_active,
-                    inventory_batches ( quantity_remaining )
-                ),
-                categories!fk_products_main_category (id, name, slug),
-                product_collections ( category_id )
-            `)
+            .select(selectFields)
             .order('created_at', { ascending: false });
 
         // [CẬP NHẬT]: Nếu không phải admin gọi (Khách hàng xem web), thì chỉ hiện sản phẩm đang Active
@@ -125,6 +143,7 @@ exports.getProducts = async (req, res) => {
         if (error) throw error;
 
         const productsWithStock = data.map(product => {
+            if (view === 'media' || view === 'admin-list') return product;
             const validVariants = sortVariantsByDisplayOrder(product.variants ? product.variants.filter(v => v.is_deleted === false) : []);
             const variantsWithStock = validVariants.map(v => {
                 const totalStock = v.inventory_batches 
@@ -152,7 +171,7 @@ exports.getProducts = async (req, res) => {
 exports.getProductBySlug = async (req, res) => {
     try {
         const { slug } = req.params;
-        const { data, error } = await supabase
+        let query = supabase
             .from('products')
             .select(`
                 *,
@@ -161,11 +180,12 @@ exports.getProductBySlug = async (req, res) => {
                     discount_amount, is_discount_active,
                     inventory_batches ( quantity_remaining )
                 ),
-                categories!fk_products_main_category (id, name, slug)
+                categories!fk_products_main_category (id, name, slug),
+                product_collections ( category_id )
             `)
-            .eq('slug', slug)
-            .eq('is_active', true)
-            .single();
+            .eq('slug', slug);
+        if (req.query.admin !== 'true') query = query.eq('is_active', true);
+        const { data, error } = await query.single();
 
         if (error) throw error;
 

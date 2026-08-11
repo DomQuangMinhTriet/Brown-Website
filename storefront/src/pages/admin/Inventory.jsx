@@ -78,7 +78,7 @@ const Inventory = () => {
       const [supRes, storeRes, prodRes] = await Promise.all([
         axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/suppliers`), 
         axios.get(`${import.meta.env.VITE_API_URL}/api/inventory/stores`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/products`) 
+        axios.get(`${import.meta.env.VITE_API_URL}/api/products?view=card`)
       ]);
       
       if (supRes.data.success) setSuppliers(supRes.data.data);

@@ -8,36 +8,40 @@ exports.getDashboardStats = async (req, res) => {
         const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
         // Tính doanh thu tháng này
-        const { data: revenueData, error: revError } = await supabase
-            .from('orders')
-            .select('total_amount')
-            .in('status', ['completed', 'shipping'])
-            .gte('created_at', startOfMonth)
-            .lte('created_at', endOfMonth);
-        
-        if (revError) throw revError;
-        const totalRevenue = revenueData.reduce((sum, order) => sum + order.total_amount, 0);
+        const revenuePromise = supabase.from('orders').select('total_amount')
+            .in('status', ['completed', 'shipping']).gte('created_at', startOfMonth).lte('created_at', endOfMonth);
 
         // Đếm số đơn hàng tháng này
-        const { count: totalOrders, error: orderError } = await supabase
+        const ordersPromise = supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
             .gte('created_at', startOfMonth)
             .lte('created_at', endOfMonth);
         
         // Đếm số khách hàng mới tháng này
-        const { count: totalCustomers, error: cusError } = await supabase
+        const customersPromise = supabase
             .from('customers')
             .select('*', { count: 'exact', head: true })
             .gte('created_at', startOfMonth)
             .lte('created_at', endOfMonth);
 
         // Đơn hàng gần nhất thì vẫn lấy 5 đơn mới nhất
-        const { data: recentOrders } = await supabase
+        const recentPromise = supabase
             .from('orders')
             .select('id, code, customer_name, total_amount, status, created_at')
             .order('created_at', { ascending: false })
             .limit(5);
+
+        const [revenueResult, ordersResult, customersResult, recentResult] = await Promise.all([
+            revenuePromise, ordersPromise, customersPromise, recentPromise,
+        ]);
+        const firstError = revenueResult.error || ordersResult.error || customersResult.error || recentResult.error;
+        if (firstError) throw firstError;
+
+        const totalRevenue = (revenueResult.data || []).reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+        const totalOrders = ordersResult.count || 0;
+        const totalCustomers = customersResult.count || 0;
+        const recentOrders = recentResult.data || [];
 
         res.json({
             success: true,

@@ -153,7 +153,7 @@ const ProductDetail = () => {
                                 />
                             ) : (
                                 <img
-                                    src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 800)}
+                                    src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 1600)}
                                     alt={product.name}
                                     className="h-full w-full object-cover"
                                     fetchPriority="high"

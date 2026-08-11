@@ -10,7 +10,6 @@ import {
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2'; 
 import { FaCalendarAlt, FaFileExcel, FaFilter, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
-import * as XLSX from 'xlsx';
 import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 // Đăng ký các thành phần biểu đồ
@@ -207,8 +206,9 @@ const Reports = () => {
   };
 
   // Xuất Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
       if (!data) return;
+      const XLSX = await import('xlsx');
       const exportData = [
           { "Chỉ tiêu": "Doanh thu", "Kỳ này": data.current.revenue, "Kỳ trước": data.previous.revenue, "Tăng trưởng": calcGrowth(data.current.revenue, data.previous.revenue) },
           { "Chỉ tiêu": "Giá vốn (COGS)", "Kỳ này": data.current.cogs, "Kỳ trước": data.previous.cogs, "Tăng trưởng": calcGrowth(data.current.cogs, data.previous.cogs) },

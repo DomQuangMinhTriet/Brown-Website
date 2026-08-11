@@ -6,7 +6,7 @@ import { FaSearch, FaShoppingBag, FaUser, FaBars, FaTimes, FaGlobe, FaChevronDow
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import axios from 'axios';
+import { cachedGet } from '../utils/apiCache';
 
 const Navbar = () => {
   const { cartCount } = useCart();
@@ -37,7 +37,7 @@ const Navbar = () => {
   useEffect(() => {
     const fetchCats = async () => {
         try {
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
+            const res = await cachedGet(`${import.meta.env.VITE_API_URL}/api/categories`, 120_000);
             if(res.data.success) {
                 const allCats = res.data.data;
                 const visibleCats = allCats.filter(cat => cat.is_visible_on_home !== false);

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars -- motion được dùng trong JSX.
 import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from 'framer-motion';
@@ -11,6 +10,7 @@ import ProductCard from '../components/ui/ProductCard';
 import { isVideoUrl } from '../components/lookbook/blockUtils';
 import { optimizeImage } from '../utils/cloudinaryHelper';
 import { useLanguage } from '../context/LanguageContext';
+import { cachedGet } from '../utils/apiCache';
 
 const EASE = [0.16, 1, 0.3, 1];
 
@@ -34,10 +34,12 @@ const Home = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
+        const productsPromise = cachedGet(`${import.meta.env.VITE_API_URL}/api/products?view=card`, 60_000)
+          .catch(() => ({ data: { success: false, data: [] } }));
         const [banRes, catRes, lookRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/categories`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } })),
+          cachedGet(`${import.meta.env.VITE_API_URL}/api/content/banners`, 120_000),
+          cachedGet(`${import.meta.env.VITE_API_URL}/api/categories`, 120_000),
+          cachedGet(`${import.meta.env.VITE_API_URL}/api/content/lookbook`, 120_000).catch(() => ({ data: { data: [] } })),
         ]);
         if (banRes.data.success) setBanners(banRes.data.data);
         if (lookRes.data?.data) {
@@ -54,8 +56,10 @@ const Home = () => {
           setCategories(visibleCats);
         }
 
+        setLoading(false);
+
         // Gộp thành 1 lần gọi duy nhất thay vì 1 request/danh mục (tránh N+1 truy vấn DB)
-        const allProductsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+        const allProductsRes = await productsPromise;
         const allProducts = allProductsRes.data.success ? allProductsRes.data.data : [];
         const grouped = {};
         for (const cat of visibleCats) {
@@ -111,11 +115,11 @@ const Home = () => {
               className={`absolute inset-0 block transition-opacity duration-[1200ms] ease-in-out ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
             >
               {isVideo(banner.image_url) ? (
-                <video autoPlay loop muted playsInline className="h-full w-full object-cover">
+                <video autoPlay={index === currentBanner} preload={index === currentBanner ? 'auto' : 'metadata'} loop muted playsInline className="h-full w-full object-cover">
                   <source src={banner.image_url} type="video/mp4" />
                 </video>
               ) : (
-                <img src={optimizeImage(banner.image_url, 1600)} alt={banner.title || 'BROWN'} className="h-full w-full object-cover animate-ken-burns" />
+                <img src={optimizeImage(banner.image_url, 1600)} alt={banner.title || 'BROWN'} loading={index === 0 ? 'eager' : 'lazy'} fetchPriority={index === 0 ? 'high' : 'auto'} decoding="async" className="h-full w-full object-cover animate-ken-burns" />
               )}
             </Link>
           ))

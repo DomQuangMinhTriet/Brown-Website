@@ -1,45 +1,45 @@
 const NodeCache = require('node-cache');
 
-// stdTTL: Thời gian sống mặc định (giây) - 300s = 5 phút
-const cache = new NodeCache({ stdTTL: 300 });
+const cache = new NodeCache({ stdTTL: 300, useClones: false });
 
-const verifyCache = (duration) => (req, res, next) => {
+const clearCache = (keyPart) => {
+    const matches = cache.keys().filter((key) => key.includes(keyPart));
+    if (matches.length) cache.del(matches);
+};
+
+const verifyCache = (duration = 300) => (req, res, next) => {
     try {
-        // Tạo Key duy nhất dựa trên URL (Ví dụ: /api/products?search=ao)
-        // Nếu URL khác nhau thì Cache khác nhau
-        const key = '__express__' + req.originalUrl || req.url;
-        
+        if (req.query?.admin === 'true' || req.headers.authorization) {
+            res.setHeader('Cache-Control', 'private, no-store');
+            return next();
+        }
+        const key = '__express__' + (req.originalUrl || req.url);
         const cachedBody = cache.get(key);
 
-        if (cachedBody) {
-            // ✅ HIT: Đã có trong Cache -> Trả về ngay
-            console.log(`🚀 Cache Hit: ${key}`);
-            return res.json(JSON.parse(cachedBody));
-        } else {
-            // ❌ MISS: Chưa có -> Ghi đè hàm res.json để tự động lưu Cache khi Controller trả về
-            console.log(`🐢 Cache Miss: ${key}`);
-            
-            res.sendResponse = res.json;
-            res.json = (body) => {
-                // Lưu vào RAM trước khi trả về cho khách
-                cache.set(key, JSON.stringify(body), duration);
-                res.sendResponse(body);
-            };
-            next();
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+        if (cachedBody !== undefined) {
+            res.setHeader('X-Cache', 'HIT');
+            return res.json(cachedBody);
         }
+
+        res.setHeader('X-Cache', 'MISS');
+        const sendJson = res.json.bind(res);
+        res.json = (body) => {
+            if (res.statusCode >= 200 && res.statusCode < 300) cache.set(key, body, duration);
+            return sendJson(body);
+        };
+        next();
     } catch (error) {
-        console.error("Cache Error:", error);
-        next(); // Nếu lỗi cache thì cứ cho chạy bình thường
+        console.error('Cache Error:', error);
+        next();
     }
 };
 
-// Hàm để xóa Cache khi Admin cập nhật sản phẩm (Advanced)
-const clearCache = (keyPart) => {
-    const keys = cache.keys();
-    // Tìm và xóa các key có chứa từ khóa (VD: xóa tất cả cache liên quan products)
-    const matches = keys.filter(k => k.includes(keyPart));
-    cache.del(matches);
-    console.log(`🧹 Đã dọn dẹp ${matches.length} cache keys chứa '${keyPart}'`);
+const invalidateAfterResponse = (...keyParts) => (req, res, next) => {
+    res.once('finish', () => {
+        if (res.statusCode >= 200 && res.statusCode < 400) keyParts.forEach(clearCache);
+    });
+    next();
 };
 
-module.exports = { verifyCache, clearCache };
+module.exports = { verifyCache, clearCache, invalidateAfterResponse };

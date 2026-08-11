@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { formatPrice } from '../utils/currencyHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
+import { clearApiCache } from '../utils/apiCache';
 
 // CẤU HÌNH API GHN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce';
@@ -57,6 +58,28 @@ const Checkout = () => {
   const [discountAmount, setDiscountAmount] = useState(0);
 
   const [isTransferConfirmed, setIsTransferConfirmed] = useState(false);
+  const [legacyBikiniProductIds, setLegacyBikiniProductIds] = useState([]);
+
+  const isBikiniItem = (item) => `${item.category_slug || ''} ${item.category_name || ''}`.toLowerCase().includes('bikini');
+
+  // Giỏ tạo từ phiên bản cũ chưa có thông tin danh mục: kiểm tra lại theo slug sản phẩm.
+  useEffect(() => {
+    let active = true;
+    const legacyItems = cartItems.filter((item) => !item.category_slug && !item.category_name && item.slug);
+    if (!legacyItems.length) {
+      setLegacyBikiniProductIds([]);
+      return () => { active = false; };
+    }
+    Promise.all(legacyItems.map((item) => axios.get(`${import.meta.env.VITE_API_URL}/api/products/${item.slug}`)
+      .then(({ data }) => ({ id: item.product_id, category: data?.data?.categories }))
+      .catch(() => null)))
+      .then((results) => {
+        if (active) setLegacyBikiniProductIds(results.filter((result) => result && `${result.category?.slug || ''} ${result.category?.name || ''}`.toLowerCase().includes('bikini')).map((result) => result.id));
+      });
+    return () => { active = false; };
+  }, [cartItems]);
+
+  const hasBikiniInCart = useMemo(() => cartItems.some((item) => isBikiniItem(item) || legacyBikiniProductIds.includes(item.product_id)), [cartItems, legacyBikiniProductIds]);
 
   // LOGIC KIỂM TRA LỊCH NGHỈ TẾT
   const getTetStatus = () => {
@@ -205,6 +228,7 @@ const Checkout = () => {
 
         if (res.data.success) {
             toast.success(t('checkout.toast_order_success'));
+            clearApiCache('/api/products');
             clearCart();
             setIsOrderSuccess(true);
         }
@@ -306,6 +330,22 @@ const Checkout = () => {
                         <div>
                             <strong className="block">{t('checkout.tet_notice')}</strong>
                             <span className="text-sm">{t(tetStatus.msgKey)}</span>
+                        </div>
+                    </div>
+                )}
+
+                {hasBikiniInCart && (
+                    <div className="mb-8 border-2 border-red-500 bg-red-50 p-5 text-red-950 shadow-lg md:p-6" role="alert">
+                        <div className="flex items-start gap-4">
+                            <FaExclamationCircle className="mt-0.5 shrink-0 text-3xl text-red-600" />
+                            <div>
+                                <h2 className="text-lg font-bold uppercase tracking-wide text-red-800">Lưu ý quan trọng về sản phẩm bikini</h2>
+                                <p className="mt-3 whitespace-pre-line text-base font-medium leading-relaxed">
+                                    Vì lý do vệ sinh và nhằm đảm bảo sự nguyên vẹn của từng thiết kế, bikini là sản phẩm không áp dụng đổi hoặc trả dưới bất kỳ hình thức nào.{"\n"}
+                                    Chỉ hỗ trợ đổi trong trường hợp sản phẩm phát sinh lỗi từ phía nhà sản xuất.{"\n"}
+                                    Brown trân trọng mong bạn cân nhắc kỹ về lựa chọn trước khi đặt hàng.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FaStore, FaShoppingCart } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
@@ -8,6 +7,7 @@ import { formatPrice } from '../utils/currencyHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import ProductCard from '../components/ui/ProductCard';
+import { cachedGet } from '../utils/apiCache';
 
 const Collection = () => {
   const [products, setProducts] = useState([]);
@@ -30,7 +30,7 @@ const Collection = () => {
             setPageTitle(`${t('collection.search_result')}: "${searchQuery}"`);
         } else if (categorySlug) {
             try {
-                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
+                const res = await cachedGet(`${import.meta.env.VITE_API_URL}/api/categories`, 120_000);
                 if (res.data.success) {
                     const foundCat = res.data.data.find(c => c.slug === categorySlug);
                     setPageTitle(foundCat ? `${foundCat.name}` : `${categorySlug}`);
@@ -51,11 +51,11 @@ const Collection = () => {
       setLoading(true);
       try {
         let url = `${import.meta.env.VITE_API_URL}/api/products?`;
-        const params = [];
+        const params = ['view=card'];
         if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`);
         if (categorySlug) params.push(`category=${encodeURIComponent(categorySlug)}`);
 
-        const res = await axios.get(url + params.join('&'));
+        const res = await cachedGet(url + params.join('&'), 60_000);
         if (res.data.success) setProducts(res.data.data);
       } catch (error) {
           console.error(error);

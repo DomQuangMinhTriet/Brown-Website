@@ -333,21 +333,31 @@ exports.getAllOrders = async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('orders')
-            .select(`*, order_items (id, quantity, price_at_purchase, variants (sku, size, color, products (name, images)))`)
+            .select('*')
             .order('created_at', { ascending: false });
         if (error) throw error;
-        
-        const formattedData = data.map(order => ({
-            ...order,
-            order_items: order.order_items.map(item => ({
-                ...item,
-                unit_price: item.price_at_purchase,
-                total_price: item.price_at_purchase * item.quantity,
-                product_name: item.variants?.products?.name,
-                product_image: item.variants?.products?.images?.[0]
-            }))
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getOrderById = async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('orders')
+            .select(`*, order_items (id, quantity, price_at_purchase, variants (sku, size, color, products (name, images)))`)
+            .eq('id', req.params.id)
+            .single();
+        if (error) throw error;
+        const orderItems = (data.order_items || []).map((item) => ({
+            ...item,
+            unit_price: item.price_at_purchase,
+            total_price: item.price_at_purchase * item.quantity,
+            product_name: item.variants?.products?.name,
+            product_image: item.variants?.products?.images?.[0],
         }));
-        res.json({ success: true, data: formattedData });
+        res.json({ success: true, data: { ...data, order_items: orderItems } });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

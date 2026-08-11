@@ -80,6 +80,17 @@ const Orders = () => {
     }
   };
 
+  const openOrderDetail = async (order) => {
+      try {
+          const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders/${order.id}`);
+          setSelectedOrder(res.data?.data || order);
+          setIsEditingMode(false);
+          setShowModal(true);
+      } catch (error) {
+          toast.error(error.response?.data?.message || 'Không thể tải chi tiết đơn hàng');
+      }
+  };
+
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
@@ -427,11 +438,7 @@ const Orders = () => {
 
                     <td className="p-4 text-right">
                         <button 
-                            onClick={() => { 
-                                setSelectedOrder(order); 
-                                setIsEditingMode(false); 
-                                setShowModal(true); 
-                            }}
+                            onClick={() => openOrderDetail(order)}
                             className="text-stone-500 hover:text-stone-900 flex items-center gap-1 ml-auto p-2 hover:bg-stone-100 rounded"
                         >
                             <FaEye /> Chi tiết

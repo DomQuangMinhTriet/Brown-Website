@@ -30,7 +30,7 @@ const Lookbook = () => {
 
       // 2) Fallback DEMO: dựng từ ảnh sản phẩm để xem trước hướng thiết kế
       try {
-        const r = await axios.get(`${api}/api/products`);
+        const r = await axios.get(`${api}/api/products?view=media&limit=10`);
         const imgs = (r.data?.data || []).flatMap((p) => p.images || []).filter(Boolean);
         if (!imgs.length) { setBlocks([]); return; }
         const g = (i) => imgs[i % imgs.length];

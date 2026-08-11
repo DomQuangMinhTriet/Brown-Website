@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code — skill/plugin cài cho công cụ, không phải code website
 .claude/
+
+# Database dumps and local SQL migrations stay local; never commit them.
+/database/

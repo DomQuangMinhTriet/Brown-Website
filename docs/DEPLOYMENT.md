@@ -55,7 +55,7 @@ const allowedOrigins = [
 
 ## 5. Checklist trước khi go-live
 
-- [ ] Đã chạy `full_schema_data.sql` trên Supabase production
+- [ ] Đã chạy bản `brownvn_complete.sql` đã được quản trị dự án cung cấp trên Supabase production (hoặc migration đã được phê duyệt)
 - [ ] Phân quyền `anon` chỉ `SELECT` (đã có trong schema)
 - [ ] Tất cả biến `.env` backend đã cấu hình (Supabase, Cloudinary, Resend, GHN)
 - [ ] Biến `VITE_*` frontend trỏ đúng backend production

@@ -11,7 +11,7 @@ const uploadController = require('../controllers/uploadController');
 // Multer không phân biệt được ảnh/video ở bước này nên dùng chung 1 mức trần;
 // giới hạn chặt hơn cho từng loại (ảnh 5MB, video 15MB) được kiểm tra thêm ở
 // uploadController sau khi đã biết mimetype.
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: MAX_UPLOAD_BYTES } });
 

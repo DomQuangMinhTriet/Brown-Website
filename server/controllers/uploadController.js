@@ -12,9 +12,9 @@ cloudinary.config({
 
 // [AN TOÀN] Giới hạn riêng theo loại file — chặt hơn mức trần chung ở Multer,
 // để tránh 1 ảnh/video khổng lồ âm thầm ăn hết dung lượng Cloudinary.
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;   // 5MB — dư sức cho ảnh sản phẩm chất lượng cao
-const MAX_VIDEO_BYTES = 15 * 1024 * 1024;  // 15MB — đủ cho video ngắn ~10s
-const MAX_VIDEO_SECONDS = 10;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 30;
 
 exports.uploadImage = async (req, res) => {
     try {
@@ -44,12 +44,12 @@ exports.uploadImage = async (req, res) => {
                     // [AN TOÀN] Giới hạn cứng độ phân giải video — dù nguồn là 4K/8K thì file lưu
                     // trên Cloudinary vẫn bị ép về tối đa 1280px chiều rộng (crop:'limit' chỉ thu
                     // nhỏ, không phóng to video nhỏ hơn), giữ dung lượng lưu trữ trong tầm kiểm soát.
-                    options.transformation = [{ width: 1280, crop: 'limit', quality: 'auto' }];
+                    options.transformation = [{ width: 1920, crop: 'limit', quality: 'auto:good' }];
                 } else {
                     // Chỉ ép format webp + nén ảnh khi file là ẢNH.
                     // Ép format webp lên VIDEO sẽ làm hỏng file (webp là định dạng ảnh).
                     options.format = 'webp';
-                    options.transformation = [{ quality: 'auto', fetch_format: 'auto' }];
+                    options.transformation = [{ quality: 'auto:good', fetch_format: 'auto' }];
                 }
 
                 const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {

@@ -126,7 +126,7 @@ const ProductCard = ({ product, posMode = false }) => {
     <div className="group">
       <Link to={to} onClick={onCardClick} className="block transition-transform duration-500 ease-out hover:-translate-y-1.5">
         <div
-          className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-parchment shadow-[0_2px_10px_-6px_rgba(63,46,38,0.25)] transition-shadow duration-500 group-hover:shadow-[0_34px_60px_-28px_rgba(87,52,37,0.55)]"
+          className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-parchment shadow-[0_2px_10px_-6px_rgba(63,46,38,0.25)] transition-shadow duration-500 group-hover:shadow-[0_34px_60px_-28px_rgba(87,52,37,0.55)]"
           onMouseEnter={onImgEnter}
           onMouseLeave={onImgLeave}
           onTouchStart={onTouchStart}

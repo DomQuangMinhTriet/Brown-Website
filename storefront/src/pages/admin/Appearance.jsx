@@ -15,7 +15,7 @@ import { optimizeImage } from '../../utils/cloudinaryHelper';
 const compressIfImage = async (file) => {
   if (!file || !file.type?.startsWith('image/')) return file;
   try {
-    return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
+    return await imageCompression(file, { maxSizeMB: 3, maxWidthOrHeight: 2400 });
   } catch (err) {
     console.error('Lỗi nén ảnh, dùng file gốc:', err);
     return file;
@@ -29,6 +29,7 @@ const Appearance = () => {
   const [newBanner, setNewBanner] = useState({ title: '', link_to: '', display_order: 0 });
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [draggedBannerId, setDraggedBannerId] = useState(null);
 
   // --- [MỚI] STATE DANH MỤC ---
   const [categories, setCategories] = useState([]);
@@ -130,6 +131,24 @@ const Appearance = () => {
           toast.success("Đã xóa banner");
       } catch (error) {
           toast.error("Lỗi xóa banner");
+      }
+  };
+
+  const reorderBanners = async (targetId) => {
+      if (draggedBannerId === null || draggedBannerId === targetId) return;
+      const sourceIndex = banners.findIndex((banner) => banner.id === draggedBannerId);
+      const targetIndex = banners.findIndex((banner) => banner.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return;
+      const reordered = [...banners];
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      const ordered = reordered.map((banner, index) => ({ ...banner, display_order: index }));
+      setBanners(ordered);
+      try {
+          await Promise.all(ordered.map((banner) => axios.put(`${import.meta.env.VITE_API_URL}/api/content/banners/${banner.id}`, { display_order: banner.display_order })));
+      } catch (error) {
+          toast.error('Không thể lưu thứ tự banner.');
+          fetchData();
       }
   };
 
@@ -394,10 +413,15 @@ const Appearance = () => {
                     </div>
                 ) : (
                    banners.map(banner => (
-                    <div key={banner.id} className="bg-white rounded-lg shadow border overflow-hidden relative group">
-                        <div className="h-40 w-full bg-stone-100 relative">
+                    <div key={banner.id} draggable
+                        onDragStart={() => setDraggedBannerId(banner.id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => { reorderBanners(banner.id); setDraggedBannerId(null); }}
+                        onDragEnd={() => setDraggedBannerId(null)}
+                        className={`bg-white rounded-xl shadow border overflow-hidden relative group cursor-grab active:cursor-grabbing ${draggedBannerId === banner.id ? 'opacity-40 ring-2 ring-stone-900' : ''}`}>
+                        <div className="aspect-[4/5] w-full bg-stone-100 relative">
                             <img
-                                src={optimizeImage(banner.image_url, 400)}
+                                src={optimizeImage(banner.image_url, 800)}
                                 alt={banner.title}
                                 className="w-full h-full object-cover"
                                 loading="lazy"

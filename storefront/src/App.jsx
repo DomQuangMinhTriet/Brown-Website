@@ -5,15 +5,15 @@ import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 // ==============================
 // 1. IMPORTS CHO STOREFRONT
 // ==============================
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import Footer from './components/Footer';
-import Preloader from './components/Preloader';
 //import About from './pages/About';
 
 // [Code-split] Trang chủ là điểm vào phổ biến nhất nên tải ngay (eager); các trang
 // còn lại của storefront chỉ tải khi khách thực sự điều hướng tới, giảm dung lượng
 // bundle chính mà mọi khách phải tải khi chỉ ghé trang chủ.
+const Navbar = lazy(() => import('./components/Navbar'));
+const Home = lazy(() => import('./pages/Home'));
+const Footer = lazy(() => import('./components/Footer'));
+const Preloader = lazy(() => import('./components/Preloader'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Collection = lazy(() => import('./pages/Collection'));
@@ -48,6 +48,7 @@ const Appearance = lazy(() => import('./pages/admin/Appearance'));
 const Promotions = lazy(() => import('./pages/admin/Promotions'));
 const CreateOrder = lazy(() => import('./pages/admin/CreateOrder'));
 const DefectiveItems = lazy(() => import('./pages/admin/DefectiveItems'));
+const Policies = lazy(() => import('./pages/admin/Policies'));
 
 // --- Layout Wrapper cho Admin (Realtime & Sidebar) ---
 const AdminLayoutWrapper = () => {
@@ -145,6 +146,7 @@ function App() {
               <Route path="inventory" element={<Inventory />} />
               <Route path="promotions" element={<Promotions />} />
               <Route path="appearance" element={<Appearance />} />
+              <Route path="policies" element={<Policies />} />
               <Route path="reports" element={<Reports />} />
               <Route path="expenses" element={<Expenses />} />
               <Route path="inventory/defective" element={<DefectiveItems />} />

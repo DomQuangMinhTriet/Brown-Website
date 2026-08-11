@@ -35,16 +35,23 @@ export const CartProvider = ({ children }) => {
 
   // --- ACTIONS ---
   const addToCart = (product, variant, quantity = 1) => { // FIX: Mặc định quantity = 1
+      // react-toastify updates its own state. Keep this side effect outside
+      // the functional updater because React can invoke that updater while
+      // CartProvider is rendering.
+      toast.success(`Đã thêm "${product.name}" vào giỏ!`);
+
       setCartItems(prev => {
           const existingItem = prev.find(item => item.variant_id === variant.id);
-          
-          // Thông báo thành công
-          toast.success(`Đã thêm "${product.name}" vào giỏ!`);
 
           if (existingItem) {
               return prev.map(item => 
                   item.variant_id === variant.id 
-                      ? { ...item, quantity: item.quantity + Number(quantity) } 
+                      ? {
+                          ...item,
+                          quantity: item.quantity + Number(quantity),
+                          category_slug: product.categories?.slug || item.category_slug || '',
+                          category_name: product.categories?.name || item.category_name || ''
+                        }
                       : item
               );
           } else {
@@ -63,7 +70,9 @@ export const CartProvider = ({ children }) => {
                   is_discounted: eff.isDiscounted,
                   quantity: Number(quantity), // FIX: Ép kiểu số
                   max_stock: Number(variant.quantity_remaining || 0),
-                  is_preorder: product.is_preorder || false // [MỚI] Lưu cờ preorder
+                  is_preorder: product.is_preorder || false, // [MỚI] Lưu cờ preorder
+                  category_slug: product.categories?.slug || '',
+                  category_name: product.categories?.name || ''
               }];
           }
       });

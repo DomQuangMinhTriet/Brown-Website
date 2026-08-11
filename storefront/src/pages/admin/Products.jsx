@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { FaPlus, FaSearch, FaEdit, FaTrash, FaFileExcel } from 'react-icons/fa';
-import ProductModal from '../../components/ProductModal';
 import { toast } from 'react-toastify';
 import { optimizeImage as getOptimizedImageUrl } from '../../utils/cloudinaryHelper';
+
+const ProductModal = lazy(() => import('../../components/ProductModal'));
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -20,7 +21,7 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true`);
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?admin=true&view=admin-list`);
       if (response.data.success) {
         setProducts(response.data.data);
       }
@@ -45,10 +46,17 @@ const Products = () => {
     }
   };
 
-  const handleEdit = (product) => {
+  const handleEdit = async (product) => {
       if (!product) return;
-      setSelectedProduct(product); 
-      setIsModalOpen(true);        
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${product.slug}?admin=true`);
+        if (response.data.success) {
+          setSelectedProduct(response.data.data);
+          setIsModalOpen(true);
+        }
+      } catch (error) {
+        toast.error('Không thể tải chi tiết sản phẩm: ' + (error.response?.data?.message || error.message));
+      }
   };
 
   const handleCreate = () => {
@@ -56,9 +64,9 @@ const Products = () => {
       setIsModalOpen(true);
   };
 
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = useMemo(() => products.filter(product =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [products, searchTerm]);
 
   // Hàm xử lý xuất file Excel
   const handleExportSapo = async () => {
@@ -203,12 +211,16 @@ const Products = () => {
         )}
       </div>
 
-      <ProductModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={fetchProducts}
-        productToEdit={selectedProduct} 
-      />
+      {isModalOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 text-white">Đang mở trình chỉnh sửa...</div>}>
+          <ProductModal
+            isOpen
+            onClose={() => setIsModalOpen(false)}
+            onSuccess={fetchProducts}
+            productToEdit={selectedProduct}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

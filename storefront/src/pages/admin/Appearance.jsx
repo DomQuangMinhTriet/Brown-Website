@@ -22,6 +22,14 @@ const compressIfImage = async (file) => {
   }
 };
 
+const startBannerReorder = (event, setDraggedBannerId, bannerId) => {
+  // Reordering is state-based, so do not expose the media URL as native drag data.
+  event.dataTransfer?.clearData();
+  event.dataTransfer?.setData('text/plain', '');
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  setDraggedBannerId(bannerId);
+};
+
 const Appearance = () => {
   // --- STATE BANNER ---
   const [banners, setBanners] = useState([]); 
@@ -414,17 +422,19 @@ const Appearance = () => {
                 ) : (
                    banners.map(banner => (
                     <div key={banner.id} draggable
-                        onDragStart={() => setDraggedBannerId(banner.id)}
+                        onDragStart={(event) => startBannerReorder(event, setDraggedBannerId, banner.id)}
                         onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => { reorderBanners(banner.id); setDraggedBannerId(null); }}
+                        onDrop={(event) => { event.preventDefault(); reorderBanners(banner.id); setDraggedBannerId(null); }}
                         onDragEnd={() => setDraggedBannerId(null)}
                         className={`bg-white rounded-xl shadow border overflow-hidden relative group cursor-grab active:cursor-grabbing ${draggedBannerId === banner.id ? 'opacity-40 ring-2 ring-stone-900' : ''}`}>
                         <div className="aspect-[4/5] w-full bg-stone-100 relative">
                             <img
                                 src={optimizeImage(banner.image_url, 800)}
                                 alt={banner.title}
-                                className="w-full h-full object-cover"
+                                className="pointer-events-none h-full w-full select-none object-cover"
                                 loading="lazy"
+                                draggable={false}
+                                onContextMenu={(event) => event.preventDefault()}
                                 onError={(e) => {e.target.src = 'https://via.placeholder.com/400x200?text=Lỗi+Ảnh'}}
                             />
                         </div>

@@ -24,6 +24,14 @@ const readVideoDuration = (file) => new Promise((resolve, reject) => {
     videoEl.src = URL.createObjectURL(file);
 });
 
+// Reordering is state-based, so a media URL must never become native drag data.
+const startMediaReorder = (event, setDraggedIndex, index) => {
+    event.dataTransfer?.clearData();
+    event.dataTransfer?.setData('text/plain', '');
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+};
+
 const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -538,16 +546,18 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                     {images.map((img, idx) => (
                         <div key={img} draggable
-                            onDragStart={() => setDraggedImageIndex(idx)}
+                            onDragStart={(event) => startMediaReorder(event, setDraggedImageIndex, idx)}
                             onDragOver={(event) => event.preventDefault()}
-                            onDrop={() => { moveMediaByDrag(setImages, draggedImageIndex, idx); setDraggedImageIndex(null); }}
+                            onDrop={(event) => { event.preventDefault(); moveMediaByDrag(setImages, draggedImageIndex, idx); setDraggedImageIndex(null); }}
                             onDragEnd={() => setDraggedImageIndex(null)}
                             className={`relative group border border-stone-200 rounded-xl overflow-hidden aspect-[4/5] bg-stone-100 cursor-grab active:cursor-grabbing ${draggedImageIndex === idx ? 'opacity-40 ring-2 ring-cocoa' : ''}`}>
                             <img 
                                     src={getOptimizedImageUrl(img, 400)}
                                 alt="" 
-                                className="w-full h-full object-cover" 
-                                loading="lazy" 
+                                className="pointer-events-none h-full w-full select-none object-cover"
+                                loading="lazy"
+                                draggable={false}
+                                onContextMenu={(event) => event.preventDefault()}
                             />
                             <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-[10px] font-bold text-white">{idx + 1}</span>
                                 <div className="absolute inset-x-0 bottom-0 bg-black/60 flex items-center justify-between px-2 py-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
@@ -580,12 +590,12 @@ const ProductModal = ({ isOpen, onClose, onSuccess, productToEdit }) => {
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                         {videos.map((vid, idx) => (
                             <div key={vid} draggable
-                                onDragStart={() => setDraggedVideoIndex(idx)}
-                                onDragOver={(event) => event.preventDefault()}
-                                onDrop={() => { moveMediaByDrag(setVideos, draggedVideoIndex, idx); setDraggedVideoIndex(null); }}
+                                onDragStart={(event) => startMediaReorder(event, setDraggedVideoIndex, idx)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => { event.preventDefault(); moveMediaByDrag(setVideos, draggedVideoIndex, idx); setDraggedVideoIndex(null); }}
                                 onDragEnd={() => setDraggedVideoIndex(null)}
                                 className={`relative group border border-stone-200 rounded-xl overflow-hidden aspect-[4/5] bg-black cursor-grab active:cursor-grabbing ${draggedVideoIndex === idx ? 'opacity-40 ring-2 ring-cocoa' : ''}`}>
-                                <video src={vid} className="w-full h-full object-cover" muted playsInline />
+                                <video src={vid} className="pointer-events-none h-full w-full select-none object-cover" muted playsInline draggable={false} />
                                 <div className="absolute top-1 left-1 bg-black/60 text-white p-1 rounded-sm pointer-events-none">
                                     <FaVideo size={10} />
                                 </div>

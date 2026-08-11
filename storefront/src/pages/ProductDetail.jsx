@@ -121,6 +121,27 @@ const ProductDetail = () => {
         setMainImage(galleryMedia[nextIndex]);
     };
 
+    const mainImageUrl = mainImage || product?.images?.[0] || 'https://via.placeholder.com/500';
+
+    const handleMainImageError = (event) => {
+        const image = event.currentTarget;
+
+        // Some uploaded assets have a working smaller Cloudinary derivative,
+        // but fail when a large one is requested. Fall back to the same 200px
+        // derivative that is used successfully by the thumbnail.
+        if (image.dataset.usedThumbnailFallback !== 'true') {
+            image.dataset.usedThumbnailFallback = 'true';
+            image.src = getOptimizedImageUrl(mainImageUrl, 200);
+            return;
+        }
+
+        // A direct original remains the final fallback for assets without a
+        // usable Cloudinary derivative.
+        if (image.dataset.usedOriginalFallback === 'true' || !mainImageUrl) return;
+        image.dataset.usedOriginalFallback = 'true';
+        image.src = mainImageUrl;
+    };
+
     if (!product) return <div className="flex min-h-screen items-center justify-center font-heading text-muted">{t('product.loading')}</div>;
 
     const isOutOfStock = getStock(selectedVariant) <= 0;
@@ -153,10 +174,13 @@ const ProductDetail = () => {
                                 />
                             ) : (
                                 <img
-                                    src={getOptimizedImageUrl(mainImage || product.images?.[0] || 'https://via.placeholder.com/500', 1600)}
+                                    key={mainImageUrl}
+                                    src={getOptimizedImageUrl(mainImageUrl, 1000)}
                                     alt={product.name}
                                     className="h-full w-full object-cover"
                                     fetchPriority="high"
+                                    decoding="async"
+                                    onError={handleMainImageError}
                                 />
                             )}
 

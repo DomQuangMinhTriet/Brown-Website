@@ -6,7 +6,12 @@
 // một bản giống hệt nhau (trước đây có 4 bản trùng lặp).
 export const optimizeImage = (url, width = 400) => {
   if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-  const uploadIndex = url.indexOf('upload/') + 7;
-  const transformations = `c_scale,w_${width},f_auto,q_auto/`;
-  return url.substring(0, uploadIndex) + transformations + url.substring(uploadIndex);
+  const uploadIndex = url.indexOf('/upload/');
+  if (uploadIndex === -1) return url;
+
+  const safeWidth = Math.max(1, Math.round(Number(width) || 400));
+  const insertAt = uploadIndex + '/upload/'.length;
+
+  const transformations = `c_scale,w_${safeWidth},f_auto,q_auto/`;
+  return url.substring(0, insertAt) + transformations + url.substring(insertAt);
 };

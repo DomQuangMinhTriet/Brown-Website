@@ -8,12 +8,15 @@ import { optimizeImage } from '../../utils/cloudinaryHelper';
 
 
 // [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
-  const formatColorForTranslate = (color) => {
+const formatColorForTranslate = (color) => {
       if (!color) return '';
       const c = color.toString().trim();
       if (c.toLowerCase() === 'xanh') return 'Xanh dương'; 
       return c;
   };
+
+const isRevenueAdjustment = (product) =>
+    product?.is_revenue_adjustment === true || product?.name === 'Phụ kiện BrownVN';
 
 const CreateOrder = () => {
     // Dữ liệu
@@ -66,15 +69,16 @@ const CreateOrder = () => {
     // Logic Giỏ hàng
     const addToCart = (product, variant) => {
         // [ĐÃ SỬA] Nhận diện phụ kiện để bỏ qua check tồn kho
-        const isAccessory = product.name === 'Phụ kiện BrownVN';
+        const isAccessory = isRevenueAdjustment(product);
+        const tracksInventory = product.tracks_inventory !== false && !isAccessory;
 
-        if (variant.quantity_remaining <= 0 && !isAccessory) return toast.error("Hết hàng!");
+        if (variant.quantity_remaining <= 0 && tracksInventory) return toast.error("Hết hàng!");
         
         setCart(prev => {
             const existing = prev.find(item => item.variant_id === variant.id);
             if (existing) {
                 // [ĐÃ SỬA] Bỏ qua chặn tăng số lượng nếu là Phụ kiện
-                if (existing.quantity >= variant.quantity_remaining && !isAccessory) {
+                if (existing.quantity >= variant.quantity_remaining && tracksInventory) {
                     toast.warn(`Kho chỉ còn ${variant.quantity_remaining} sản phẩm!`);
                     return prev;
                 }
@@ -90,9 +94,11 @@ const CreateOrder = () => {
                 price: eff.price || 0,
                 original_price: eff.original || 0,
                 is_discounted: eff.isDiscounted,
+                tracks_inventory: product.tracks_inventory,
+                is_revenue_adjustment: product.is_revenue_adjustment,
                 quantity: 1,
                 // [ĐÃ SỬA] Set tồn kho ảo vô hạn cho phụ kiện
-                max_stock: isAccessory ? 999999 : variant.quantity_remaining,
+                max_stock: tracksInventory ? variant.quantity_remaining : 999999,
                 image: product.images?.[0]
             }];
         });
@@ -129,7 +135,7 @@ const CreateOrder = () => {
         try {
             const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/promotions/check`, {
                 code: voucherCode,
-                items: cart.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
+                items: cart.map(i => ({ variant_id: i.variant_id, quantity: i.quantity })),
             });
             if (res.data.success) {
                 setDiscountAmount(res.data.data.discountAmount);
@@ -185,7 +191,7 @@ const CreateOrder = () => {
                     const newVariants = p.variants.map(v => {
                         const cartItem = cart.find(c => c.variant_id === v.id);
                         // Không trừ tồn kho nếu là Phụ kiện
-                        if (cartItem && p.name !== 'Phụ kiện BrownVN') {
+                        if (cartItem && p.tracks_inventory !== false && p.name !== 'Phụ kiện BrownVN') {
                             return { 
                                 ...v, 
                                 quantity_remaining: Math.max(0, v.quantity_remaining - cartItem.quantity) 
@@ -243,16 +249,16 @@ const CreateOrder = () => {
                                 <div className="flex flex-wrap gap-1 mt-2">
                                     {/* [ĐÃ SỬA] Xử lý hiển thị nút chọn cho Phụ kiện */}
                                     {p.variants?.map(v => {
-                                        const isAccessory = p.name === 'Phụ kiện BrownVN';
+                                        const isAccessory = isRevenueAdjustment(p);
                                         const hasStock = v.quantity_remaining > 0;
 
                                         return (
                                             <button 
                                                 key={v.id} 
                                                 onClick={() => addToCart(p, v)} 
-                                                disabled={!hasStock && !isAccessory} 
+                                                disabled={!hasStock && p.tracks_inventory !== false && !isAccessory}
                                                 className={`text-xs px-2 py-1 border rounded ${
-                                                    hasStock || isAccessory
+                                                    hasStock || p.tracks_inventory === false || isAccessory
                                                     ? 'hover:bg-stone-800 hover:text-white' 
                                                     : 'bg-stone-100 text-stone-300 line-through'
                                                 }`}
@@ -291,7 +297,7 @@ const CreateOrder = () => {
                                 <div className="text-xs text-stone-500">{item.size} / {formatColorForTranslate(item.color)}</div>
                                 
                                 {/* HIỂN THỊ Ô NHẬP GIÁ NẾU LÀ PHỤ KIỆN BROWNVN */}
-                                {item.name === 'Phụ kiện BrownVN' ? (
+                                {isRevenueAdjustment(item) ? (
                                     <div className="mt-2 flex items-center gap-2">
                                         <span className="text-xs font-bold text-stone-500">Giá:</span>
                                         <input 

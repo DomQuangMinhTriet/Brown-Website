@@ -500,7 +500,10 @@ const Reports = () => {
                                       ) : (
                                           <div className="w-10 h-10 rounded bg-stone-100 border border-stone-200 shrink-0" />
                                       )}
-                                      <span className="font-medium text-stone-700">{p.name}</span>
+                                      <div>
+                                        <span className="font-medium text-stone-700">{p.name}</span>
+                                        {p.is_revenue_adjustment && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-blue-600">Khoản thu điều chỉnh</span>}
+                                      </div>
                                   </div>
                               </td>
                               <td className="p-4 text-right text-stone-600">{p.quantity}</td>

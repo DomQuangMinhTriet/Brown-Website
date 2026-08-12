@@ -81,7 +81,7 @@ exports.getProducts = async (req, res) => {
             : view === 'card'
                 ? `
                     id, name, name_en, slug, base_price, category_id, images,
-                    is_active, is_preorder, preorder_note,
+                    is_active, is_preorder, preorder_note, tracks_inventory, is_revenue_adjustment,
                     variants (
                         id, size, color, color_en, sku, image_url, is_deleted, display_order,
                         discount_amount, is_discount_active,

@@ -143,3 +143,7 @@ vite.config.ts.timestamp-*
 
 # Database dumps and local SQL migrations stay local; never commit them.
 /database/
+# Keep versioned production migrations while continuing to ignore local dumps.
+!/database/
+/database/*
+!/database/20260812_fix_accessory_inventory.sql

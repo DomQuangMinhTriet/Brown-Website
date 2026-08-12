@@ -1,5 +1,12 @@
 const supabase = require('../config/supabase');
 
+// A non-inventory product has intentionally no COGS. Do not apply the legacy
+// 70% fallback to it, otherwise a zero COGS line becomes a false loss again.
+const hasNoInventoryCost = (product) =>
+    product?.tracks_inventory === false || product?.name === 'Phụ kiện BrownVN';
+const isRevenueAdjustment = (product) =>
+    product?.is_revenue_adjustment === true || product?.name === 'Phụ kiện BrownVN';
+
 exports.getDashboardStats = async (req, res) => {
     try {
         // [MỚI] Lấy ngày đầu và ngày cuối của tháng hiện tại
@@ -83,7 +90,8 @@ exports.getFinancialReport = async (req, res) => {
                 order_items (
                     price_at_purchase,
                     quantity,
-                    cogs_total
+                    cogs_total,
+                    variants ( products ( name, tracks_inventory ) )
                 )
             `)
             // [SỬA 2] LẤY ĐƠN HOÀN THÀNH VÀ ĐANG GIAO
@@ -115,7 +123,7 @@ exports.getFinancialReport = async (req, res) => {
             const orderCogs = o.order_items.reduce((itemSum, item) => {
                 let cost = item.cogs_total || 0;
                 // Nếu dữ liệu cũ chưa có giá vốn, tạm tính = 70% giá bán
-                if (cost === 0 && item.price_at_purchase > 0) {
+                if (cost === 0 && item.price_at_purchase > 0 && !hasNoInventoryCost(item.variants?.products)) {
                     cost = (item.price_at_purchase * item.quantity) * 0.7; 
                 }
                 return itemSum + cost;
@@ -199,7 +207,7 @@ exports.getProductSalesReport = async (req, res) => {
                 created_at, status,
                 order_items (
                     quantity, price_at_purchase, cogs_total,
-                    variants ( product_id, products ( id, name, images ) )
+                    variants ( product_id, products ( id, name, images, tracks_inventory, is_revenue_adjustment ) )
                 )
             `)
             .in('status', ['completed', 'shipping'])
@@ -223,6 +231,7 @@ exports.getProductSalesReport = async (req, res) => {
                         quantity: 0,
                         revenue: 0,
                         cogs: 0,
+                        is_revenue_adjustment: isRevenueAdjustment(product),
                     };
                 }
                 map[product.id].quantity += item.quantity || 0;
@@ -259,7 +268,7 @@ exports.getMonthlyFinancialReport = async (req, res) => {
         // Hàm helper để truy xuất số liệu theo khoảng thời gian
         const getStatsForPeriod = async (start, end) => {
             const [ordersRes, expensesRes] = await Promise.all([
-                supabase.from('orders').select('total_amount, order_items(cogs_total)')
+                supabase.from('orders').select('total_amount, order_items(cogs_total, variants(products(name, tracks_inventory)))')
                         .in('status', ['completed', 'shipping']).gte('created_at', start).lte('created_at', end),
                 supabase.from('expenses').select('amount').gte('expense_date', start).lte('expense_date', end)
             ]);

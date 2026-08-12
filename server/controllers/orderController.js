@@ -5,6 +5,15 @@ const { calculateShippingFee, createGHNOrder } = require('../services/shippingSe
 const { z } = require('zod');
 const exceljs = require('exceljs');
 
+// The manual "Phụ kiện BrownVN" line is a revenue adjustment, not merchandise.
+// The database flags are the source of truth; the name fallback protects legacy
+// data until the migration has been applied.
+const ACCESSORY_PRODUCT_NAME = 'Phụ kiện BrownVN';
+const doesProductTrackInventory = (product) =>
+    product?.tracks_inventory !== false && product?.name !== ACCESSORY_PRODUCT_NAME;
+const isRevenueAdjustment = (product) =>
+    product?.is_revenue_adjustment === true || product?.name === ACCESSORY_PRODUCT_NAME;
+
 // --- 1. CẬP NHẬT BỘ LỌC DỮ LIỆU (VALIDATION SCHEMA) ---
 const orderSchema = z.object({
     customer: z.object({
@@ -123,7 +132,7 @@ exports.createOrder = async (req, res) => {
                 size, color, color_en,
                 current_price,
                 discount_amount, is_discount_active,
-                products(id, name, base_price, is_preorder),
+                products(id, name, base_price, is_preorder, tracks_inventory, is_revenue_adjustment),
                 inventory_batches(quantity_remaining)
             `)
             .in('id', variantIds);
@@ -136,20 +145,21 @@ exports.createOrder = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Sản phẩm không còn tồn tại.` });
             }
 
+            const tracksInventory = doesProductTrackInventory(variant.products);
             const totalStock = variant.inventory_batches
                 ? variant.inventory_batches.reduce((sum, batch) => sum + (Number(batch.quantity_remaining) || 0), 0)
                 : 0;
 
             const isPreorder = variant.products?.is_preorder;
 
-            if (!isPreorder && item.quantity > totalStock) {
+            if (tracksInventory && !isPreorder && item.quantity > totalStock) {
                 return res.status(400).json({ 
                     success: false, 
                     message: `Rất tiếc! Một sản phẩm trong giỏ hàng của bạn hiện chỉ còn ${totalStock} chiếc. Vui lòng cập nhật lại số lượng.` 
                 });
             }
 
-            if (item.quantity > totalStock) {
+            if (tracksInventory && item.quantity > totalStock) {
                 itemsToNegative.push({
                     variant_id: item.variant_id,
                     excess_qty: item.quantity - totalStock
@@ -169,19 +179,21 @@ exports.createOrder = async (req, res) => {
                 product_id: prod?.id,
                 quantity: item.quantity,
                 unit_price: realPrice,
-                on_discount: onDiscount
+                on_discount: onDiscount,
+                is_revenue_adjustment: isRevenueAdjustment(prod)
             });
 
-            const { data: latestBatch } = await supabase
-                .from('inventory_batches')
-                .select('cost_price')
-                .eq('variant_id', item.variant_id)
-                .order('created_at', { ascending: false }) 
-                .limit(1)
-                .single();
-
-            const unitCost = latestBatch ? Number(latestBatch.cost_price) : 0;
-            const totalCogs = unitCost * item.quantity;
+            let totalCogs = 0;
+            if (tracksInventory) {
+                const { data: latestBatch } = await supabase
+                    .from('inventory_batches')
+                    .select('cost_price')
+                    .eq('variant_id', item.variant_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                totalCogs = (latestBatch ? Number(latestBatch.cost_price) : 0) * item.quantity;
+            }
 
             cleanItems.push({
                 variant_id: item.variant_id,
@@ -384,7 +396,7 @@ exports.updateOrderStatus = async (req, res) => {
                         size,
                         color,
                         weight, 
-                        products ( name )
+                        products ( name, tracks_inventory, is_revenue_adjustment )
                     )
                 )
             `)
@@ -432,7 +444,8 @@ exports.updateOrderStatus = async (req, res) => {
                     // này cần giá vốn thủ công (client gửi cost_price_overrides), không tự ý để 0đ.
                     const batchByVariant = {};
                     const missing = [];
-                    for (const item of orderItems) {
+                    const stockItems = orderItems.filter((item) => doesProductTrackInventory(item.variants?.products));
+                    for (const item of stockItems) {
                         const { data: latestBatch } = await supabase.from('inventory_batches')
                             .select('id, quantity_remaining')
                             .eq('variant_id', item.variant_id)
@@ -462,7 +475,7 @@ exports.updateOrderStatus = async (req, res) => {
                     }
 
                     // Pass 2: áp dụng hoàn kho thật
-                    for (const item of orderItems) {
+                    for (const item of stockItems) {
                         const latestBatch = batchByVariant[item.variant_id];
                         if (latestBatch) {
                             await supabase.from('inventory_batches')
@@ -508,6 +521,12 @@ exports.updateOrderStatus = async (req, res) => {
 exports.createAdminOrder = async (req, res) => {
     try {
         const { customer, items, payment_method, note, shipping_fee, is_paid, voucher_code, discount_amount } = req.body;
+        if (!customer || !Array.isArray(items) || items.length === 0 || items.some((item) =>
+            !Number.isInteger(item?.variant_id) || !Number.isInteger(item?.quantity) || item.quantity < 1 ||
+            !Number.isFinite(Number(item?.price)) || Number(item.price) < 0
+        )) {
+            return res.status(400).json({ success: false, message: 'Dữ liệu sản phẩm trong đơn không hợp lệ.' });
+        }
         const discountAmt = Number(discount_amount) || 0;
 
         let customerId = null;
@@ -553,6 +572,16 @@ exports.createAdminOrder = async (req, res) => {
             if (promo) { promotionId = promo.id; promoRow = promo; }
         }
 
+        const variantIds = [...new Set(items.map((item) => item.variant_id))];
+        const { data: variantsDB, error: variantsError } = await supabase
+            .from('variants')
+            .select('id, products(name, tracks_inventory, is_revenue_adjustment)')
+            .in('id', variantIds);
+        if (variantsError || !variantsDB || variantsDB.length !== variantIds.length) {
+            return res.status(400).json({ success: false, message: 'Một hoặc nhiều biến thể trong đơn không tồn tại.' });
+        }
+        const variantById = new Map(variantsDB.map((variant) => [variant.id, variant]));
+
         const orderPayload = {
             code: orderCode,
             customer_id: customerId,
@@ -585,16 +614,18 @@ exports.createAdminOrder = async (req, res) => {
         const orderItemsData = [];
 
         for (const item of items) {
-            const { data: latestBatch } = await supabase
-                .from('inventory_batches')
-                .select('cost_price')
-                .eq('variant_id', item.variant_id)
-                .order('created_at', { ascending: false }) 
-                .limit(1)
-                .single();
-
-            const unitCost = latestBatch ? Number(latestBatch.cost_price) : 0;
-            const totalCogs = unitCost * item.quantity;
+            const tracksInventory = doesProductTrackInventory(variantById.get(item.variant_id)?.products);
+            let totalCogs = 0;
+            if (tracksInventory) {
+                const { data: latestBatch } = await supabase
+                    .from('inventory_batches')
+                    .select('cost_price')
+                    .eq('variant_id', item.variant_id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                totalCogs = (latestBatch ? Number(latestBatch.cost_price) : 0) * item.quantity;
+            }
 
             orderItemsData.push({
                 order_id: order.id,
@@ -611,6 +642,7 @@ exports.createAdminOrder = async (req, res) => {
         console.log("--- BẮT ĐẦU TRỪ KHO FIFO ---");
 
         for (const item of items) {
+            if (!doesProductTrackInventory(variantById.get(item.variant_id)?.products)) continue;
             let remainingNeeded = item.quantity; 
 
             const { data: batches } = await supabase
@@ -676,7 +708,7 @@ exports.bulkUpdateOrderStatus = async (req, res) => {
 
         for (const id of orderIds) {
             try {
-                const { data: currentOrder } = await supabase.from('orders').select('*, order_items(*)').eq('id', id).single();
+                const { data: currentOrder } = await supabase.from('orders').select('*, order_items(*, variants(products(name, tracks_inventory, is_revenue_adjustment)))').eq('id', id).single();
                 if (!currentOrder) continue;
 
                 let trackingCode = currentOrder.shipping_tracking_code;
@@ -697,7 +729,8 @@ exports.bulkUpdateOrderStatus = async (req, res) => {
                         // Pass 1: biến thể nào chưa từng có lô kho nào thì KHÔNG được tự ý tạo lô 0đ —
                         // fail riêng đơn này (không chặn cả loạt), admin xử lý thủ công qua trang chi tiết đơn.
                         const batchByVariant = {};
-                        for (const item of orderItems) {
+                        const stockItems = orderItems.filter((item) => doesProductTrackInventory(item.variants?.products));
+                        for (const item of stockItems) {
                             const { data: batch } = await supabase.from('inventory_batches')
                                 .select('id, quantity_remaining')
                                 .eq('variant_id', item.variant_id)
@@ -708,7 +741,7 @@ exports.bulkUpdateOrderStatus = async (req, res) => {
                             }
                         }
 
-                        for (const item of orderItems) {
+                        for (const item of stockItems) {
                             const batch = batchByVariant[item.variant_id];
                             await supabase.from('inventory_batches').update({ quantity_remaining: batch.quantity_remaining + item.quantity }).eq('id', batch.id);
                         }

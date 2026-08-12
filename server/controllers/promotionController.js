@@ -37,7 +37,10 @@ async function evaluateVoucher(code, lineItems) {
         return { ok: false, message: 'Mã đã hết lượt sử dụng' };
     }
 
-    const cartTotal = lineItems.reduce((s, li) => s + li.unit_price * li.quantity, 0);
+    // Revenue adjustments (outside shipping, bags, ad-hoc fees) are not items
+    // that can qualify for or receive a merchandise voucher.
+    const merchandiseItems = lineItems.filter((li) => !li.is_revenue_adjustment);
+    const cartTotal = merchandiseItems.reduce((s, li) => s + li.unit_price * li.quantity, 0);
     if (cartTotal < (promo.min_order_value || 0)) {
         return {
             ok: false,
@@ -52,7 +55,8 @@ async function evaluateVoucher(code, lineItems) {
     // Phần tiền được tính giảm: SP KHÔNG đang giảm giá trực tiếp
     // và (nếu có danh sách áp dụng) phải nằm trong danh sách đó.
     const eligibleItems = lineItems.filter(li =>
-        !li.on_discount && (applicable.length === 0 || applicable.includes(Number(li.product_id)))
+        !li.is_revenue_adjustment && !li.on_discount &&
+        (applicable.length === 0 || applicable.includes(Number(li.product_id)))
     );
     const eligibleSubtotal = eligibleItems.reduce((s, li) => s + li.unit_price * li.quantity, 0);
 
@@ -154,7 +158,7 @@ exports.checkVoucher = async (req, res) => {
             const variantIds = [...new Set(items.map(i => i.variant_id).filter(Boolean))];
             const { data: variants } = await supabase
                 .from('variants')
-                .select('id, discount_amount, is_discount_active, products(id, base_price)')
+                .select('id, discount_amount, is_discount_active, products(id, name, base_price, is_revenue_adjustment)')
                 .in('id', variantIds.length ? variantIds : [-1]);
 
             const vmap = {};
@@ -168,7 +172,13 @@ exports.checkVoucher = async (req, res) => {
                 const unit = onDiscount
                     ? Math.max(0, basePrice - Number(v.discount_amount))
                     : basePrice;
-                return { product_id: v.products.id, quantity: Number(i.quantity) || 1, unit_price: unit, on_discount: onDiscount };
+                return {
+                    product_id: v.products.id,
+                    quantity: Number(i.quantity) || 1,
+                    unit_price: unit,
+                    on_discount: onDiscount,
+                    is_revenue_adjustment: v.products.is_revenue_adjustment === true || v.products.name === 'Phụ kiện BrownVN'
+                };
             }).filter(Boolean);
         } else if (cartTotal != null) {
             // Fallback tương thích client cũ: coi cả giỏ như 1 dòng, không thuộc SP giảm giá

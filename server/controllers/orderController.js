@@ -18,7 +18,7 @@ const isRevenueAdjustment = (product) =>
 const orderSchema = z.object({
     customer: z.object({
         fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
-        phone: z.string().min(8, "Số điện thoại phải có ít nhất 8 ký tự"), 
+        phone: z.string().regex(/^0\d{9}$/, "Số điện thoại phải gồm đúng 10 chữ số"),
         email: z.string().email("Email không hợp lệ").nullable().optional().or(z.literal('')),
         address: z.string().min(5, "Địa chỉ quá ngắn"),
         province: z.string().nullable().optional(),

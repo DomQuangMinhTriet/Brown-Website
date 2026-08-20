@@ -134,6 +134,7 @@ export const translations = {
       toast_tet_closed: "Shop đang nghỉ Tết, tạm thời chưa nhận đơn mới!",
       toast_hcm_only: "Xin lỗi, sau 8/2 Shop chỉ nhận đơn giao tại TP.HCM để kịp trước Tết!",
       toast_missing_info: "Vui lòng điền đầy đủ thông tin giao hàng!",
+      toast_invalid_phone: "Số điện thoại không hợp lệ (phải gồm đúng 10 chữ số)!",
 
       shipping_type: "Khu vực giao hàng",
       domestic: "Trong nước (Việt Nam)",
@@ -364,6 +365,7 @@ export const translations = {
       toast_tet_closed: "We are currently closed for the holiday and not accepting new orders!",
       toast_hcm_only: "Sorry, after Feb 8th we only accept orders within HCMC to ensure delivery before Tet!",
       toast_missing_info: "Please fill in all required shipping information!",
+      toast_invalid_phone: "Invalid phone number (must be exactly 10 digits)!",
 
       // ... các từ cũ
       shipping_type: "Shipping Destination",

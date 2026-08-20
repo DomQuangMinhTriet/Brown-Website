@@ -26,6 +26,8 @@ const COUNTRY_LIST = [
   { code: 'JP', name: 'Japan', mockFee: 'To be announced later' },
 ];
 
+const PHONE_REGEX = /^0\d{9}$/;
+
 const inputCls = 'w-full rounded-xl border border-sand bg-cream p-3 text-ink outline-none transition-colors focus:border-cocoa placeholder:text-muted/60';
 const selectCls = 'w-full rounded-xl border border-sand bg-cream p-3 text-ink outline-none transition-colors focus:border-cocoa';
 
@@ -248,6 +250,8 @@ const Checkout = () => {
     }
   };
 
+  const isPhoneValid = () => PHONE_REGEX.test(formData.phone);
+
   const handleDomesticSubmit = async (e) => {
     e.preventDefault();
     if (shippingType === 'international') return;
@@ -259,6 +263,11 @@ const Checkout = () => {
 
     if (!isFormValid()) {
         toast.warning(t('checkout.toast_missing_info'));
+        return;
+    }
+
+    if (!isPhoneValid()) {
+        toast.warning(t('checkout.toast_invalid_phone'));
         return;
     }
 
@@ -368,8 +377,10 @@ const Checkout = () => {
                                     value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
 
                                 <div className="grid grid-cols-2 items-start gap-4">
-                                    <input type="text" placeholder={t('checkout.phone')} required className={inputCls}
-                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                    <input type="tel" inputMode="numeric" placeholder={t('checkout.phone')} required
+                                        pattern="0[0-9]{9}" maxLength={10} className={inputCls}
+                                        value={formData.phone}
+                                        onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} />
                                     <div>
                                         <input type="email" placeholder={t('checkout.email')} className={inputCls}
                                             value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />

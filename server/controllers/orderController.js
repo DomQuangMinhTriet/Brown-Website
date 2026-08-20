@@ -4,6 +4,7 @@ const { sendOrderConfirmation, sendShippingConfirmation, sendNewOrderNotifyToAdm
 const { calculateShippingFee, createGHNOrder } = require('../services/shippingService'); // <--- IMPORT HELPER
 const { z } = require('zod');
 const exceljs = require('exceljs');
+const { PHONE_REGEX, isValidPhone } = require('../utils/validation');
 
 // The manual "Phụ kiện BrownVN" line is a revenue adjustment, not merchandise.
 // The database flags are the source of truth; the name fallback protects legacy
@@ -18,7 +19,7 @@ const isRevenueAdjustment = (product) =>
 const orderSchema = z.object({
     customer: z.object({
         fullName: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
-        phone: z.string().regex(/^0\d{9}$/, "Số điện thoại phải gồm đúng 10 chữ số"),
+        phone: z.string().regex(PHONE_REGEX, "Số điện thoại phải gồm đúng 10 chữ số"),
         email: z.string().email("Email không hợp lệ").nullable().optional().or(z.literal('')),
         address: z.string().min(5, "Địa chỉ quá ngắn"),
         province: z.string().nullable().optional(),
@@ -526,6 +527,9 @@ exports.createAdminOrder = async (req, res) => {
             !Number.isFinite(Number(item?.price)) || Number(item.price) < 0
         )) {
             return res.status(400).json({ success: false, message: 'Dữ liệu sản phẩm trong đơn không hợp lệ.' });
+        }
+        if (!isValidPhone(customer.phone)) {
+            return res.status(400).json({ success: false, message: 'Số điện thoại phải gồm đúng 10 chữ số.' });
         }
         const discountAmt = Number(discount_amount) || 0;
 

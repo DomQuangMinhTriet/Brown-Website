@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { isValidPhone } = require('../utils/validation');
 
 exports.getCustomers = async (req, res) => {
     try {
@@ -116,6 +117,10 @@ exports.updateMyProfile = async (req, res) => {
     try {
         const userId = req.user.id;
         const { full_name, phone, address } = req.body;
+
+        if (!isValidPhone(phone)) {
+            return res.status(400).json({ success: false, message: 'Số điện thoại phải gồm đúng 10 chữ số.' });
+        }
 
         const { data, error } = await supabase
             .from('customers')

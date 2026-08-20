@@ -173,7 +173,8 @@ export const translations = {
       fullname: "Họ và tên",
       phone: "Số điện thoại",
       toast_register_success: "✅ Đăng ký thành công! Bạn đã được tự động đăng nhập.",
-      toast_error: "❌ Lỗi: "
+      toast_error: "❌ Lỗi: ",
+      toast_invalid_phone: "Số điện thoại không hợp lệ (phải gồm đúng 10 chữ số)!"
     },
     profile: {
       title: "Tài khoản của tôi",
@@ -187,7 +188,8 @@ export const translations = {
       phone: "Số điện thoại",
       address: "Địa chỉ cụ thể",
       toast_update_success: "✅ Cập nhật thành công!",
-      toast_update_error: "Lỗi cập nhật"
+      toast_update_error: "Lỗi cập nhật",
+      toast_invalid_phone: "Số điện thoại không hợp lệ (phải gồm đúng 10 chữ số)!"
     },
     footer: {
       about: "Về BROWN",
@@ -404,7 +406,8 @@ export const translations = {
       fullname: "Full Name",
       phone: "Phone Number",
       toast_register_success: "✅ Registration successful! You are now logged in.",
-      toast_error: "❌ Error: "
+      toast_error: "❌ Error: ",
+      toast_invalid_phone: "Invalid phone number (must be exactly 10 digits)!"
     },
     profile: {
       title: "My Account",
@@ -418,7 +421,8 @@ export const translations = {
       phone: "Phone Number",
       address: "Specific Address",
       toast_update_success: "✅ Profile updated successfully!",
-      toast_update_error: "Update failed"
+      toast_update_error: "Update failed",
+      toast_invalid_phone: "Invalid phone number (must be exactly 10 digits)!"
     },
     footer: {
       about: "About BROWN",

@@ -5,6 +5,7 @@ import { FaSearch, FaUser, FaMapMarkerAlt, FaPhone, FaTrash, FaBoxOpen, FaTag, F
 import { toast } from 'react-toastify';
 import { getEffectivePrice } from '../../utils/currencyHelper';
 import { optimizeImage } from '../../utils/cloudinaryHelper';
+import { isValidPhone, sanitizePhoneInput } from '../../utils/validation';
 
 
 // [MỚI] Hàm ép chữ Xanh thành Xanh dương để Google Translate dịch thành Blue
@@ -159,6 +160,7 @@ const CreateOrder = () => {
     const handleCreateOrder = async () => {
         if (cart.length === 0) return toast.error("Giỏ hàng trống!");
         if (!customerInfo.phone) return toast.error("Vui lòng nhập SĐT khách hàng");
+        if (!isValidPhone(customerInfo.phone)) return toast.error("Số điện thoại không hợp lệ (phải gồm đúng 10 chữ số)!");
 
         const payload = {
             customer: {
@@ -279,7 +281,7 @@ const CreateOrder = () => {
                 <h2 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUser/> Khách hàng</h2>
                 <div className="space-y-4">
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Tên khách (*)</label><input className="w-full p-2 border rounded bg-white text-sm" value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} /></div>
-                    <div><label className="text-xs font-bold text-stone-500 block mb-1">Điện thoại (*)</label><div className="relative"><FaPhone className="absolute left-3 top-3 text-stone-400 text-xs"/><input className="w-full pl-8 p-2 border rounded bg-white text-sm" value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} /></div></div>
+                    <div><label className="text-xs font-bold text-stone-500 block mb-1">Điện thoại (*)</label><div className="relative"><FaPhone className="absolute left-3 top-3 text-stone-400 text-xs"/><input type="tel" inputMode="numeric" maxLength={10} className="w-full pl-8 p-2 border rounded bg-white text-sm" value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: sanitizePhoneInput(e.target.value)})} /></div></div>
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Địa chỉ giao</label><div className="relative"><FaMapMarkerAlt className="absolute left-3 top-3 text-stone-400 text-xs"/><textarea className="w-full pl-8 p-2 border rounded bg-white h-20 text-sm" value={customerInfo.address} onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})} /></div></div>
                     <div><label className="text-xs font-bold text-stone-500 block mb-1">Ghi chú</label><input className="w-full p-2 border rounded bg-white text-sm" placeholder="Nguồn đơn..." value={customerInfo.note} onChange={e => setCustomerInfo({...customerInfo, note: e.target.value})} /></div>
                 </div>

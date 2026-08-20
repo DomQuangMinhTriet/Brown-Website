@@ -6,6 +6,7 @@ import { ORDER_STATUS_MAP } from '../utils/translations';
 import { useLanguage } from '../context/LanguageContext';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation';
 
 const inputCls =
   'w-full mt-2 rounded-xl border border-sand bg-cream px-4 py-3 text-ink outline-none transition-colors focus:border-cocoa';
@@ -40,6 +41,12 @@ const Profile = () => {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+
+    if (!isValidPhone(formData.phone)) {
+      alert(t('profile.toast_invalid_phone'));
+      return;
+    }
+
     try {
       const token = getToken();
       await axios.put(`${import.meta.env.VITE_API_URL}/api/customers/me/profile`, formData, {
@@ -78,7 +85,7 @@ const Profile = () => {
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('profile.phone')}</label>
-              <input type="text" className={inputCls} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+              <input type="tel" inputMode="numeric" pattern="0[0-9]{9}" maxLength={10} className={inputCls} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: sanitizePhoneInput(e.target.value) })} />
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('profile.address')}</label>

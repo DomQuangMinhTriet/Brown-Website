@@ -10,6 +10,7 @@ import { formatPrice } from '../utils/currencyHelper';
 import Container from '../components/ui/Container';
 import Button from '../components/ui/Button';
 import { clearApiCache } from '../utils/apiCache';
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation';
 
 // CẤU HÌNH API GHN
 const GHN_TOKEN = '7a83a4ad-f72f-11f0-835a-aa01149835ce';
@@ -25,8 +26,6 @@ const COUNTRY_LIST = [
   { code: 'KR', name: 'South Korea', mockFee: 'To be announced later' },
   { code: 'JP', name: 'Japan', mockFee: 'To be announced later' },
 ];
-
-const PHONE_REGEX = /^0\d{9}$/;
 
 const inputCls = 'w-full rounded-xl border border-sand bg-cream p-3 text-ink outline-none transition-colors focus:border-cocoa placeholder:text-muted/60';
 const selectCls = 'w-full rounded-xl border border-sand bg-cream p-3 text-ink outline-none transition-colors focus:border-cocoa';
@@ -250,7 +249,7 @@ const Checkout = () => {
     }
   };
 
-  const isPhoneValid = () => PHONE_REGEX.test(formData.phone);
+  const isPhoneValid = () => isValidPhone(formData.phone);
 
   const handleDomesticSubmit = async (e) => {
     e.preventDefault();
@@ -380,7 +379,7 @@ const Checkout = () => {
                                     <input type="tel" inputMode="numeric" placeholder={t('checkout.phone')} required
                                         pattern="0[0-9]{9}" maxLength={10} className={inputCls}
                                         value={formData.phone}
-                                        onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} />
+                                        onChange={e => setFormData({...formData, phone: sanitizePhoneInput(e.target.value)})} />
                                     <div>
                                         <input type="email" placeholder={t('checkout.email')} className={inputCls}
                                             value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />

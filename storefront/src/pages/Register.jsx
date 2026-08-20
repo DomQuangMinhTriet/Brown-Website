@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import Button from '../components/ui/Button';
+import { isValidPhone, sanitizePhoneInput } from '../utils/validation';
 
 const inputCls =
   'w-full mt-2 rounded-xl border border-sand bg-cream px-4 py-3 text-ink outline-none transition-colors focus:border-cocoa placeholder:text-muted/60';
@@ -15,6 +16,12 @@ const Register = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    if (!isValidPhone(formData.phone)) {
+      alert(t('auth.toast_invalid_phone'));
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -56,7 +63,7 @@ const Register = () => {
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-muted">{t('auth.phone')}</label>
-            <input type="tel" className={inputCls} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required autoComplete="tel" />
+            <input type="tel" inputMode="numeric" pattern="0[0-9]{9}" maxLength={10} className={inputCls} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: sanitizePhoneInput(e.target.value) })} required autoComplete="tel" />
           </div>
 
           <div>

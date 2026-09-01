@@ -425,8 +425,8 @@ const Appearance = () => {
             <FaImage /> Banner Trang chủ
         </h2>
         <p className="text-sm text-stone-500 mb-6 max-w-2xl">
-            Khung banner là khối ngang <b>tỉ lệ cố định 16:9</b>, đóng khung và căn giữa — giống hệt nhau
-            trên cả điện thoại lẫn máy tính (không full-bleed ngang, không đổi tỉ lệ theo màn hình).
+            Khung banner tràn hết chiều ngang màn hình (full-bleed), giữ <b>tỉ lệ cố định 16:9</b> — giống
+            hệt nhau trên cả điện thoại lẫn máy tính (chỉ đổi chiều rộng theo màn hình, tỉ lệ không đổi).
             Nên chuẩn bị ảnh đúng tỉ lệ 16:9 (vd. <b>1920×1080px</b>), ảnh vẫn bị crop nhẹ để lấp khung
             (object-cover) và có hiệu ứng zoom mờ dần (Ken Burns), nên đặt chủ thể/chữ chính giữa ảnh,
             tránh sát 4 cạnh.

@@ -104,47 +104,45 @@ const Home = () => {
       <SEO title={t('home.title')} />
 
       {/* ============================================================
-          1. HERO — BANNER khung ngang 16:9 cố định, đóng khung & căn giữa
-             (đồng nhất trên mọi kích thước màn hình, không full-bleed ngang)
+          1. HERO — BANNER khung ngang 16:9 cố định, full-bleed hết chiều
+             ngang màn hình (đồng nhất tỉ lệ trên mọi kích thước màn hình)
          ============================================================ */}
-      <section className="w-full bg-parchment py-8 md:py-12">
-        <div className="relative mx-auto aspect-video w-full max-w-full overflow-hidden rounded-2xl sm:max-w-[640px] md:max-w-[900px] lg:max-w-[1100px]">
-          {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center font-sugo text-4xl tracking-[0.1em] text-muted animate-pulse">BROWN</div>
-          ) : banners.length > 0 ? (
-            banners.map((banner, index) => (
-              <Link
-                to={banner.link_to || '/collection'}
-                key={banner.id}
-                className={`absolute inset-0 block transition-opacity duration-[1200ms] ease-in-out ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-              >
-                {isVideo(banner.image_url) ? (
-                  <video autoPlay={index === currentBanner} preload={index === currentBanner ? 'auto' : 'metadata'} loop muted playsInline className="h-full w-full object-cover">
-                    <source src={banner.image_url} type="video/mp4" />
-                  </video>
-                ) : (
-                  <img src={optimizeImage(banner.image_url, 1600)} alt={banner.title || 'BROWN'} loading={index === 0 ? 'eager' : 'lazy'} fetchPriority={index === 0 ? 'high' : 'auto'} decoding="async" className="h-full w-full object-cover animate-ken-burns" />
-                )}
-              </Link>
-            ))
-          ) : (
-            <div className="absolute inset-0 bg-cocoa" />
-          )}
+      <section className="relative w-full overflow-hidden bg-parchment aspect-video">
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center font-sugo text-4xl tracking-[0.1em] text-muted animate-pulse">BROWN</div>
+        ) : banners.length > 0 ? (
+          banners.map((banner, index) => (
+            <Link
+              to={banner.link_to || '/collection'}
+              key={banner.id}
+              className={`absolute inset-0 block transition-opacity duration-[1200ms] ease-in-out ${index === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            >
+              {isVideo(banner.image_url) ? (
+                <video autoPlay={index === currentBanner} preload={index === currentBanner ? 'auto' : 'metadata'} loop muted playsInline className="h-full w-full object-cover">
+                  <source src={banner.image_url} type="video/mp4" />
+                </video>
+              ) : (
+                <img src={optimizeImage(banner.image_url, 1600)} alt={banner.title || 'BROWN'} loading={index === 0 ? 'eager' : 'lazy'} fetchPriority={index === 0 ? 'high' : 'auto'} decoding="async" className="h-full w-full object-cover animate-ken-burns" />
+              )}
+            </Link>
+          ))
+        ) : (
+          <div className="absolute inset-0 bg-cocoa" />
+        )}
 
-          {/* Chỉ giữ chấm điều hướng, không có chữ đè */}
-          {!loading && banners.length > 1 && (
-            <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
-              {banners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => { e.preventDefault(); setCurrentBanner(idx); }}
-                  aria-label={`Banner ${idx + 1}`}
-                  className={`h-1.5 rounded-full shadow-sm transition-all duration-500 ${idx === currentBanner ? 'w-8 bg-cream' : 'w-2 bg-cream/60 hover:bg-cream'}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Chỉ giữ chấm điều hướng, không có chữ đè */}
+        {!loading && banners.length > 1 && (
+          <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+            {banners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.preventDefault(); setCurrentBanner(idx); }}
+                aria-label={`Banner ${idx + 1}`}
+                className={`h-1.5 rounded-full shadow-sm transition-all duration-500 ${idx === currentBanner ? 'w-8 bg-cream' : 'w-2 bg-cream/60 hover:bg-cream'}`}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ============================================================

@@ -425,11 +425,11 @@ const Appearance = () => {
             <FaImage /> Banner Trang chủ
         </h2>
         <p className="text-sm text-stone-500 mb-6 max-w-2xl">
-            Khung banner chiếm toàn bộ chiều ngang màn hình và ~82% chiều cao, ảnh được crop tự động
-            (object-cover) để lấp đầy khung — trên máy tính khung sẽ rất rộng/dẹt (≈21:9), trên điện thoại
-            lại rất cao/hẹp (≈9:16), và ảnh có hiệu ứng zoom nhẹ dần (Ken Burns) nên mép ảnh sẽ bị cắt thêm.
-            Nên chuẩn bị ảnh <b>tối thiểu ~2400px</b> chiều dài, và đặt chủ thể/chữ chính giữa khung hình
-            (tránh sát 2 cạnh trái-phải) để không bị cắt mất khi hiển thị trên điện thoại.
+            Khung banner là khối dọc <b>tỉ lệ cố định 9:16</b>, đóng khung và căn giữa — giống hệt nhau
+            trên cả điện thoại lẫn máy tính (không full-bleed ngang, không đổi tỉ lệ theo màn hình).
+            Nên chuẩn bị ảnh đúng tỉ lệ 9:16 (vd. <b>1080×1920px</b>), ảnh vẫn bị crop nhẹ để lấp khung
+            (object-cover) và có hiệu ứng zoom mờ dần (Ken Burns), nên đặt chủ thể/chữ chính giữa ảnh,
+            tránh sát 4 cạnh.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -491,7 +491,7 @@ const Appearance = () => {
                         onDrop={(event) => { event.preventDefault(); reorderBanners(banner.id); setDraggedBannerId(null); }}
                         onDragEnd={() => setDraggedBannerId(null)}
                         className={`bg-white rounded-xl shadow border overflow-hidden relative group cursor-grab active:cursor-grabbing ${draggedBannerId === banner.id ? 'opacity-40 ring-2 ring-stone-900' : ''}`}>
-                        <div className="aspect-[4/5] w-full bg-stone-100 relative">
+                        <div className="aspect-[9/16] w-full bg-stone-100 relative">
                             <img
                                 src={optimizeImage(banner.image_url, 800)}
                                 alt={banner.title}

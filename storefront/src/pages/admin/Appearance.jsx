@@ -501,14 +501,15 @@ const Appearance = () => {
                                 onContextMenu={(event) => event.preventDefault()}
                                 onError={(e) => {e.target.src = 'https://via.placeholder.com/400x200?text=Lỗi+Ảnh'}}
                             />
-                        </div>
-                        <div className="p-3">
-                            <h4 className="font-bold text-stone-800 text-sm truncate">{banner.title}</h4>
-                            <div className="flex justify-between items-center mt-2">
-                                <span className="text-xs bg-stone-100 px-2 py-1 rounded text-stone-600">Thứ tự: {banner.display_order}</span>
-                                <button onClick={() => handleDelete(banner.id)} className="text-stone-400 hover:text-red-500 transition-colors">
-                                    <FaTrash />
-                                </button>
+                            {/* Đè thông tin lên ảnh (không cộng thêm chiều cao) để cả khung preview giữ đúng 9:16 */}
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10">
+                                <h4 className="font-bold text-white text-sm truncate drop-shadow">{banner.title}</h4>
+                                <div className="flex justify-between items-center mt-2">
+                                    <span className="text-xs bg-white/20 backdrop-blur px-2 py-1 rounded text-white">Thứ tự: {banner.display_order}</span>
+                                    <button onClick={() => handleDelete(banner.id)} className="text-white/85 hover:text-red-400 transition-colors">
+                                        <FaTrash />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

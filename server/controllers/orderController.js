@@ -249,7 +249,8 @@ exports.createOrder = async (req, res) => {
             p_shipping_fee: shipping_fee, 
             p_discount_amount: discount_amount,
             p_voucher_code: voucher_code || null,
-            p_items: cleanItems 
+            p_items: cleanItems,
+            p_note: note || null
         });
 
         if (error) {

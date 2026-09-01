@@ -425,9 +425,9 @@ const Appearance = () => {
             <FaImage /> Banner Trang chủ
         </h2>
         <p className="text-sm text-stone-500 mb-6 max-w-2xl">
-            Khung banner là khối dọc <b>tỉ lệ cố định 9:16</b>, đóng khung và căn giữa — giống hệt nhau
+            Khung banner là khối ngang <b>tỉ lệ cố định 16:9</b>, đóng khung và căn giữa — giống hệt nhau
             trên cả điện thoại lẫn máy tính (không full-bleed ngang, không đổi tỉ lệ theo màn hình).
-            Nên chuẩn bị ảnh đúng tỉ lệ 9:16 (vd. <b>1080×1920px</b>), ảnh vẫn bị crop nhẹ để lấp khung
+            Nên chuẩn bị ảnh đúng tỉ lệ 16:9 (vd. <b>1920×1080px</b>), ảnh vẫn bị crop nhẹ để lấp khung
             (object-cover) và có hiệu ứng zoom mờ dần (Ken Burns), nên đặt chủ thể/chữ chính giữa ảnh,
             tránh sát 4 cạnh.
         </p>
@@ -491,7 +491,7 @@ const Appearance = () => {
                         onDrop={(event) => { event.preventDefault(); reorderBanners(banner.id); setDraggedBannerId(null); }}
                         onDragEnd={() => setDraggedBannerId(null)}
                         className={`bg-white rounded-xl shadow border overflow-hidden relative group cursor-grab active:cursor-grabbing ${draggedBannerId === banner.id ? 'opacity-40 ring-2 ring-stone-900' : ''}`}>
-                        <div className="aspect-[9/16] w-full bg-stone-100 relative">
+                        <div className="aspect-video w-full bg-stone-100 relative">
                             <img
                                 src={optimizeImage(banner.image_url, 800)}
                                 alt={banner.title}

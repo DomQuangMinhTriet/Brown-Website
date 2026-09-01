@@ -104,11 +104,11 @@ const Home = () => {
       <SEO title={t('home.title')} />
 
       {/* ============================================================
-          1. HERO — BANNER khung dọc 9:16 cố định, đóng khung & căn giữa
+          1. HERO — BANNER khung ngang 16:9 cố định, đóng khung & căn giữa
              (đồng nhất trên mọi kích thước màn hình, không full-bleed ngang)
          ============================================================ */}
       <section className="w-full bg-parchment py-8 md:py-12">
-        <div className="relative mx-auto aspect-[9/16] w-full max-w-[420px] overflow-hidden rounded-2xl sm:max-w-[460px] md:max-w-[500px]">
+        <div className="relative mx-auto aspect-video w-full max-w-full overflow-hidden rounded-2xl sm:max-w-[640px] md:max-w-[900px] lg:max-w-[1100px]">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center font-sugo text-4xl tracking-[0.1em] text-muted animate-pulse">BROWN</div>
           ) : banners.length > 0 ? (

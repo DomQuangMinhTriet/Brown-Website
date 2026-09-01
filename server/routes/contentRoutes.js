@@ -22,4 +22,8 @@ router.delete('/lookbook/:id', contentController.deleteLookbook);
 router.get('/policies/:slug', verifyCache(300), contentController.getPolicy);
 router.put('/policies/:slug', requireAuth, contentController.updatePolicy);
 
+// Settings (feature flags, vd. bật/tắt mục Lookbook). Reading is public; changes require an authenticated admin.
+router.get('/settings', verifyCache(300), contentController.getSettings);
+router.put('/settings/:key', requireAuth, contentController.updateSetting);
+
 module.exports = router;

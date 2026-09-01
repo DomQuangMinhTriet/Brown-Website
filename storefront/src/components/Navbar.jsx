@@ -6,12 +6,14 @@ import { FaSearch, FaShoppingBag, FaUser, FaBars, FaTimes, FaGlobe, FaChevronDow
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useSettings } from '../context/SettingsContext';
 import { cachedGet } from '../utils/apiCache';
 
 const Navbar = () => {
   const { cartCount } = useCart();
   const { user, logout } = useAuth();
   const { t, lang, toggleLang } = useLanguage();
+  const { lookbook_enabled } = useSettings();
 
   const [showSearch, setShowSearch] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -122,7 +124,7 @@ const Navbar = () => {
                 </div>
             </div>
 
-            <Link to="/lookbook" className={navLink}>LOOKBOOK</Link>
+            {lookbook_enabled && <Link to="/lookbook" className={navLink}>LOOKBOOK</Link>}
             <Link to="/policy/return" className={navLink}>{t('nav.return_policy')}</Link>
             <Link to="/policy/shipping" className={navLink}>{t('nav.shipping_policy')}</Link>
             <Link to="/policy/care" className={navLink}>{t('nav.care_guide')}</Link>
@@ -215,9 +217,11 @@ const Navbar = () => {
                         </div>
                     </div>
 
-                    <Link to="/lookbook" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-sand py-3 font-heading text-lg text-espresso">
-                         LOOKBOOK
-                    </Link>
+                    {lookbook_enabled && (
+                      <Link to="/lookbook" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-sand py-3 font-heading text-lg text-espresso">
+                           LOOKBOOK
+                      </Link>
+                    )}
                     <Link to="/policy/return" onClick={() => setIsMobileMenuOpen(false)} className="border-b border-sand py-3 font-heading text-lg text-espresso">
                         {t('nav.return_policy')}
                     </Link>

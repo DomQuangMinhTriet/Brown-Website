@@ -10,12 +10,14 @@ import ProductCard from '../components/ui/ProductCard';
 import { isVideoUrl } from '../components/lookbook/blockUtils';
 import { optimizeImage } from '../utils/cloudinaryHelper';
 import { useLanguage } from '../context/LanguageContext';
+import { useSettings } from '../context/SettingsContext';
 import { cachedGet } from '../utils/apiCache';
 
 const EASE = [0.16, 1, 0.3, 1];
 
 const Home = () => {
   const { t, lang } = useLanguage();
+  const { lookbook_enabled } = useSettings();
   const reduce = useReducedMotion();
 
   const [banners, setBanners] = useState([]);
@@ -249,6 +251,7 @@ const Home = () => {
           {/* ============================================================
               4. LOOKBOOK — teaser dẫn tới trang /lookbook
              ============================================================ */}
+          {lookbook_enabled && (
           <section className="bg-cream py-16 md:py-24">
             <Container>
               <div className="mb-8 flex items-end justify-between">
@@ -277,6 +280,7 @@ const Home = () => {
               </div>
             </Container>
           </section>
+          )}
 
           {/* ============================================================
               EDITORIAL — ảnh lớn tràn viền + CTA mua ngay (phá nhịp lưới)

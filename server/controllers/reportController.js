@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { vnStartOfDayISO, vnEndOfDayISO, vnNowParts, vnMonthRange } = require('../utils/timezone');
 
 // A non-inventory product has intentionally no COGS. Do not apply the legacy
 // 70% fallback to it, otherwise a zero COGS line becomes a false loss again.
@@ -9,10 +10,9 @@ const isRevenueAdjustment = (product) =>
 
 exports.getDashboardStats = async (req, res) => {
     try {
-        // [MỚI] Lấy ngày đầu và ngày cuối của tháng hiện tại
-        const date = new Date();
-        const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
-        const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+        // Lấy ngày đầu và ngày cuối của tháng hiện tại, tính theo giờ VN (server chạy UTC trên Railway)
+        const { year: nowYear, month: nowMonth } = vnNowParts();
+        const { startISO: startOfMonth, endISO: endOfMonth } = vnMonthRange(nowYear, nowMonth);
 
         // Tính doanh thu tháng này
         const revenuePromise = supabase.from('orders').select('total_amount')
@@ -71,11 +71,9 @@ exports.getFinancialReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
 
-        // [SỬA 1] CHUẨN HÓA NGÀY THÁNG SANG ISO STRING
-        const startISO = new Date(startDate).toISOString();
-        const endObj = new Date(endDate);
-        endObj.setHours(23, 59, 59, 999);
-        const endISO = endObj.toISOString();
+        // Chuẩn hóa ngày tháng sang ISO string theo giờ VN (không phụ thuộc múi giờ server)
+        const startISO = vnStartOfDayISO(startDate);
+        const endISO = vnEndOfDayISO(endDate);
 
         console.log(`📊 Báo cáo từ ${startISO} đến ${endISO}`);
 
@@ -99,11 +97,13 @@ exports.getFinancialReport = async (req, res) => {
             .gte('created_at', startISO)
             .lte('created_at', endISO);
 
+        // expense_date là cột date (không có giờ/múi giờ) nên so sánh trực tiếp bằng chuỗi ngày,
+        // không dùng startISO/endISO (timestamptz) kẻo bị lệch ngày khi quy đổi qua UTC
         let queryExpenses = supabase
             .from('expenses')
             .select('amount, created_at')
-            .gte('expense_date', startISO)
-            .lte('expense_date', endISO);
+            .gte('expense_date', startDate)
+            .lte('expense_date', endDate);
 
         const [ordersRes, expensesRes] = await Promise.all([queryOrders, queryExpenses]);
 
@@ -196,10 +196,8 @@ exports.getProductSalesReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
 
-        const startISO = new Date(startDate).toISOString();
-        const endObj = new Date(endDate);
-        endObj.setHours(23, 59, 59, 999);
-        const endISO = endObj.toISOString();
+        const startISO = vnStartOfDayISO(startDate);
+        const endISO = vnEndOfDayISO(endDate);
 
         const { data: orders, error } = await supabase
             .from('orders')
@@ -257,20 +255,22 @@ exports.getMonthlyFinancialReport = async (req, res) => {
         const targetMonth = parseInt(month);
         const targetYear = parseInt(year);
 
-        // Tháng hiện tại được chọn
-        const startCurrent = new Date(targetYear, targetMonth - 1, 1).toISOString();
-        const endCurrent = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999).toISOString();
+        // Tháng hiện tại được chọn (tính theo giờ VN)
+        const current = vnMonthRange(targetYear, targetMonth);
 
         // Tháng liền trước đó để so sánh
-        const startPrev = new Date(targetYear, targetMonth - 2, 1).toISOString();
-        const endPrev = new Date(targetYear, targetMonth - 1, 0, 23, 59, 59, 999).toISOString();
+        let prevMonth = targetMonth - 1;
+        let prevYear = targetYear;
+        if (prevMonth < 1) { prevMonth = 12; prevYear -= 1; }
+        const prev = vnMonthRange(prevYear, prevMonth);
 
         // Hàm helper để truy xuất số liệu theo khoảng thời gian
-        const getStatsForPeriod = async (start, end) => {
+        // range: { startISO, endISO } cho created_at (timestamptz), { startDate, endDate } cho expense_date (date)
+        const getStatsForPeriod = async (range) => {
             const [ordersRes, expensesRes] = await Promise.all([
                 supabase.from('orders').select('total_amount, order_items(cogs_total, variants(products(name, tracks_inventory)))')
-                        .in('status', ['completed', 'shipping']).gte('created_at', start).lte('created_at', end),
-                supabase.from('expenses').select('amount').gte('expense_date', start).lte('expense_date', end)
+                        .in('status', ['completed', 'shipping']).gte('created_at', range.startISO).lte('created_at', range.endISO),
+                supabase.from('expenses').select('amount').gte('expense_date', range.startDate).lte('expense_date', range.endDate)
             ]);
 
             const orders = ordersRes.data || [];
@@ -289,8 +289,8 @@ exports.getMonthlyFinancialReport = async (req, res) => {
             return { revenue, cogs, totalExpenses, netProfit, orderCount: orders.length };
         };
 
-        const currentData = await getStatsForPeriod(startCurrent, endCurrent);
-        const prevData = await getStatsForPeriod(startPrev, endPrev);
+        const currentData = await getStatsForPeriod(current);
+        const prevData = await getStatsForPeriod(prev);
 
         res.json({
             success: true,

@@ -37,6 +37,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { HelmetProvider } from 'react-helmet-async';
 import { LanguageProvider } from './context/LanguageContext';
+import { SettingsProvider } from './context/SettingsContext';
 
 // --- Providers Admin ---
 import { AdminAuthProvider } from './context/AdminAuthContext';
@@ -49,16 +50,18 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <HelmetProvider>
       <LanguageProvider>
-        {/* Bọc cả AdminAuth và CustomerAuth */}
-        <AdminAuthProvider>
-          <AuthProvider>
-            <CartProvider>
-              <App />
-              {/* ToastContainer dùng chung cho cả 2 hệ thống */}
-              <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
-            </CartProvider>
-          </AuthProvider>
-        </AdminAuthProvider>
+        <SettingsProvider>
+          {/* Bọc cả AdminAuth và CustomerAuth */}
+          <AdminAuthProvider>
+            <AuthProvider>
+              <CartProvider>
+                <App />
+                {/* ToastContainer dùng chung cho cả 2 hệ thống */}
+                <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+              </CartProvider>
+            </AuthProvider>
+          </AdminAuthProvider>
+        </SettingsProvider>
       </LanguageProvider>
     </HelmetProvider>
   </StrictMode>,

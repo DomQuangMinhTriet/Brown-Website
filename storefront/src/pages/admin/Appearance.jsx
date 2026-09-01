@@ -2,11 +2,12 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import imageCompression from 'browser-image-compression';
-import { FaTrash, FaPlus, FaImage, FaCloudUploadAlt, FaList, FaEye, FaEyeSlash, FaGripVertical, FaQuoteRight, FaVideo } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaImage, FaCloudUploadAlt, FaList, FaEye, FaEyeSlash, FaGripVertical, FaQuoteRight, FaVideo, FaCog } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import LookbookBlocks from '../../components/lookbook/LookbookBlocks';
 import { toLookbookBlock, isVideoUrl } from '../../components/lookbook/blockUtils';
 import { optimizeImage } from '../../utils/cloudinaryHelper';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
 // [AN TOÀN] Nén ảnh (banner/lookbook) ngay trên trình duyệt trước khi upload —
 // giống cách ProductModal đã làm cho ảnh sản phẩm — để tránh 1 ảnh chụp thẳng
@@ -31,6 +32,12 @@ const startBannerReorder = (event, setDraggedBannerId, bannerId) => {
 };
 
 const Appearance = () => {
+  const { supabase } = useAdminAuth();
+
+  // --- STATE CÀI ĐẶT HIỂN THỊ ---
+  const [lookbookEnabled, setLookbookEnabled] = useState(true);
+  const [savingLookbookToggle, setSavingLookbookToggle] = useState(false);
+
   // --- STATE BANNER ---
   const [banners, setBanners] = useState([]); 
   const [loading, setLoading] = useState(true);
@@ -55,11 +62,16 @@ const Appearance = () => {
     try {
       setLoading(true);
       // Gọi các API cùng lúc
-      const [bannerRes, catRes, lookRes] = await Promise.all([
+      const [bannerRes, catRes, lookRes, settingsRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_URL}/api/content/banners`),
           axios.get(`${import.meta.env.VITE_API_URL}/api/categories`),
-          axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } }))
+          axios.get(`${import.meta.env.VITE_API_URL}/api/content/lookbook`).catch(() => ({ data: { data: [] } })),
+          axios.get(`${import.meta.env.VITE_API_URL}/api/content/settings`).catch(() => ({ data: { data: {} } }))
       ]);
+
+      if (settingsRes.data?.data?.lookbook_enabled !== undefined) {
+        setLookbookEnabled(!!settingsRes.data.data.lookbook_enabled);
+      }
 
       // Xử lý Banner
       if (bannerRes.data && Array.isArray(bannerRes.data.data)) {
@@ -81,6 +93,29 @@ const Appearance = () => {
       toast.error("Không tải được dữ liệu giao diện");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ==========================================================
+  // LOGIC CÀI ĐẶT HIỂN THỊ (bật/tắt mục Lookbook trên website)
+  // ==========================================================
+  const handleToggleLookbookEnabled = async () => {
+    const nextValue = !lookbookEnabled;
+    setSavingLookbookToggle(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Phiên đăng nhập đã hết hạn.');
+      await axios.put(
+        `${import.meta.env.VITE_API_URL}/api/content/settings/lookbook_enabled`,
+        { value: nextValue },
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+      setLookbookEnabled(nextValue);
+      toast.success(nextValue ? 'Đã bật hiển thị mục Lookbook' : 'Đã tắt hiển thị mục Lookbook');
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || 'Không thể cập nhật cài đặt.');
+    } finally {
+      setSavingLookbookToggle(false);
     }
   };
 
@@ -361,12 +396,41 @@ const Appearance = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
-      
+
+      {/* --- PHẦN 0: CÀI ĐẶT HIỂN THỊ --- */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-4 flex items-center gap-2">
+            <FaCog /> Cài đặt hiển thị
+        </h2>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-stone-700">Hiển thị mục Lookbook trên website</p>
+            <p className="text-sm text-stone-500">Tắt để ẩn tạm thời link Lookbook (Navbar + trang chủ) trong lúc chưa có ảnh thật.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleLookbookEnabled}
+            disabled={savingLookbookToggle}
+            className={`relative w-14 h-8 rounded-full transition-colors shrink-0 disabled:opacity-50 ${lookbookEnabled ? 'bg-stone-800' : 'bg-stone-300'}`}
+            aria-pressed={lookbookEnabled}
+          >
+            <span className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${lookbookEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </div>
+
       {/* --- PHẦN 1: QUẢN LÝ BANNER (GIỮ NGUYÊN) --- */}
       <div>
-        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-6 flex items-center gap-2">
+        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-2 flex items-center gap-2">
             <FaImage /> Banner Trang chủ
         </h2>
+        <p className="text-sm text-stone-500 mb-6 max-w-2xl">
+            Khung banner chiếm toàn bộ chiều ngang màn hình và ~82% chiều cao, ảnh được crop tự động
+            (object-cover) để lấp đầy khung — trên máy tính khung sẽ rất rộng/dẹt (≈21:9), trên điện thoại
+            lại rất cao/hẹp (≈9:16), và ảnh có hiệu ứng zoom nhẹ dần (Ken Burns) nên mép ảnh sẽ bị cắt thêm.
+            Nên chuẩn bị ảnh <b>tối thiểu ~2400px</b> chiều dài, và đặt chủ thể/chữ chính giữa khung hình
+            (tránh sát 2 cạnh trái-phải) để không bị cắt mất khi hiển thị trên điện thoại.
+        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Form thêm mới */}

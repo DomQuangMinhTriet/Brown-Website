@@ -34,6 +34,7 @@ const CareGuide = lazy(() => import('./pages/policies/CareGuide'));
 import useRealtimeOrder from './hooks/useRealtimeOrder';
 import AdminRoute from './components/AdminRoute';
 import AdminLoadingOverlay from './components/AdminLoadingOverlay';
+import { useSettings } from './context/SettingsContext';
 const Sidebar = lazy(() => import('./components/Sidebar'));
 const Header = lazy(() => import('./components/Header'));
 const AdminLogin = lazy(() => import('./pages/admin/Login'));
@@ -87,6 +88,13 @@ const AdminLayoutWrapper = () => {
       </div>
     </div>
   );
+};
+
+// --- Chặn truy cập /lookbook trực tiếp bằng URL khi admin đã tắt mục này ---
+const LookbookRoute = () => {
+  const { lookbook_enabled } = useSettings();
+  if (!lookbook_enabled) return <div className="p-20 text-center">404 - Page Not Found</div>;
+  return <Lookbook />;
 };
 
 // --- Layout Wrapper cho Storefront (Navbar & Footer) ---
@@ -161,7 +169,7 @@ function App() {
         <Route path="/" element={<StorefrontLayout />}>
            <Route index element={<Home />} />
            <Route path="collection" element={<Collection />} />
-           <Route path="lookbook" element={<Lookbook />} />
+           <Route path="lookbook" element={<LookbookRoute />} />
            <Route path="product/:slug" element={<ProductDetail />} />
            <Route path="cart" element={<Cart />} /> 
            <Route path="checkout" element={<Checkout />} />

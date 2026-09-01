@@ -213,6 +213,50 @@ exports.updateLookbook = async (req, res) => {
     }
 };
 
+// =====================================================================
+// SETTINGS — feature flag đơn giản dạng key-value (vd. bật/tắt mục Lookbook)
+// =====================================================================
+
+// Public: lấy toàn bộ cờ cấu hình dạng { key: value }
+exports.getSettings = async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('content_settings').select('key, value');
+        if (error) throw error;
+        const settings = {};
+        (data || []).forEach((row) => { settings[row.key] = row.value; });
+        res.json({ success: true, data: settings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Admin: bật/tắt một cờ cấu hình
+exports.updateSetting = async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { value } = req.body;
+
+        if (req.user?.email !== ADMIN_EMAIL) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền chỉnh sửa cấu hình.' });
+        }
+        if (typeof value !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'Giá trị cấu hình không hợp lệ.' });
+        }
+
+        const { data, error } = await supabase
+            .from('content_settings')
+            .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+            .select('key, value')
+            .single();
+
+        if (error) throw error;
+        clearCache('/api/content/settings');
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 const POLICY_SLUGS = ['return', 'shipping', 'care'];
 const ADMIN_EMAIL = 'brownvn25@gmail.com';
 
